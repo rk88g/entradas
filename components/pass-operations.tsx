@@ -47,7 +47,10 @@ export function PassOperations({
       <article className="data-card">
         <div className="actions-row" style={{ justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
           <strong className="section-title">Pases</strong>
-          <span className="chip">{profiles.length}</span>
+          <div className="tag-row">
+            {operatingDate ? <span className="chip">{operatingDate.fechaCompleta}</span> : null}
+            <span className="chip">{profiles.length}</span>
+          </div>
         </div>
 
         <MutationBanner state={state} />

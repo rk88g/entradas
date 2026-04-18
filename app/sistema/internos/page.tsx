@@ -8,5 +8,11 @@ export default async function InternosPage() {
     getVisitas()
   ]);
 
-  return <InternalBrowser profiles={profiles} availableVisitors={visitors} />;
+  return (
+    <InternalBrowser
+      profiles={profiles}
+      availableVisitors={visitors}
+      operatingDate={operatingDate?.fechaCompleta ?? null}
+    />
+  );
 }

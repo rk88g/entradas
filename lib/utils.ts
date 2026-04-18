@@ -1,20 +1,38 @@
 import { ListingRecord, PassVisitor, RoleKey, VisitorRecord } from "@/lib/types";
 
 export function formatLongDate(input: string) {
-  return new Intl.DateTimeFormat("es-MX", {
-    weekday: "long",
-    day: "numeric",
-    month: "long",
-    year: "numeric"
-  }).format(new Date(input));
+  try {
+    const value = new Date(input);
+    if (Number.isNaN(value.getTime())) {
+      return input || "-";
+    }
+
+    return new Intl.DateTimeFormat("es-MX", {
+      weekday: "long",
+      day: "numeric",
+      month: "long",
+      year: "numeric"
+    }).format(value);
+  } catch {
+    return input || "-";
+  }
 }
 
 export function formatShortDate(input: string) {
-  return new Intl.DateTimeFormat("es-MX", {
-    day: "2-digit",
-    month: "short",
-    year: "numeric"
-  }).format(new Date(input));
+  try {
+    const value = new Date(input);
+    if (Number.isNaN(value.getTime())) {
+      return input || "-";
+    }
+
+    return new Intl.DateTimeFormat("es-MX", {
+      day: "2-digit",
+      month: "short",
+      year: "numeric"
+    }).format(value);
+  } catch {
+    return input || "-";
+  }
 }
 
 export function formatDateInput(input: Date) {

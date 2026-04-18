@@ -13,10 +13,12 @@ import { formatShortDate } from "@/lib/utils";
 
 export function InternalBrowser({
   profiles,
-  availableVisitors
+  availableVisitors,
+  operatingDate
 }: {
   profiles: InternalProfile[];
   availableVisitors: VisitorRecord[];
+  operatingDate?: string | null;
 }) {
   const [query, setQuery] = useState("");
   const [selectedId, setSelectedId] = useState(profiles[0]?.id ?? "");
@@ -56,7 +58,10 @@ export function InternalBrowser({
       <article className="data-card">
         <div className="actions-row" style={{ justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
           <strong className="section-title">Internos</strong>
-          <span className="chip">{profiles.length}</span>
+          <div className="tag-row">
+            {operatingDate ? <span className="chip">{operatingDate}</span> : null}
+            <span className="chip">{profiles.length}</span>
+          </div>
         </div>
 
         <div className="field" style={{ marginBottom: "1rem" }}>

@@ -8,10 +8,12 @@ import { InternalRecord, VisitorRecord } from "@/lib/types";
 
 export function VisitorManager({
   visitors,
-  internals
+  internals,
+  operatingDate
 }: {
   visitors: VisitorRecord[];
   internals: InternalRecord[];
+  operatingDate?: string | null;
 }) {
   const [state, action, pending] = useActionState(createVisitorAction, mutationInitialState);
 
@@ -20,7 +22,10 @@ export function VisitorManager({
       <article className="data-card">
         <div className="actions-row" style={{ justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
           <strong className="section-title">Visitas</strong>
-          <span className="chip">{visitors.length}</span>
+          <div className="tag-row">
+            {operatingDate ? <span className="chip">{operatingDate}</span> : null}
+            <span className="chip">{visitors.length}</span>
+          </div>
         </div>
 
         <div className="table-wrap">
