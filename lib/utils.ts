@@ -1,5 +1,15 @@
 import { ListingRecord, PassVisitor, RoleKey, VisitorRecord } from "@/lib/types";
 
+function parseLocalDate(input: string) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(input);
+  if (match) {
+    const [, year, month, day] = match;
+    return new Date(Number(year), Number(month) - 1, Number(day));
+  }
+
+  return new Date(input);
+}
+
 export function getAgeFromDate(input: string) {
   const date = new Date(input);
   if (Number.isNaN(date.getTime())) {
@@ -18,7 +28,7 @@ export function getAgeFromDate(input: string) {
 
 export function formatLongDate(input: string) {
   try {
-    const value = new Date(input);
+    const value = parseLocalDate(input);
     if (Number.isNaN(value.getTime())) {
       return input || "-";
     }
@@ -36,7 +46,7 @@ export function formatLongDate(input: string) {
 
 export function formatShortDate(input: string) {
   try {
-    const value = new Date(input);
+    const value = parseLocalDate(input);
     if (Number.isNaN(value.getTime())) {
       return input || "-";
     }
@@ -73,6 +83,12 @@ export function getTodayDate() {
 export function getTomorrowDate() {
   const date = new Date();
   date.setDate(date.getDate() + 1);
+  return formatDateInput(date);
+}
+
+export function getDateOffset(offset: number) {
+  const date = new Date();
+  date.setDate(date.getDate() + offset);
   return formatDateInput(date);
 }
 

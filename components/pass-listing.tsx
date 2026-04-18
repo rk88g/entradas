@@ -7,15 +7,18 @@ import { formatLongDate, formatShortDate, sortListingsForPrint } from "@/lib/uti
 type PrintMode = "agrupado" | "separado" | "entrega";
 
 const activeButtonStyle = {
-  background: "var(--primary)",
-  color: "white",
-  borderColor: "var(--primary)"
+  background: "#dbe3ee",
+  color: "#12233c",
+  borderColor: "#dbe3ee"
 } as const;
 
 const listingButtonStyle = {
   flex: "1 1 180px",
   minWidth: "180px",
-  justifyContent: "center"
+  justifyContent: "center",
+  background: "var(--primary)",
+  color: "white",
+  borderColor: "var(--primary)"
 } as const;
 
 function get618VisibleVisitors(pass: ListingRecord) {
@@ -69,6 +72,54 @@ function renderCompactPass(pass: ListingRecord) {
           <div className="compact-pass-note">{pass.menciones}</div>
         ) : null}
       </div>
+    </article>
+  );
+}
+
+function renderLoosePass(pass: ListingRecord) {
+  const { listedVisitors, underTwelveCount } = get618VisibleVisitors(pass);
+
+  return (
+    <article key={pass.id} className="pass-card">
+      <div className="pass-head">
+        <div>
+          <span className="eyebrow">Pases sueltos</span>
+          <h3 className="pass-title" style={{ marginTop: "0.75rem" }}>
+            {pass.internoUbicacion} {pass.internoNombre}
+          </h3>
+          <div className="muted" style={{ color: "var(--muted)", marginTop: "0.3rem" }}>
+            {formatLongDate(pass.fechaVisita)}
+          </div>
+        </div>
+      </div>
+
+      <div className="visitor-stack">
+        {listedVisitors.map((visitor) => (
+          <div
+            key={`${pass.id}-${visitor.visitorId}`}
+            className={`visitor-pill ${visitor.edad < 18 ? "minor" : ""}`}
+          >
+            {formatCompactVisitorName(visitor)}
+          </div>
+        ))}
+
+        {underTwelveCount > 0 ? (
+          <div className="compact-pass-children">+ {underTwelveCount} menores</div>
+        ) : null}
+      </div>
+
+      {pass.menciones ? (
+        <div
+          className="compact-pass-note"
+          style={{
+            marginTop: "1rem",
+            border: "1px solid rgba(15, 23, 42, 0.16)",
+            background: "#fff8e8"
+          }}
+        >
+          {pass.menciones}
+        </div>
+      ) : null}
     </article>
   );
 }
@@ -144,10 +195,9 @@ export function PassListing({
       : sorted.sueltos.filter((item) => item.area === "INTIMA");
   }, [activeArea, listings, nextDate, openDate, printMode]);
 
-  function printTomorrowList() {
+  function selectDeliveryNumbers() {
     setActiveArea("618");
     setPrintMode("entrega");
-    window.setTimeout(() => window.print(), 80);
   }
 
   function select618() {
@@ -208,7 +258,7 @@ export function PassListing({
           <button
             type="button"
             className="button-secondary"
-            onClick={printTomorrowList}
+            onClick={selectDeliveryNumbers}
             style={{
               ...listingButtonStyle,
               ...(printMode === "entrega" ? activeButtonStyle : {})
@@ -225,10 +275,6 @@ export function PassListing({
           >
             Imprimir
           </button>
-        </div>
-        <div className="tag-row" style={{ marginTop: "0.75rem" }}>
-          {nextDate ? <span className="chip">618 {nextDate}</span> : null}
-          {openDate ? <span className="chip">Sueltos {openDate}</span> : null}
         </div>
       </div>
 
@@ -294,7 +340,7 @@ export function PassListing({
             </div>
           </article>
         ) : printMode === "agrupado" ? (
-          filtered.map((pass) => renderCompactPass(pass))
+          filtered.map((pass) => (pass.area === "INTIMA" ? renderLoosePass(pass) : renderCompactPass(pass)))
         ) : (
           filtered.map((pass) => renderSeparatedCompactPass(pass))
         )}

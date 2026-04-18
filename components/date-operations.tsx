@@ -1,10 +1,10 @@
 "use client";
 
-import { useActionState } from "react";
+import { useActionState, useState } from "react";
 import { closeDateAction, createDateAction, updateClosePasswordAction } from "@/app/sistema/actions";
 import { MutationBanner } from "@/components/mutation-banner";
 import { DateRecord, MutationState, RoleKey } from "@/lib/types";
-import { formatLongDate } from "@/lib/utils";
+import { formatLongDate, getDateOffset } from "@/lib/utils";
 
 const statusLabels = {
   abierto: "Fecha operando",
@@ -30,6 +30,7 @@ export function DateOperations({
   roleKey: RoleKey;
   closePasswordConfigured: boolean;
 }) {
+  const [selectedStatus, setSelectedStatus] = useState<"abierto" | "proximo">("abierto");
   const [createState, createAction, createPending] = useActionState(
     createDateAction,
     mutationInitialState
@@ -45,11 +46,6 @@ export function DateOperations({
       <article className="data-card">
         <div className="actions-row" style={{ justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
           <strong className="section-title">Fechas</strong>
-          <div className="tag-row">
-            {nextDate ? <span className="chip">618 {nextDate.fechaCompleta}</span> : null}
-            {openDate ? <span className="chip">Sueltos {openDate.fechaCompleta}</span> : null}
-            <span className="chip">{dates.length}</span>
-          </div>
         </div>
 
         <div className="mini-list" style={{ marginBottom: "1rem" }}>
@@ -72,9 +68,6 @@ export function DateOperations({
             <article key={date.id} className="calendar-card">
               <div className="record-title">
                 <strong>{formatLongDate(date.fechaCompleta)}</strong>
-                <span>
-                  {date.dia}/{date.mes}/{date.anio}
-                </span>
               </div>
               <div className="chips-row">
                 <span className="chip">{statusLabels[date.estado]}</span>
@@ -96,11 +89,23 @@ export function DateOperations({
         >
           <div className="field">
             <label htmlFor="fecha_completa">Fecha de visita</label>
-            <input id="fecha_completa" name="fecha_completa" type="date" autoComplete="off" />
+            <input
+              id="fecha_completa"
+              name="fecha_completa"
+              type="date"
+              min={getDateOffset(1)}
+              max={getDateOffset(2)}
+              autoComplete="off"
+            />
           </div>
           <div className="field">
             <label htmlFor="estado">Uso de la fecha</label>
-            <select id="estado" name="estado" defaultValue="abierto">
+            <select
+              id="estado"
+              name="estado"
+              value={selectedStatus}
+              onChange={(event) => setSelectedStatus(event.target.value as "abierto" | "proximo")}
+            >
               <option value="abierto">Abierto</option>
               <option value="proximo">Proximo</option>
             </select>
@@ -112,7 +117,7 @@ export function DateOperations({
           </div>
         </form>
 
-        {roleKey === "control" && nextDate ? (
+        {(roleKey === "super-admin" || roleKey === "control") && nextDate ? (
           <>
             <div style={{ height: "1rem" }} />
             <strong className="section-title">Cierre</strong>

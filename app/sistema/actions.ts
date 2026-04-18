@@ -10,7 +10,12 @@ import {
   getOpenDate
 } from "@/lib/supabase/queries";
 import { MutationState } from "@/lib/types";
-import { canChoosePassType, canManageMentions, nextPassNumber } from "@/lib/utils";
+import {
+  canChoosePassType,
+  canManageMentions,
+  getDateOffset,
+  nextPassNumber
+} from "@/lib/utils";
 
 function success(message: string): MutationState {
   return { success: message, error: null };
@@ -79,6 +84,17 @@ export async function createDateAction(
     }
 
     const [openDate, nextDate] = await Promise.all([getOpenDate(), getNextDate()]);
+    const allowedOpenDate = getDateOffset(1);
+    const allowedNextDate = getDateOffset(2);
+
+    if (status === "abierto" && dateValue !== allowedOpenDate) {
+      return failure("La fecha abierta solo puede ser para manana.");
+    }
+
+    if (status === "proximo" && dateValue !== allowedNextDate) {
+      return failure("La fecha proximo solo puede ser para pasado manana.");
+    }
+
     if (status === "abierto" && openDate) {
       return failure("Ya existe una fecha abierta para pases sueltos.");
     }
@@ -116,7 +132,7 @@ export async function closeDateAction(
 ): Promise<MutationState> {
   try {
     const profile = await requireProfile();
-    if (profile.roleKey !== "control") {
+    if (!["super-admin", "control"].includes(profile.roleKey)) {
       return failure("Tu rol no puede cerrar la fecha.");
     }
 
@@ -571,12 +587,22 @@ export async function createPassAction(
       );
     }
 
-    if (area === "618" && (targetDate.cierre || targetDate.estado !== "proximo")) {
+    const canOperateClosedDate = ["super-admin", "control"].includes(profile.roleKey);
+
+    if (area === "618" && targetDate.estado !== "proximo") {
+      return failure("La fecha proximo del 618 no esta disponible.");
+    }
+
+    if (area === "618" && targetDate.cierre && !canOperateClosedDate) {
       return failure("La fecha proximo del 618 ya esta cerrada o no esta disponible.");
     }
 
     if (area === "INTIMA" && targetDate.estado !== "abierto") {
       return failure("La fecha abierta para pases sueltos no esta disponible.");
+    }
+
+    if (area === "INTIMA" && targetDate.cierre && !canOperateClosedDate) {
+      return failure("La fecha abierta para pases sueltos ya esta cerrada.");
     }
 
     if (visitorIds.length === 0) {
