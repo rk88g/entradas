@@ -1,9 +1,9 @@
 "use client";
 
 import { useActionState } from "react";
-import { createDateAction } from "@/app/sistema/actions";
+import { closeDateAction, createDateAction, updateClosePasswordAction } from "@/app/sistema/actions";
 import { MutationBanner } from "@/components/mutation-banner";
-import { DateRecord, MutationState } from "@/lib/types";
+import { DateRecord, MutationState, RoleKey } from "@/lib/types";
 import { formatLongDate } from "@/lib/utils";
 
 const statusLabels = {
@@ -19,13 +19,22 @@ const mutationInitialState: MutationState = {
 
 export function DateOperations({
   dates,
-  operatingDate
+  operatingDate,
+  roleKey,
+  closePasswordConfigured
 }: {
   dates: DateRecord[];
   operatingDate: DateRecord | null;
+  roleKey: RoleKey;
+  closePasswordConfigured: boolean;
 }) {
   const [createState, createAction, createPending] = useActionState(
     createDateAction,
+    mutationInitialState
+  );
+  const [closeState, closeAction, closePending] = useActionState(closeDateAction, mutationInitialState);
+  const [passwordState, passwordAction, passwordPending] = useActionState(
+    updateClosePasswordAction,
     mutationInitialState
   );
 
@@ -99,6 +108,69 @@ export function DateOperations({
             </button>
           </div>
         </form>
+
+        {(roleKey === "super-admin" || roleKey === "control") && operatingDate ? (
+          <>
+            <div style={{ height: "1rem" }} />
+            <strong className="section-title">Cierre</strong>
+            <MutationBanner state={closeState} />
+            <form
+              action={closeAction}
+              className="field-grid"
+              style={{ marginTop: "1rem" }}
+              autoComplete="off"
+            >
+              <input type="hidden" name="fecha_completa" value={operatingDate.fechaCompleta} />
+              <div className="field">
+                <label htmlFor="close_password">Contrasena de cierre</label>
+                <input
+                  id="close_password"
+                  name="close_password"
+                  type="password"
+                  placeholder="Contrasena"
+                  autoComplete="off"
+                />
+              </div>
+              <div className="actions-row">
+                <button className="button-secondary" type="submit" disabled={closePending}>
+                  Cerrar fecha
+                </button>
+              </div>
+            </form>
+          </>
+        ) : null}
+
+        {roleKey === "super-admin" ? (
+          <>
+            <div style={{ height: "1rem" }} />
+            <strong className="section-title">Contrasena</strong>
+            <MutationBanner state={passwordState} />
+            <form
+              action={passwordAction}
+              className="field-grid"
+              style={{ marginTop: "1rem" }}
+              autoComplete="off"
+            >
+              <div className="field">
+                <label htmlFor="new_close_password">
+                  {closePasswordConfigured ? "Nueva contrasena de cierre" : "Crear contrasena de cierre"}
+                </label>
+                <input
+                  id="new_close_password"
+                  name="close_password"
+                  type="password"
+                  placeholder="Contrasena"
+                  autoComplete="off"
+                />
+              </div>
+              <div className="actions-row">
+                <button type="submit" className="button" disabled={passwordPending}>
+                  Guardar contrasena
+                </button>
+              </div>
+            </form>
+          </>
+        ) : null}
       </article>
     </section>
   );

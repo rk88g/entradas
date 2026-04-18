@@ -25,6 +25,7 @@ export interface InternalRecord {
   llego: string;
   libre: string;
   ubicacion: number;
+  telefono: string;
   ubiFiliacion: string;
   clasificacion: AccessArea;
   createdAt: string;

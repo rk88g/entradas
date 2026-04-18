@@ -179,9 +179,6 @@ export function VisitorManager({
               ))}
             </select>
           </div>
-          <div className="field">
-            <input name="relation_parentesco" placeholder="Parentesco con interno" autoComplete="off" />
-          </div>
           <label style={{ display: "flex", gap: "0.6rem", alignItems: "center" }}>
             <input type="checkbox" name="titular" autoComplete="off" />
             Principal

@@ -51,6 +51,7 @@ function mapInternalRecord(item: {
   llego: string;
   libre: string | null;
   ubicacion: number;
+  telefono: string | null;
   ubi_filiacion: string;
   apartado: "618" | "INTIMA";
   observaciones: string | null;
@@ -68,6 +69,7 @@ function mapInternalRecord(item: {
     llego: item.llego,
     libre: item.libre ?? "",
     ubicacion: item.ubicacion,
+    telefono: item.telefono ?? "",
     ubiFiliacion: item.ubi_filiacion,
     clasificacion: item.apartado,
     createdAt: item.created_at,
@@ -167,7 +169,7 @@ async function getInternosMap(
   const { data, error } = await supabase
     .from("internos")
     .select(
-      "id, expediente, nombres, apellido_pat, apellido_mat, nacimiento, llego, libre, ubicacion, ubi_filiacion, apartado, observaciones, created_at, updated_at"
+      "id, expediente, nombres, apellido_pat, apellido_mat, nacimiento, llego, libre, ubicacion, telefono, ubi_filiacion, apartado, observaciones, created_at, updated_at"
     )
     .in("id", internalIds);
 
@@ -336,7 +338,7 @@ export async function getInternos(): Promise<InternalRecord[]> {
   const { data, error } = await supabase
     .from("internos")
     .select(
-      "id, expediente, nombres, apellido_pat, apellido_mat, nacimiento, llego, libre, ubicacion, ubi_filiacion, apartado, observaciones, created_at, updated_at"
+      "id, expediente, nombres, apellido_pat, apellido_mat, nacimiento, llego, libre, ubicacion, telefono, ubi_filiacion, apartado, observaciones, created_at, updated_at"
     )
     .order("ubicacion", { ascending: true });
 
@@ -577,9 +579,8 @@ export async function getInternalProfiles(dateValue?: string): Promise<InternalP
 export async function getListingBuilderData(): Promise<ListingBuilderData> {
   const operatingDate = await getOperatingDate();
   const todayDate = await getDateByValue(getTodayDate());
-  const supabase = await createServerSupabaseClient();
-  const [{ data: closePasswordSetting }, internalProfiles, todaysPasses] = await Promise.all([
-    supabase.from("app_settings").select("key").eq("key", "close_password").maybeSingle(),
+  const [closePasswordConfigured, internalProfiles, todaysPasses] = await Promise.all([
+    getClosePasswordConfigured(),
     getInternalProfiles(operatingDate?.fechaCompleta),
     getListado({ fechaVisita: getTodayDate() })
   ]);
@@ -589,8 +590,19 @@ export async function getListingBuilderData(): Promise<ListingBuilderData> {
     todayDate,
     internalProfiles,
     todaysPasses,
-    closePasswordConfigured: Boolean(closePasswordSetting)
+    closePasswordConfigured
   };
+}
+
+export async function getClosePasswordConfigured() {
+  const supabase = await createServerSupabaseClient();
+  const { data } = await supabase
+    .from("app_settings")
+    .select("key")
+    .eq("key", "close_password")
+    .maybeSingle();
+
+  return Boolean(data);
 }
 
 export async function getDashboardSummary() {

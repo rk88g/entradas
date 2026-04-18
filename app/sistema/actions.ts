@@ -206,6 +206,7 @@ export async function createInternalAction(
       llego: String(formData.get("llego") ?? "").trim() || new Date().toISOString().slice(0, 10),
       libre: String(formData.get("libre") ?? "").trim() || null,
       ubicacion: Number(formData.get("ubicacion") ?? 0),
+      telefono: String(formData.get("telefono") ?? "").trim() || null,
       ubi_filiacion: String(formData.get("ubi_filiacion") ?? "").trim() || "Sin dato",
       apartado: "618",
       observaciones: String(formData.get("observaciones") ?? "").trim() || null,
@@ -261,7 +262,6 @@ export async function createVisitorAction(
     };
 
     const internalId = String(formData.get("interno_id") ?? "").trim();
-    const relationParentesco = String(formData.get("relation_parentesco") ?? "").trim();
     const titular = String(formData.get("titular") ?? "") === "on";
 
     if (
@@ -291,7 +291,7 @@ export async function createVisitorAction(
       const { error: relationError } = await supabase.from("interno_visitas").insert({
         interno_id: internalId,
         visita_id: insertedVisitor.id,
-        parentesco: relationParentesco || visitorPayload.parentesco,
+        parentesco: visitorPayload.parentesco,
         titular,
         created_by: profile.id
       });

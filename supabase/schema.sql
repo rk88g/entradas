@@ -45,6 +45,7 @@ create table if not exists public.internos (
   llego date not null,
   libre date,
   ubicacion integer not null,
+  telefono text,
   ubi_filiacion text not null,
   apartado text not null check (apartado in ('618', 'INTIMA')),
   estatus text not null default 'activo',
@@ -53,6 +54,9 @@ create table if not exists public.internos (
   created_at timestamptz not null default timezone('utc', now()),
   updated_at timestamptz not null default timezone('utc', now())
 );
+
+alter table public.internos
+  add column if not exists telefono text;
 
 create table if not exists public.visitas (
   id uuid primary key default gen_random_uuid(),

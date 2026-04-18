@@ -1,11 +1,7 @@
 "use client";
 
 import { useActionState, useEffect, useMemo, useState } from "react";
-import {
-  closeDateAction,
-  createPassAction,
-  updateClosePasswordAction
-} from "@/app/sistema/actions";
+import { createPassAction } from "@/app/sistema/actions";
 import { MutationBanner } from "@/components/mutation-banner";
 import { StatusBadge } from "@/components/status-badge";
 import { DateRecord, InternalProfile, ListingRecord, MutationState, RoleKey } from "@/lib/types";
@@ -35,30 +31,38 @@ export function PassOperations({
   operatingDate,
   profiles,
   todaysPasses,
-  roleKey,
-  closePasswordConfigured
+  roleKey
 }: {
   operatingDate: DateRecord | null;
   profiles: InternalProfile[];
   todaysPasses: ListingRecord[];
   roleKey: RoleKey;
-  closePasswordConfigured: boolean;
 }) {
   const [query, setQuery] = useState("");
   const [modalInternalId, setModalInternalId] = useState<string | null>(null);
   const [selectionState, setSelectionState] = useState<MutationState>(mutationInitialState);
   const [state, action, pending] = useActionState(createPassAction, mutationInitialState);
-  const [closeState, closeAction, closePending] = useActionState(closeDateAction, mutationInitialState);
-  const [passwordState, passwordAction, passwordPending] = useActionState(
-    updateClosePasswordAction,
-    mutationInitialState
-  );
 
   useEffect(() => {
     if (state.success) {
       setModalInternalId(null);
     }
   }, [state.success]);
+
+  useEffect(() => {
+    if (!modalInternalId) {
+      return;
+    }
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setModalInternalId(null);
+      }
+    };
+
+    window.addEventListener("keydown", handleEscape);
+    return () => window.removeEventListener("keydown", handleEscape);
+  }, [modalInternalId]);
 
   const filteredProfiles = useMemo(() => {
     const normalized = query.trim().toLowerCase();
@@ -168,72 +172,6 @@ export function PassOperations({
               </tbody>
             </table>
           </div>
-        </article>
-
-        <article className="form-card">
-          <div
-            className="actions-row"
-            style={{ justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}
-          >
-            <strong className="section-title">Cierre</strong>
-            {operatingDate ? <span className="chip">{operatingDate.fechaCompleta}</span> : null}
-          </div>
-
-          {(roleKey === "super-admin" || roleKey === "control") && operatingDate ? (
-            <>
-              <MutationBanner state={closeState} />
-              <form
-                action={closeAction}
-                className="field-grid"
-                style={{ marginTop: "1rem" }}
-                autoComplete="off"
-              >
-                <input type="hidden" name="fecha_completa" value={operatingDate.fechaCompleta} />
-                <div className="field">
-                  <input
-                    name="close_password"
-                    type="password"
-                    placeholder="Contrasena de cierre"
-                    autoComplete="off"
-                  />
-                </div>
-                <div className="actions-row">
-                  <button className="button-secondary" type="submit" disabled={closePending}>
-                    Cerrar fecha
-                  </button>
-                </div>
-              </form>
-            </>
-          ) : null}
-
-          {roleKey === "super-admin" ? (
-            <>
-              <div style={{ height: "1rem" }} />
-              <MutationBanner state={passwordState} />
-              <form
-                action={passwordAction}
-                className="field-grid"
-                style={{ marginTop: "1rem" }}
-                autoComplete="off"
-              >
-                <div className="field">
-                  <input
-                    name="close_password"
-                    type="password"
-                    placeholder={
-                      closePasswordConfigured ? "Nueva contrasena de cierre" : "Crear contrasena de cierre"
-                    }
-                    autoComplete="off"
-                  />
-                </div>
-                <div className="actions-row">
-                  <button type="submit" className="button" disabled={passwordPending}>
-                    Guardar contrasena
-                  </button>
-                </div>
-              </form>
-            </>
-          ) : null}
         </article>
 
         <article className="data-card" style={{ gridColumn: "1 / -1" }}>
