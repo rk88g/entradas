@@ -30,34 +30,32 @@ export async function getCurrentUserProfile(): Promise<UserProfile | null> {
     return null;
   }
 
-  const { data: profile } = await supabase
+  const { data: profile, error: profileError } = await supabase
     .from("user_profiles")
-    .select(
-      `
-        id,
-        full_name,
-        active,
-        roles:role_id (
-          key,
-          name
-        )
-      `
-    )
+    .select("id, full_name, role_id, active")
     .eq("id", user.id)
     .maybeSingle();
 
-  if (!profile) {
+  if (profileError || !profile) {
     return null;
   }
 
-  const role = Array.isArray(profile.roles) ? profile.roles[0] : profile.roles;
+  const { data: role, error: roleError } = await supabase
+    .from("roles")
+    .select("key, name")
+    .eq("id", profile.role_id)
+    .maybeSingle();
+
+  if (roleError || !role) {
+    return null;
+  }
 
   return {
     id: profile.id,
     email: user.email ?? "",
     fullName: profile.full_name ?? user.email ?? "Usuario",
-    roleKey: ensureRoleKey(role?.key),
-    roleName: role?.name ?? "Sin rol",
+    roleKey: ensureRoleKey(role.key),
+    roleName: role.name,
     active: Boolean(profile.active)
   };
 }
@@ -234,47 +232,74 @@ export async function getFechas(): Promise<DateRecord[]> {
 
 export async function getListado(): Promise<ListingRecord[]> {
   const supabase = await createServerSupabaseClient();
-  const { data, error } = await supabase
+  const { data: listadoRows, error: listadoError } = await supabase
     .from("listado")
-    .select(
-      `
-        id,
-        interno_id,
-        fecha_visita,
-        apartado,
-        status,
-        menciones,
-        internos:interno_id (
-          nombres,
-          apellido_pat,
-          apellido_mat
-        ),
-        listado_visitas (
-          orden,
-          visitas:visita_id (
-            id,
-            nombres,
-            apellido_pat,
-            apellido_mat,
-            parentesco,
-            edad,
-            menor,
-            betada
-          )
-        )
-      `
-    )
+    .select("id, interno_id, fecha_visita, apartado, status, menciones")
     .order("fecha_visita", { ascending: true });
 
-  if (error || !data) {
+  if (listadoError || !listadoRows) {
     return [];
   }
 
-  return data.map((item) => {
-    const interno = Array.isArray(item.internos) ? item.internos[0] : item.internos;
-    const visitors = (item.listado_visitas ?? [])
+  const internoIds = [...new Set(listadoRows.map((item) => item.interno_id))];
+
+  const [
+    { data: internosRows, error: internosError },
+    { data: listadoVisitasRows, error: listadoVisitasError }
+  ] = await Promise.all([
+    internoIds.length
+      ? supabase
+          .from("internos")
+          .select("id, nombres, apellido_pat, apellido_mat")
+          .in("id", internoIds)
+      : Promise.resolve({ data: [], error: null }),
+    supabase
+      .from("listado_visitas")
+      .select("listado_id, visita_id, orden")
+      .in(
+        "listado_id",
+        listadoRows.map((item) => item.id)
+      )
+  ]);
+
+  if (internosError || listadoVisitasError) {
+    return [];
+  }
+
+  const visitaIds = [...new Set((listadoVisitasRows ?? []).map((item) => item.visita_id))];
+
+  const { data: visitasRows, error: visitasError } = visitaIds.length
+    ? await supabase
+        .from("visitas")
+        .select("id, nombres, apellido_pat, apellido_mat, parentesco, edad, menor, betada")
+        .in("id", visitaIds)
+    : { data: [], error: null };
+
+  if (visitasError) {
+    return [];
+  }
+
+  const internosMap = new Map(
+    (internosRows ?? []).map((item) => [
+      item.id,
+      fullNameFromParts(item.nombres, item.apellido_pat, item.apellido_mat)
+    ])
+  );
+
+  const visitasMap = new Map((visitasRows ?? []).map((item) => [item.id, item]));
+  const listadoVisitasMap = new Map<string, typeof listadoVisitasRows>();
+
+  (listadoVisitasRows ?? []).forEach((item) => {
+    const current = listadoVisitasMap.get(item.listado_id) ?? [];
+    current.push(item);
+    listadoVisitasMap.set(item.listado_id, current);
+  });
+
+  return listadoRows.map((item) => {
+    const visitors = (listadoVisitasMap.get(item.id) ?? [])
+      .sort((a, b) => a.orden - b.orden)
       .map((relation) => {
-        const visitor = Array.isArray(relation.visitas) ? relation.visitas[0] : relation.visitas;
+        const visitor = visitasMap.get(relation.visita_id);
         if (!visitor) {
           return null;
         }
@@ -288,14 +313,12 @@ export async function getListado(): Promise<ListingRecord[]> {
           betada: Boolean(visitor.betada)
         };
       })
-      .filter((visitor) => visitor !== null);
+      .filter((visitor): visitor is NonNullable<typeof visitor> => visitor !== null);
 
     return {
       id: item.id,
       internoId: item.interno_id,
-      internoNombre: interno
-        ? fullNameFromParts(interno.nombres, interno.apellido_pat, interno.apellido_mat)
-        : "Interno sin nombre",
+      internoNombre: internosMap.get(item.interno_id) ?? "Interno sin nombre",
       fechaVisita: item.fecha_visita,
       area: item.apartado,
       createdByRole: "capturador",
