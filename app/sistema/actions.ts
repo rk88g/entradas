@@ -527,6 +527,10 @@ export async function createPassAction(
       return failure("Tu rol no puede capturar menciones.");
     }
 
+    if (mentions && area !== "INTIMA") {
+      return failure("Las menciones solo aplican para pases sueltos.");
+    }
+
     const { data: existingPass } = await supabase
       .from("listado")
       .select("id, status")
@@ -593,7 +597,8 @@ export async function createPassAction(
         .from("listado")
         .update({
           apartado: area,
-          menciones: canManageMentions(profile.roleKey) && mentions ? mentions : null,
+          menciones:
+            area === "INTIMA" && canManageMentions(profile.roleKey) && mentions ? mentions : null,
           updated_at: new Date().toISOString()
         })
         .eq("id", existingPass.id);
@@ -614,7 +619,8 @@ export async function createPassAction(
           status: "capturado",
           numero_pase: null,
           cierre_aplicado: false,
-          menciones: canManageMentions(profile.roleKey) && mentions ? mentions : null,
+          menciones:
+            area === "INTIMA" && canManageMentions(profile.roleKey) && mentions ? mentions : null,
           created_by: profile.id
         })
         .select("id")

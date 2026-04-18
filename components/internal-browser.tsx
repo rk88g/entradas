@@ -1,7 +1,11 @@
 "use client";
 
-import { useActionState, useEffect, useMemo, useState } from "react";
-import { createInternalAction, createPassAction } from "@/app/sistema/actions";
+import { useActionState, useEffect, useMemo, useRef, useState } from "react";
+import {
+  createInternalAction,
+  createPassAction,
+  createVisitorAction
+} from "@/app/sistema/actions";
 import { MutationBanner } from "@/components/mutation-banner";
 import { StatusBadge } from "@/components/status-badge";
 import { InternalProfile, MutationState, RoleKey } from "@/lib/types";
@@ -38,11 +42,17 @@ export function InternalBrowser({
   const [query, setQuery] = useState("");
   const [modalInternalId, setModalInternalId] = useState<string | null>(null);
   const [selectedVisitorIds, setSelectedVisitorIds] = useState<string[]>([]);
+  const [selectedArea, setSelectedArea] = useState<"618" | "INTIMA">("618");
   const [createState, createAction, createPending] = useActionState(
     createInternalAction,
     mutationInitialState
   );
   const [passState, passAction, passPending] = useActionState(createPassAction, mutationInitialState);
+  const [visitorState, visitorAction, visitorPending] = useActionState(
+    createVisitorAction,
+    mutationInitialState
+  );
+  const visitorFormRef = useRef<HTMLFormElement>(null);
 
   const filtered = useMemo(() => {
     const normalized = query.trim().toLowerCase();
@@ -68,6 +78,12 @@ export function InternalBrowser({
   }, [passState.success]);
 
   useEffect(() => {
+    if (visitorState.success) {
+      visitorFormRef.current?.reset();
+    }
+  }, [visitorState.success]);
+
+  useEffect(() => {
     if (!modalInternalId) {
       return;
     }
@@ -82,17 +98,6 @@ export function InternalBrowser({
     return () => window.removeEventListener("keydown", handleEscape);
   }, [modalInternalId]);
 
-  useEffect(() => {
-    if (!selected) {
-      setSelectedVisitorIds([]);
-      return;
-    }
-
-    const currentSelection =
-      selected.currentDatePass?.visitantes.map((visitor) => visitor.visitorId) ?? [];
-    setSelectedVisitorIds(currentSelection);
-  }, [selected]);
-
   const selectedVisitors =
     selected?.visitors.filter((item) => selectedVisitorIds.includes(item.visitaId)) ?? [];
   const availableVisitors =
@@ -104,6 +109,12 @@ export function InternalBrowser({
     selectedAdults.length > 0 &&
     !selectedLock?.blocked &&
     Boolean(operatingDate);
+
+  function openPassModal(profile: InternalProfile) {
+    setSelectedVisitorIds(profile.currentDatePass?.visitantes.map((visitor) => visitor.visitorId) ?? []);
+    setSelectedArea(profile.currentDatePass?.area ?? "618");
+    setModalInternalId(profile.id);
+  }
 
   function toggleVisitor(visitaId: string) {
     setSelectedVisitorIds((current) =>
@@ -156,7 +167,7 @@ export function InternalBrowser({
                   filtered.map((profile) => (
                     <tr
                       key={profile.id}
-                      onClick={() => setModalInternalId(profile.id)}
+                      onClick={() => openPassModal(profile)}
                       style={{ cursor: "pointer" }}
                     >
                       <td>
@@ -229,7 +240,7 @@ export function InternalBrowser({
         >
           <div
             className="form-card"
-            style={{ width: "min(100%, 980px)", maxHeight: "90vh", overflow: "auto" }}
+            style={{ width: "min(100%, 1100px)", maxHeight: "90vh", overflow: "auto" }}
             onClick={(event) => event.stopPropagation()}
           >
             <div
@@ -276,7 +287,7 @@ export function InternalBrowser({
                     <strong>{selectedAdults.length}</strong>
                   </div>
                   <div className="mini-row">
-                    <span>Incluidos en el pase</span>
+                    <span>Incluidos en pase</span>
                     <strong>{selectedVisitors.length}</strong>
                   </div>
                   <div className="mini-row">
@@ -307,122 +318,181 @@ export function InternalBrowser({
               </div>
             ) : null}
 
-            <MutationBanner state={passState} />
-
-            <form
-              action={passAction}
-              className="field-grid"
-              style={{ marginTop: "1rem" }}
-              autoComplete="off"
-            >
-              <input type="hidden" name="interno_id" value={selected.id} />
-
-              {selectedVisitorIds.map((visitorId) => (
-                <input key={visitorId} type="hidden" name="visitor_ids" value={visitorId} />
-              ))}
-
-              {canChoosePassType(roleKey) ? (
-                <div className="field">
-                  <select name="apartado" defaultValue={selected.currentDatePass?.area ?? "618"}>
-                    <option value="618">618</option>
-                    <option value="INTIMA">Suelto</option>
-                  </select>
-                </div>
-              ) : (
-                <input type="hidden" name="apartado" value="618" />
-              )}
-
-              <div className="field" style={{ gridColumn: "1 / -1" }}>
-                <div className="split-grid">
-                  <div className="data-card" style={{ padding: "1rem" }}>
-                    <strong style={{ display: "block", marginBottom: "0.75rem" }}>No vendran</strong>
-                    <div className="mini-list">
-                      {availableVisitors.length === 0 ? (
-                        <div className="mini-row">
-                          <span>Sin registros</span>
-                          <span className="chip">0</span>
-                        </div>
-                      ) : (
-                        availableVisitors.map((item) => (
-                          <button
-                            key={item.id}
-                            type="button"
-                            className="mini-row"
-                            onClick={() => toggleVisitor(item.visitaId)}
-                            style={{
-                              border: "1px solid var(--line)",
-                              borderRadius: "16px",
-                              padding: "0.9rem 1rem",
-                              background: "white",
-                              width: "100%",
-                              textAlign: "left",
-                              cursor: "pointer"
-                            }}
-                          >
-                            <div className="record-title">
-                              <strong>{item.visitor.fullName}</strong>
-                              <span>{item.visitor.edad} anos</span>
-                            </div>
-                          </button>
-                        ))
-                      )}
+            <div className="split-grid" style={{ marginTop: "1rem" }}>
+              <div className="data-card" style={{ padding: "1rem" }}>
+                <strong style={{ display: "block", marginBottom: "0.75rem" }}>No vendran</strong>
+                <div className="mini-list">
+                  {availableVisitors.length === 0 ? (
+                    <div className="mini-row">
+                      <span>Sin registros</span>
+                      <span className="chip">0</span>
                     </div>
-                  </div>
-
-                  <div className="data-card" style={{ padding: "1rem" }}>
-                    <strong style={{ display: "block", marginBottom: "0.75rem" }}>Vendran</strong>
-                    <div className="mini-list">
-                      {selectedVisitors.length === 0 ? (
-                        <div className="mini-row">
-                          <span>Sin registros</span>
-                          <span className="chip">0</span>
+                  ) : (
+                    availableVisitors.map((item) => (
+                      <button
+                        key={item.id}
+                        type="button"
+                        className="mini-row"
+                        onClick={() => toggleVisitor(item.visitaId)}
+                        style={{
+                          border: "1px solid var(--line)",
+                          borderRadius: "16px",
+                          padding: "0.9rem 1rem",
+                          background: "white",
+                          width: "100%",
+                          textAlign: "left",
+                          cursor: "pointer"
+                        }}
+                      >
+                        <div className="record-title">
+                          <strong>{item.visitor.fullName}</strong>
+                          <span>{item.visitor.edad} anos</span>
                         </div>
-                      ) : (
-                        selectedVisitors.map((item) => (
-                          <button
-                            key={item.id}
-                            type="button"
-                            className="mini-row"
-                            onClick={() => toggleVisitor(item.visitaId)}
-                            style={{
-                              border: "1px solid var(--line)",
-                              borderRadius: "16px",
-                              padding: "0.9rem 1rem",
-                              background: "white",
-                              width: "100%",
-                              textAlign: "left",
-                              cursor: "pointer"
-                            }}
-                          >
-                            <div className="record-title">
-                              <strong>{item.visitor.fullName}</strong>
-                              <span>{item.visitor.edad} anos</span>
-                            </div>
-                          </button>
-                        ))
-                      )}
-                    </div>
-                  </div>
+                      </button>
+                    ))
+                  )}
                 </div>
               </div>
 
-              {canManageMentions(roleKey) ? (
-                <div className="field" style={{ gridColumn: "1 / -1" }}>
-                  <textarea
-                    name="menciones"
-                    placeholder="Menciones"
-                    defaultValue={selected.currentDatePass?.menciones ?? ""}
-                    autoComplete="off"
-                  />
+              <div className="data-card" style={{ padding: "1rem" }}>
+                <strong style={{ display: "block", marginBottom: "0.75rem" }}>Vendran</strong>
+                <div className="mini-list">
+                  {selectedVisitors.length === 0 ? (
+                    <div className="mini-row">
+                      <span>Sin registros</span>
+                      <span className="chip">0</span>
+                    </div>
+                  ) : (
+                    selectedVisitors.map((item) => (
+                      <button
+                        key={item.id}
+                        type="button"
+                        className="mini-row"
+                        onClick={() => toggleVisitor(item.visitaId)}
+                        style={{
+                          border: "1px solid var(--line)",
+                          borderRadius: "16px",
+                          padding: "0.9rem 1rem",
+                          background: "white",
+                          width: "100%",
+                          textAlign: "left",
+                          cursor: "pointer"
+                        }}
+                      >
+                        <div className="record-title">
+                          <strong>{item.visitor.fullName}</strong>
+                          <span>{item.visitor.edad} anos</span>
+                        </div>
+                      </button>
+                    ))
+                  )}
                 </div>
-              ) : null}
-
-              <div className="actions-row">
-                <button type="submit" className="button" disabled={passPending || !canSubmitPass}>
-                  {selectedLock?.canEditExisting ? "ACTUALIZAR PASE" : "CREAR PASE"}
-                </button>
               </div>
-            </form>
+            </div>
+
+            <div className="split-grid" style={{ marginTop: "1rem" }}>
+              <div className="data-card" style={{ padding: "1rem" }}>
+                <strong style={{ display: "block", marginBottom: "0.75rem" }}>Nueva visita</strong>
+                <MutationBanner state={visitorState} />
+                <form
+                  ref={visitorFormRef}
+                  action={visitorAction}
+                  className="field-grid"
+                  style={{ marginTop: "1rem" }}
+                  autoComplete="off"
+                >
+                  <input type="hidden" name="interno_id" value={selected.id} />
+                  <div className="field">
+                    <input name="nombres" placeholder="Nombres" autoComplete="off" />
+                  </div>
+                  <div className="field">
+                    <input name="apellido_pat" placeholder="Apellido paterno" autoComplete="off" />
+                  </div>
+                  <div className="field">
+                    <input name="apellido_mat" placeholder="Apellido materno" autoComplete="off" />
+                  </div>
+                  <div className="field">
+                    <input name="fecha_nacimiento" type="date" autoComplete="off" />
+                  </div>
+                  <div className="field">
+                    <select name="sexo" defaultValue="sin-definir">
+                      <option value="sin-definir">Sexo</option>
+                      <option value="hombre">Hombre</option>
+                      <option value="mujer">Mujer</option>
+                    </select>
+                  </div>
+                  <div className="field">
+                    <input name="parentesco" placeholder="Parentesco" autoComplete="off" />
+                  </div>
+                  <div className="field">
+                    <input name="telefono" placeholder="Telefono" autoComplete="off" />
+                  </div>
+                  <div className="field">
+                    <select name="betada" defaultValue="false">
+                      <option value="false">Activa</option>
+                      <option value="true">Betada</option>
+                    </select>
+                  </div>
+                  <div className="field" style={{ gridColumn: "1 / -1" }}>
+                    <textarea name="notas" placeholder="Notas" autoComplete="off" />
+                  </div>
+                  <div className="actions-row">
+                    <button type="submit" className="button-secondary" disabled={visitorPending}>
+                      Guardar visita
+                    </button>
+                  </div>
+                </form>
+              </div>
+
+              <div className="data-card" style={{ padding: "1rem" }}>
+                <MutationBanner state={passState} />
+                <form
+                  action={passAction}
+                  className="field-grid"
+                  style={{ marginTop: "1rem" }}
+                  autoComplete="off"
+                >
+                  <input type="hidden" name="interno_id" value={selected.id} />
+                  {selectedVisitorIds.map((visitorId) => (
+                    <input key={visitorId} type="hidden" name="visitor_ids" value={visitorId} />
+                  ))}
+
+                  {canChoosePassType(roleKey) ? (
+                    <div className="field">
+                      <label htmlFor="apartado">Tipo de pase</label>
+                      <select
+                        id="apartado"
+                        name="apartado"
+                        value={selectedArea}
+                        onChange={(event) => setSelectedArea(event.target.value as "618" | "INTIMA")}
+                      >
+                        <option value="618">618</option>
+                        <option value="INTIMA">Suelto</option>
+                      </select>
+                    </div>
+                  ) : (
+                    <input type="hidden" name="apartado" value="618" />
+                  )}
+
+                  {canManageMentions(roleKey) && selectedArea === "INTIMA" ? (
+                    <div className="field" style={{ gridColumn: "1 / -1" }}>
+                      <textarea
+                        name="menciones"
+                        placeholder="Menciones"
+                        defaultValue={selected.currentDatePass?.area === "INTIMA" ? selected.currentDatePass?.menciones ?? "" : ""}
+                        autoComplete="off"
+                      />
+                    </div>
+                  ) : null}
+
+                  <div className="actions-row">
+                    <button type="submit" className="button" disabled={passPending || !canSubmitPass}>
+                      CREAR PASE
+                    </button>
+                  </div>
+                </form>
+              </div>
+            </div>
           </div>
         </div>
       ) : null}
