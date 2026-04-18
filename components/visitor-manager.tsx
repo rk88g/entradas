@@ -35,8 +35,10 @@ export function VisitorManager({
   operatingDate?: string | null;
   roleKey: RoleKey;
 }) {
+  const pageSize = 20;
   const router = useRouter();
   const [query, setQuery] = useState("");
+  const [page, setPage] = useState(1);
   const [modalVisitorId, setModalVisitorId] = useState<string | null>(null);
   const [createState, createAction, createPending] = useActionState(
     createVisitorAction,
@@ -61,6 +63,9 @@ export function VisitorManager({
       );
     });
   }, [query, visitors]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const paginated = filtered.slice((page - 1) * pageSize, page * pageSize);
 
   const selected = visitors.find((visitor) => visitor.id === modalVisitorId) ?? null;
   const canReassign = roleKey === "super-admin" || roleKey === "control";
@@ -98,6 +103,16 @@ export function VisitorManager({
     return () => window.removeEventListener("keydown", handleEscape);
   }, [modalVisitorId]);
 
+  useEffect(() => {
+    setPage(1);
+  }, [query]);
+
+  useEffect(() => {
+    if (page > totalPages) {
+      setPage(totalPages);
+    }
+  }, [page, totalPages]);
+
   return (
     <>
       <section className="module-grid">
@@ -107,10 +122,6 @@ export function VisitorManager({
             style={{ justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}
           >
             <strong className="section-title">Visitas</strong>
-            <div className="tag-row">
-              {operatingDate ? <span className="chip">{operatingDate}</span> : null}
-              <span className="chip">{visitors.length}</span>
-            </div>
           </div>
 
           <div className="field" style={{ marginBottom: "1rem" }}>
@@ -133,12 +144,12 @@ export function VisitorManager({
                 </tr>
               </thead>
               <tbody>
-                {filtered.length === 0 ? (
+                {paginated.length === 0 ? (
                   <tr>
                     <td colSpan={4}>Sin visitas.</td>
                   </tr>
                 ) : (
-                  filtered.map((visitor) => (
+                  paginated.map((visitor) => (
                     <tr
                       key={visitor.id}
                       onClick={() => setModalVisitorId(visitor.id)}
@@ -162,6 +173,30 @@ export function VisitorManager({
                 )}
               </tbody>
             </table>
+          </div>
+
+          <div className="actions-row" style={{ marginTop: "1rem", justifyContent: "space-between" }}>
+            <span className="muted">
+              Pagina {page} de {totalPages}
+            </span>
+            <div className="actions-row">
+              <button
+                type="button"
+                className="button-soft"
+                onClick={() => setPage((current) => Math.max(1, current - 1))}
+                disabled={page === 1}
+              >
+                Anterior
+              </button>
+              <button
+                type="button"
+                className="button-soft"
+                onClick={() => setPage((current) => Math.min(totalPages, current + 1))}
+                disabled={page === totalPages}
+              >
+                Siguiente
+              </button>
+            </div>
           </div>
         </article>
 

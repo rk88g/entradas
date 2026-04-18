@@ -51,8 +51,10 @@ export function InternalBrowser({
   openDate?: string | null;
   roleKey: RoleKey;
 }) {
+  const pageSize = 20;
   const router = useRouter();
   const [query, setQuery] = useState("");
+  const [page, setPage] = useState(1);
   const [modalInternalId, setModalInternalId] = useState<string | null>(null);
   const [selectedVisitorIds, setSelectedVisitorIds] = useState<string[]>([]);
   const [selectedArea, setSelectedArea] = useState<"618" | "INTIMA">("618");
@@ -80,6 +82,9 @@ export function InternalBrowser({
       );
     });
   }, [profiles, query]);
+
+  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
+  const paginated = filtered.slice((page - 1) * pageSize, page * pageSize);
 
   const selected = profiles.find((item) => item.id === modalInternalId) ?? null;
   const selectedLock = selected
@@ -125,6 +130,16 @@ export function InternalBrowser({
     }
   }, [selected, selectedArea]);
 
+  useEffect(() => {
+    setPage(1);
+  }, [query]);
+
+  useEffect(() => {
+    if (page > totalPages) {
+      setPage(totalPages);
+    }
+  }, [page, totalPages]);
+
   const selectedVisitors =
     selected?.visitors.filter((item) => selectedVisitorIds.includes(item.visitaId)) ?? [];
   const availableVisitors =
@@ -163,11 +178,6 @@ export function InternalBrowser({
             style={{ justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}
           >
             <strong className="section-title">Internos</strong>
-            <div className="tag-row">
-              {nextDate ? <span className="chip">618 {nextDate}</span> : null}
-              {openDate ? <span className="chip">Sueltos {openDate}</span> : null}
-              <span className="chip">{profiles.length}</span>
-            </div>
           </div>
 
           <div className="field" style={{ marginBottom: "1rem" }}>
@@ -190,12 +200,12 @@ export function InternalBrowser({
                 </tr>
               </thead>
               <tbody>
-                {filtered.length === 0 ? (
+                {paginated.length === 0 ? (
                   <tr>
                     <td colSpan={3}>Sin resultados.</td>
                   </tr>
                 ) : (
-                  filtered.map((profile) => (
+                  paginated.map((profile) => (
                     <tr
                       key={profile.id}
                       onClick={() => openPassModal(profile)}
@@ -218,6 +228,30 @@ export function InternalBrowser({
                 )}
               </tbody>
             </table>
+          </div>
+
+          <div className="actions-row" style={{ marginTop: "1rem", justifyContent: "space-between" }}>
+            <span className="muted">
+              Pagina {page} de {totalPages}
+            </span>
+            <div className="actions-row">
+              <button
+                type="button"
+                className="button-soft"
+                onClick={() => setPage((current) => Math.max(1, current - 1))}
+                disabled={page === 1}
+              >
+                Anterior
+              </button>
+              <button
+                type="button"
+                className="button-soft"
+                onClick={() => setPage((current) => Math.min(totalPages, current + 1))}
+                disabled={page === totalPages}
+              >
+                Siguiente
+              </button>
+            </div>
           </div>
         </article>
 
@@ -304,31 +338,11 @@ export function InternalBrowser({
                     <span>Telefono</span>
                     <strong>{selected.telefono || "-"}</strong>
                   </div>
-                  <div className="mini-row">
-                    <span>Fecha 618</span>
-                    <strong>{nextDate ?? "-"}</strong>
-                  </div>
-                  <div className="mini-row">
-                    <span>Fecha sueltos</span>
-                    <strong>{openDate ?? "-"}</strong>
-                  </div>
-                  <div className="mini-row">
-                    <span>Familiares</span>
-                    <strong>{selected.visitors.length}</strong>
-                  </div>
                 </div>
               </div>
 
               <div className="data-card" style={{ padding: "1rem" }}>
                 <div className="mini-list">
-                  <div className="mini-row">
-                    <span>Adultos seleccionados</span>
-                    <strong>{selectedAdults.length}</strong>
-                  </div>
-                  <div className="mini-row">
-                    <span>Incluidos en pase</span>
-                    <strong>{selectedVisitors.length}</strong>
-                  </div>
                   <div className="mini-row">
                     <span>Estatus</span>
                     {selectedLock?.currentPass ? (
@@ -336,10 +350,6 @@ export function InternalBrowser({
                     ) : (
                       <StatusBadge variant="ok">Sin pase</StatusBadge>
                     )}
-                  </div>
-                  <div className="mini-row">
-                    <span>Fecha del pase</span>
-                    <strong>{selectedLock?.targetDate ?? "-"}</strong>
                   </div>
                 </div>
               </div>

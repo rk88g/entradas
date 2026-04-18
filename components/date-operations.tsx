@@ -117,18 +117,23 @@ export function DateOperations({
           </div>
         </form>
 
-        {(roleKey === "super-admin" || roleKey === "control") && nextDate ? (
+        {roleKey === "super-admin" || roleKey === "control" ? (
           <>
             <div style={{ height: "1rem" }} />
             <strong className="section-title">Cierre</strong>
             <MutationBanner state={closeState} />
+            {!nextDate ? (
+              <MutationBanner
+                state={{ success: null, error: "No hay fecha proximo para cerrar." }}
+              />
+            ) : null}
             <form
               action={closeAction}
               className="field-grid"
               style={{ marginTop: "1rem" }}
               autoComplete="off"
             >
-              <input type="hidden" name="fecha_completa" value={nextDate.fechaCompleta} />
+              <input type="hidden" name="fecha_completa" value={nextDate?.fechaCompleta ?? ""} />
               <div className="field">
                 <label htmlFor="close_password">Contrasena de cierre</label>
                 <input
@@ -140,7 +145,11 @@ export function DateOperations({
                 />
               </div>
               <div className="actions-row">
-                <button className="button-secondary" type="submit" disabled={closePending}>
+                <button
+                  className="button-secondary"
+                  type="submit"
+                  disabled={closePending || !nextDate}
+                >
                   Cerrar fecha 618
                 </button>
               </div>

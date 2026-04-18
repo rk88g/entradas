@@ -673,22 +673,33 @@ export async function getClosePasswordConfigured() {
 }
 
 export async function getDashboardSummary() {
-  const tomorrowDate = getTomorrowDate();
-
-  const [listado, visitas, betadas, fechas] = await Promise.all([
+  const [listado, visitas, betadas, fechas, openDate, nextDate] = await Promise.all([
     getListado(),
     getVisitas(),
     getBetadas(),
-    getFechas()
+    getFechas(),
+    getOpenDate(),
+    getNextDate()
   ]);
 
-  const tomorrowListings = listado.filter((item) => item.fechaVisita === tomorrowDate);
-  const listingStats = getStatsFromListings(listado);
+  const relevantListings = listado.filter((item) => {
+    if (nextDate && item.area === "618" && item.fechaVisita === nextDate.fechaCompleta) {
+      return true;
+    }
+
+    if (openDate && item.area === "INTIMA" && item.fechaVisita === openDate.fechaCompleta) {
+      return true;
+    }
+
+    return false;
+  });
+  const listingStats = getStatsFromListings(relevantListings);
 
   return {
-    tomorrowDate,
-    totalTomorrowPasses: tomorrowListings.length,
-    totalTomorrowVisitors: tomorrowListings.reduce((sum, item) => sum + item.visitantes.length, 0),
+    openDate,
+    nextDate,
+    totalTomorrowPasses: relevantListings.length,
+    totalTomorrowVisitors: relevantListings.reduce((sum, item) => sum + item.visitantes.length, 0),
     totalBetadas: betadas.filter((item) => item.activo).length,
     nextOpenDate: fechas.find((item) => item.estado === "abierto") ?? null,
     listingStats,
