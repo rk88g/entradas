@@ -17,6 +17,13 @@ export function formatShortDate(input: string) {
   }).format(new Date(input));
 }
 
+export function fullNameFromParts(...parts: Array<string | null | undefined>) {
+  return parts
+    .map((part) => part?.trim())
+    .filter(Boolean)
+    .join(" ");
+}
+
 export function sortVisitorsByAge<T extends PassVisitor | VisitorRecord>(visitors: T[]): T[] {
   return [...visitors].sort((a, b) => b.edad - a.edad);
 }

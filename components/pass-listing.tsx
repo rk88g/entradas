@@ -1,28 +1,22 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { listado } from "@/lib/mock-data";
-import { AccessArea } from "@/lib/types";
-import {
-  formatLongDate,
-  formatShortDate,
-  getTomorrowDate,
-  sortVisitorsByAge
-} from "@/lib/utils";
 import { StatusBadge } from "@/components/status-badge";
+import { AccessArea, ListingRecord } from "@/lib/types";
+import { formatLongDate, formatShortDate, getTomorrowDate, sortVisitorsByAge } from "@/lib/utils";
 
 const areaLabels: Record<AccessArea, string> = {
   "618": "Pases 618",
   INTIMA: "Pases sueltos INTIMA"
 };
 
-export function PassListing() {
+export function PassListing({ listings }: { listings: ListingRecord[] }) {
   const [activeArea, setActiveArea] = useState<AccessArea>("618");
   const [selectedDate, setSelectedDate] = useState(getTomorrowDate());
 
   const filtered = useMemo(() => {
-    return listado.filter((item) => item.area === activeArea && item.fechaVisita === selectedDate);
-  }, [activeArea, selectedDate]);
+    return listings.filter((item) => item.area === activeArea && item.fechaVisita === selectedDate);
+  }, [activeArea, listings, selectedDate]);
 
   return (
     <section className="module-panel">
@@ -56,8 +50,8 @@ export function PassListing() {
         <div className="note-box">
           <strong>Vista del listado</strong>
           <p className="mini-copy">
-            El sistema te muestra por defecto los pases del día siguiente. Cada interno aparece
-            agrupado en su rectángulo con visitantes ordenados de mayor a menor edad.
+            El sistema muestra los pases reales por fecha y apartado. Cada interno aparece
+            agrupado con visitantes ordenados de mayor a menor edad.
           </p>
         </div>
       </div>
@@ -65,9 +59,9 @@ export function PassListing() {
       <div className="print-zone passes-grid">
         {filtered.length === 0 ? (
           <div className="data-card">
-            <h3>Sin pases para esta combinación</h3>
+            <h3>Sin pases para esta combinacion</h3>
             <p className="muted" style={{ color: "var(--muted)" }}>
-              Cambia la fecha o el apartado para revisar otros pases capturados.
+              Cambia la fecha o el apartado para revisar otros pases registrados.
             </p>
           </div>
         ) : (
@@ -96,7 +90,9 @@ export function PassListing() {
                           ? "ok"
                           : pass.status === "autorizado"
                             ? "warn"
-                            : "off"
+                            : pass.status === "cancelado"
+                              ? "danger"
+                              : "off"
                       }
                     >
                       {pass.status}
@@ -119,7 +115,7 @@ export function PassListing() {
                       >
                         <strong>{visitor.nombre}</strong>
                         <span>{visitor.parentesco}</span>
-                        <span>{visitor.edad} años</span>
+                        <span>{visitor.edad} anos</span>
                         <span>{visitor.menor ? "Menor" : "Adulto"}</span>
                         <span>{visitor.betada ? "Betada" : "Activa"}</span>
                       </div>
@@ -128,7 +124,7 @@ export function PassListing() {
 
                   {pass.area === "INTIMA" && pass.menciones ? (
                     <div className="alert-box">
-                      <strong>Mención para pase suelto</strong>
+                      <strong>Mencion para pase suelto</strong>
                       <p className="mini-copy">{pass.menciones}</p>
                     </div>
                   ) : null}
@@ -141,4 +137,3 @@ export function PassListing() {
     </section>
   );
 }
-

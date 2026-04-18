@@ -3,6 +3,8 @@
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
+import { LogoutButton } from "@/components/logout-button";
+import { UserProfile } from "@/lib/types";
 
 const navItems = [
   { href: "/sistema", icon: "IN", label: "Inicio" },
@@ -15,11 +17,13 @@ const navItems = [
 export function AppShell({
   children,
   title,
-  subtitle
+  subtitle,
+  user
 }: {
   children: React.ReactNode;
   title: string;
   subtitle: string;
+  user: UserProfile;
 }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
@@ -40,7 +44,7 @@ export function AppShell({
                 </div>
               </div>
               <button className="mobile-toggle" onClick={() => setOpen((value) => !value)}>
-                {open ? "×" : "☰"}
+                {open ? "x" : "="}
               </button>
             </div>
 
@@ -50,7 +54,7 @@ export function AppShell({
                   <p className="muted" style={{ margin: 0, color: "var(--muted)" }}>
                     Sistema de control
                   </p>
-                  <h2 style={{ margin: "0.35rem 0 0" }}>Operación intuitiva y rápida</h2>
+                  <h2 style={{ margin: "0.35rem 0 0" }}>Operacion intuitiva y rapida</h2>
                 </div>
               </div>
 
@@ -73,16 +77,14 @@ export function AppShell({
 
               <div className="stack">
                 <div className="note-box">
-                  <strong>Flujo recomendado</strong>
+                  <strong>{user.fullName}</strong>
                   <p className="mini-copy">
-                    Interno → fecha → visitantes → validación → impresión del pase.
+                    {user.roleName} · {user.email}
                   </p>
                 </div>
                 <div className="tag-row">
-                  <span className="role-badge">super-admin</span>
-                  <span className="role-badge">control</span>
-                  <span className="role-badge">supervisor</span>
-                  <span className="role-badge">capturador</span>
+                  <span className="role-badge">{user.roleKey}</span>
+                  <LogoutButton />
                 </div>
               </div>
             </div>
@@ -94,9 +96,9 @@ export function AppShell({
             <div className="app-header">
               <div className="header-actions">
                 <span className="eyebrow" style={{ color: "#0f766e", background: "#d9f2ef" }}>
-                  Operación diaria
+                  Operacion diaria
                 </span>
-                <span className="chip">Diseño 100% responsivo</span>
+                <span className="chip">Diseno 100% responsivo</span>
               </div>
               <div className="header-grid">
                 <div className="stack">
@@ -108,8 +110,12 @@ export function AppShell({
                 <div className="data-card hide-print">
                   <div className="mini-list">
                     <div className="mini-row">
+                      <span>Usuario activo</span>
+                      <strong>{user.fullName}</strong>
+                    </div>
+                    <div className="mini-row">
                       <span>Vista por defecto</span>
-                      <strong>Pases del día siguiente</strong>
+                      <strong>Pases del dia siguiente</strong>
                     </div>
                     <div className="mini-row">
                       <span>Control visual</span>

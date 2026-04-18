@@ -60,12 +60,8 @@ create table if not exists public.visitas (
   apellido_pat text not null,
   apellido_mat text,
   fecha_nacimiento date not null,
-  edad integer generated always as (
-    extract(year from age(current_date, fecha_nacimiento))::integer
-  ) stored,
-  menor boolean generated always as (
-    extract(year from age(current_date, fecha_nacimiento)) < 18
-  ) stored,
+  edad integer not null default 0,
+  menor boolean not null default false,
   parentesco text not null,
   betada boolean not null default false,
   telefono text,
@@ -74,6 +70,17 @@ create table if not exists public.visitas (
   created_at timestamptz not null default timezone('utc', now()),
   updated_at timestamptz not null default timezone('utc', now())
 );
+
+create or replace function public.set_visita_derived_fields()
+returns trigger
+language plpgsql
+as $$
+begin
+  new.edad := extract(year from age(current_date, new.fecha_nacimiento))::integer;
+  new.menor := new.edad < 18;
+  return new;
+end;
+$$;
 
 create table if not exists public.betadas (
   id uuid primary key default gen_random_uuid(),
@@ -189,6 +196,12 @@ before update on public.visitas
 for each row
 execute function public.set_updated_at();
 
+drop trigger if exists visitas_set_derived_fields on public.visitas;
+create trigger visitas_set_derived_fields
+before insert or update of fecha_nacimiento on public.visitas
+for each row
+execute function public.set_visita_derived_fields();
+
 drop trigger if exists betadas_set_updated_at on public.betadas;
 create trigger betadas_set_updated_at
 before update on public.betadas
@@ -226,6 +239,20 @@ as $$
   join public.roles r on r.id = up.role_id
   where up.id = auth.uid();
 $$;
+
+drop policy if exists "read access roles" on public.roles;
+create policy "read access roles"
+on public.roles
+for select
+to authenticated
+using (true);
+
+drop policy if exists "read own profile" on public.user_profiles;
+create policy "read own profile"
+on public.user_profiles
+for select
+to authenticated
+using (id = auth.uid());
 
 drop policy if exists "read access for authenticated users" on public.internos;
 create policy "read access for authenticated users"
@@ -316,4 +343,3 @@ for all
 to authenticated
 using (public.current_role_key() in ('super-admin', 'control', 'supervisor'))
 with check (public.current_role_key() in ('super-admin', 'control', 'supervisor'));
-

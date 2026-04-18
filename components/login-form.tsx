@@ -1,67 +1,80 @@
 "use client";
 
-import Link from "next/link";
-import { roles } from "@/lib/mock-data";
+import { useActionState } from "react";
+import { signInAction, type AuthActionState } from "@/app/auth/actions";
+import { isSupabaseConfigured } from "@/lib/supabase/env";
 
-export function LoginForm() {
+const initialState: AuthActionState = {
+  error: null
+};
+
+function SubmitButton({ disabled }: { disabled: boolean }) {
   return (
-    <form className="login-form stack">
-      <div className="stack">
-        <span className="eyebrow" style={{ color: "#0f766e", background: "#d9f2ef" }}>
-          Inicio del sistema
-        </span>
-        <h2>Acceso seguro para captura y control de pases</h2>
-        <p className="muted" style={{ color: "var(--muted)" }}>
-          La vista inicial ya está pensada como login y prioriza rapidez de captura. Después
-          del acceso, el usuario aterriza en el tablero con los pases del día siguiente.
-        </p>
-      </div>
+    <button type="submit" className="button button-full" disabled={disabled}>
+      Entrar
+    </button>
+  );
+}
+
+export function LoginForm({
+  configured,
+  initialError
+}: {
+  configured: boolean;
+  initialError?: string | null;
+}) {
+  const [state, formAction, pending] = useActionState(signInAction, initialState);
+
+  const disabled = pending || !configured || !isSupabaseConfigured();
+
+  return (
+    <form action={formAction} className="login-form stack">
+      {initialError ? (
+        <div className="alert-box">
+          <p className="mini-copy">{initialError}</p>
+        </div>
+      ) : null}
+
+      {state.error ? (
+        <div className="alert-box">
+          <p className="mini-copy">{state.error}</p>
+        </div>
+      ) : null}
+
+      {!configured ? (
+        <div className="alert-box">
+          <p className="mini-copy">Falta configurar Supabase en las variables de entorno.</p>
+        </div>
+      ) : null}
 
       <div className="field-grid">
         <div className="field">
-          <label htmlFor="usuario">Usuario</label>
-          <input id="usuario" name="usuario" placeholder="capturador.01" />
+          <label htmlFor="email">Correo</label>
+          <input
+            id="email"
+            name="email"
+            type="email"
+            autoComplete="email"
+            placeholder="usuario@institucion.mx"
+            disabled={disabled}
+          />
         </div>
         <div className="field">
-          <label htmlFor="password">Contraseña</label>
-          <input id="password" name="password" type="password" placeholder="••••••••" />
-        </div>
-        <div className="field">
-          <label htmlFor="rol">Rol</label>
-          <select id="rol" defaultValue="capturador">
-            {roles.map((role) => (
-              <option key={role} value={role}>
-                {role}
-              </option>
-            ))}
-          </select>
-          <span className="field-hint" style={{ color: "var(--muted)" }}>
-            Roles contemplados: super-admin, control, supervisor y capturador.
-          </span>
+          <label htmlFor="password">Contrasena</label>
+          <input
+            id="password"
+            name="password"
+            type="password"
+            autoComplete="current-password"
+            placeholder="********"
+            disabled={disabled}
+          />
         </div>
       </div>
 
       <div className="actions-row">
-        <Link href="/sistema" className="button button-full">
-          Entrar al sistema
-        </Link>
-      </div>
-
-      <div className="split-grid">
-        <div className="note-box">
-          <strong>Captura rápida</strong>
-          <p className="mini-copy">
-            Registro de interno, selección de fecha y anexado de visitantes en un flujo corto.
-          </p>
-        </div>
-        <div className="alert-box">
-          <strong>Validación automática</strong>
-          <p className="mini-copy">
-            Si una visita está betada, el sistema la bloquea desde la captura.
-          </p>
-        </div>
+        <SubmitButton disabled={disabled} />
       </div>
     </form>
   );
 }
-

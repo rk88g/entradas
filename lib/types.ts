@@ -3,6 +3,16 @@ export type RoleKey = "super-admin" | "control" | "supervisor" | "capturador";
 export type AccessArea = "618" | "INTIMA";
 
 export type AccessStatus = "abierto" | "proximo" | "cerrado";
+export type PassStatus = "capturado" | "autorizado" | "impreso" | "cancelado";
+
+export interface UserProfile {
+  id: string;
+  email: string;
+  fullName: string;
+  roleKey: RoleKey;
+  roleName: string;
+  active: boolean;
+}
 
 export interface InternalRecord {
   id: string;
@@ -66,9 +76,21 @@ export interface ListingRecord {
   fechaVisita: string;
   area: AccessArea;
   createdByRole: RoleKey;
-  status: "capturado" | "autorizado" | "impreso";
+  status: PassStatus;
   menciones?: string;
   visitantes: PassVisitor[];
+}
+
+export interface BetadaRecord {
+  id: string;
+  fullName: string;
+  nombres: string;
+  apellidoPat: string;
+  apellidoMat: string;
+  fechaNacimiento?: string;
+  motivo: string;
+  activo: boolean;
+  createdAt: string;
 }
 
 export interface DashboardStat {
@@ -76,4 +98,3 @@ export interface DashboardStat {
   value: string;
   hint: string;
 }
-

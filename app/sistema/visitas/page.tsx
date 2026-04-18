@@ -1,16 +1,15 @@
-import { visitas } from "@/lib/mock-data";
-import { sortVisitorsByAge } from "@/lib/utils";
 import { StatusBadge } from "@/components/status-badge";
+import { getBetadas, getVisitas } from "@/lib/supabase/queries";
 
-export default function VisitasPage() {
-  const orderedVisitors = sortVisitorsByAge(visitas);
+export default async function VisitasPage() {
+  const [visitas, betadas] = await Promise.all([getVisitas(), getBetadas()]);
 
   return (
     <section className="module-grid">
       <article className="data-card">
         <div className="record-title" style={{ marginBottom: "1rem" }}>
           <strong className="section-title">Registro de visitas</strong>
-          <span>Consulta rápida con validación de edad, parentesco y estatus de betada.</span>
+          <span>Lectura real desde visitas con historial armado desde historial_ingresos.</span>
         </div>
 
         <div className="table-wrap">
@@ -26,81 +25,60 @@ export default function VisitasPage() {
               </tr>
             </thead>
             <tbody>
-              {orderedVisitors.map((visitor) => (
-                <tr key={visitor.id}>
-                  <td>
-                    <div className="record-title">
-                      <strong>{visitor.fullName}</strong>
-                      <span>{visitor.fechaNacimiento}</span>
-                    </div>
-                  </td>
-                  <td>{visitor.parentesco}</td>
-                  <td>{visitor.edad}</td>
-                  <td>{visitor.menor ? "Sí" : "No"}</td>
-                  <td>
-                    <StatusBadge variant={visitor.betada ? "danger" : "ok"}>
-                      {visitor.betada ? "Betada" : "Activa"}
-                    </StatusBadge>
-                  </td>
-                  <td>{visitor.historialInterno.join(", ")}</td>
+              {visitas.length === 0 ? (
+                <tr>
+                  <td colSpan={6}>No hay visitas para mostrar o falta permiso de lectura.</td>
                 </tr>
-              ))}
+              ) : (
+                visitas.map((visitor) => (
+                  <tr key={visitor.id}>
+                    <td>
+                      <div className="record-title">
+                        <strong>{visitor.fullName}</strong>
+                        <span>{visitor.fechaNacimiento}</span>
+                      </div>
+                    </td>
+                    <td>{visitor.parentesco}</td>
+                    <td>{visitor.edad}</td>
+                    <td>{visitor.menor ? "Si" : "No"}</td>
+                    <td>
+                      <StatusBadge variant={visitor.betada ? "danger" : "ok"}>
+                        {visitor.betada ? "Betada" : "Activa"}
+                      </StatusBadge>
+                    </td>
+                    <td>{visitor.historialInterno.length ? visitor.historialInterno.join(", ") : "-"}</td>
+                  </tr>
+                ))
+              )}
             </tbody>
           </table>
         </div>
       </article>
 
       <article className="form-card">
-        <h3>Alta de visita</h3>
+        <h3>Lista de betadas</h3>
         <p className="muted" style={{ color: "var(--muted)" }}>
-          El flujo considera la lista de betadas para impedir que una persona bloqueada se capture
-          como visita válida.
+          Esta lectura viene de la tabla betadas y sirve para validar bloqueos en captura.
         </p>
-
-        <div className="field-grid" style={{ marginTop: "1rem" }}>
-          <div className="field">
-            <label htmlFor="vnombres">Nombres</label>
-            <input id="vnombres" placeholder="Maria Fernanda" />
-          </div>
-          <div className="field">
-            <label htmlFor="vapepat">Apellido paterno</label>
-            <input id="vapepat" placeholder="Lopez" />
-          </div>
-          <div className="field">
-            <label htmlFor="vapemat">Apellido materno</label>
-            <input id="vapemat" placeholder="Ruiz" />
-          </div>
-          <div className="field">
-            <label htmlFor="vfecha">Fecha de nacimiento</label>
-            <input id="vfecha" type="date" />
-          </div>
-          <div className="field">
-            <label htmlFor="vparentesco">Parentesco</label>
-            <input id="vparentesco" placeholder="Esposa" />
-          </div>
-          <div className="field">
-            <label htmlFor="vinterno">Interno relacionado</label>
-            <input id="vinterno" placeholder="Carlos Mendoza Rivas" />
-          </div>
-          <div className="field">
-            <label htmlFor="vbetada">Estatus</label>
-            <select id="vbetada" defaultValue="false">
-              <option value="false">Activa</option>
-              <option value="true">Betada</option>
-            </select>
-          </div>
-          <div className="field" style={{ gridColumn: "1 / -1" }}>
-            <label htmlFor="vmotivo">Motivo de bloqueo o notas</label>
-            <textarea id="vmotivo" placeholder="Incidencia previa, observaciones, etc." />
-          </div>
-        </div>
-        <div className="actions-row" style={{ marginTop: "1rem" }}>
-          <button type="button" className="button">
-            Guardar visita
-          </button>
-          <button type="button" className="button-soft">
-            Agregar a betadas
-          </button>
+        <div className="mini-list" style={{ marginTop: "1rem" }}>
+          {betadas.length === 0 ? (
+            <div className="mini-row">
+              <span>Sin registros activos</span>
+              <strong>0</strong>
+            </div>
+          ) : (
+            betadas.slice(0, 8).map((item) => (
+              <div key={item.id} className="mini-row">
+                <div className="record-title">
+                  <strong>{item.fullName}</strong>
+                  <span>{item.motivo}</span>
+                </div>
+                <StatusBadge variant={item.activo ? "danger" : "off"}>
+                  {item.activo ? "Activa" : "Inactiva"}
+                </StatusBadge>
+              </div>
+            ))
+          )}
         </div>
       </article>
     </section>

@@ -1,8 +1,9 @@
 import { PassListing } from "@/components/pass-listing";
-import { listado } from "@/lib/mock-data";
+import { getListado } from "@/lib/supabase/queries";
 import { getStatsFromListings } from "@/lib/utils";
 
-export default function ListadoPage() {
+export default async function ListadoPage() {
+  const listado = await getListado();
   const stats = getStatsFromListings(listado);
 
   return (
@@ -22,22 +23,20 @@ export default function ListadoPage() {
           </div>
         </article>
         <article className="quick-card">
-          <h3>Resaltado automático</h3>
+          <h3>Origen</h3>
           <p className="muted" style={{ color: "var(--muted)" }}>
-            Las visitas menores de 12 años aparecen en rojo dentro del pase para revisión visual
-            inmediata.
+            Datos armados desde listado, listado_visitas, internos y visitas.
           </p>
         </article>
         <article className="quick-card">
           <h3>Historial consultable</h3>
           <p className="muted" style={{ color: "var(--muted)" }}>
-            El listado conecta internos, visitas y fecha para poder revisar ingresos previos por
-            interno o por visita.
+            La impresion y el historial ya salen de tu base con agrupacion por interno.
           </p>
         </article>
       </section>
 
-      <PassListing />
+      <PassListing listings={listado} />
     </>
   );
 }

@@ -1,23 +1,34 @@
-import { dashboardStats, fechas, listado } from "@/lib/mock-data";
-import { formatLongDate, getStatsFromListings } from "@/lib/utils";
 import { StatusBadge } from "@/components/status-badge";
+import { getDashboardSummary } from "@/lib/supabase/queries";
+import { formatLongDate } from "@/lib/utils";
 
-export default function SistemaPage() {
-  const stats = getStatsFromListings(listado);
-  const nextDate = fechas.find((item) => item.estado === "abierto");
+export default async function SistemaPage() {
+  const summary = await getDashboardSummary();
 
   return (
     <>
       <section className="stats-grid">
-        {dashboardStats.map((stat) => (
-          <article key={stat.label} className="stat-card">
-            <small>{stat.label}</small>
-            <strong>{stat.value}</strong>
-            <span className="muted" style={{ color: "var(--muted)" }}>
-              {stat.hint}
-            </span>
-          </article>
-        ))}
+        <article className="stat-card">
+          <small>Pases manana</small>
+          <strong>{summary.totalTomorrowPasses}</strong>
+          <span className="muted" style={{ color: "var(--muted)" }}>
+            Registros reales para {summary.tomorrowDate}
+          </span>
+        </article>
+        <article className="stat-card">
+          <small>Visitas activas</small>
+          <strong>{summary.activeVisitors}</strong>
+          <span className="muted" style={{ color: "var(--muted)" }}>
+            Lectura directa desde la tabla visitas
+          </span>
+        </article>
+        <article className="stat-card">
+          <small>Betadas activas</small>
+          <strong>{summary.totalBetadas}</strong>
+          <span className="muted" style={{ color: "var(--muted)" }}>
+            Tomadas desde la tabla betadas
+          </span>
+        </article>
       </section>
 
       <section className="quick-grid">
@@ -26,26 +37,26 @@ export default function SistemaPage() {
           <div className="mini-list">
             <div className="mini-row">
               <span>Total de pases</span>
-              <strong>{stats.totalPasses}</strong>
+              <strong>{summary.listingStats.totalPasses}</strong>
             </div>
             <div className="mini-row">
               <span>Total de visitantes</span>
-              <strong>{stats.totalVisitors}</strong>
+              <strong>{summary.listingStats.totalVisitors}</strong>
             </div>
             <div className="mini-row">
               <span>Menores detectados</span>
-              <strong>{stats.minors}</strong>
+              <strong>{summary.listingStats.minors}</strong>
             </div>
           </div>
         </article>
 
         <article className="quick-card">
-          <h3>Fecha en operación</h3>
-          {nextDate ? (
+          <h3>Fecha en operacion</h3>
+          {summary.nextOpenDate ? (
             <>
               <div className="record-title">
-                <strong>{formatLongDate(nextDate.fechaCompleta)}</strong>
-                <span>Fecha sugerida para captura e impresión</span>
+                <strong>{formatLongDate(summary.nextOpenDate.fechaCompleta)}</strong>
+                <span>Leida desde la tabla fechas</span>
               </div>
               <StatusBadge variant="ok">Abierta</StatusBadge>
             </>
@@ -55,19 +66,19 @@ export default function SistemaPage() {
         </article>
 
         <article className="quick-card">
-          <h3>Flujo sugerido</h3>
+          <h3>Lecturas activas</h3>
           <div className="mini-list">
             <div className="mini-row">
-              <span>1. Registrar interno</span>
-              <span className="chip">Base única</span>
+              <span>internos</span>
+              <span className="chip">Conectado</span>
             </div>
             <div className="mini-row">
-              <span>2. Elegir fecha</span>
-              <span className="chip">Día siguiente</span>
+              <span>visitas y betadas</span>
+              <span className="chip">Conectado</span>
             </div>
             <div className="mini-row">
-              <span>3. Vincular visitas</span>
-              <span className="chip">Sin betadas</span>
+              <span>fechas y listado</span>
+              <span className="chip">Conectado</span>
             </div>
           </div>
         </article>
@@ -76,51 +87,46 @@ export default function SistemaPage() {
       <section className="module-grid">
         <article className="module-panel">
           <div className="record-title">
-            <strong className="section-title">Qué ya quedó contemplado</strong>
-            <span>Diseño responsivo y estructura lista para conectar backend.</span>
+            <strong className="section-title">Conexion real lista</strong>
+            <span>
+              La sesion ya sale de Supabase Auth y el panel lee las tablas con la sesion del
+              usuario autenticado.
+            </span>
           </div>
           <div className="split-grid" style={{ marginTop: "1rem" }}>
             <div className="note-box">
-              <strong>Login como inicio</strong>
-              <p className="mini-copy">
-                La aplicación abre directamente con acceso al sistema y selección de rol.
-              </p>
+              <strong>Auth real</strong>
+              <p className="mini-copy">Correo y contrasena contra Supabase Auth.</p>
             </div>
             <div className="note-box">
-              <strong>Módulos principales</strong>
-              <p className="mini-copy">
-                Interno, Visitas, Listado y Fechas, con foco en operación diaria.
-              </p>
+              <strong>Roles reales</strong>
+              <p className="mini-copy">El rol viene de user_profiles y roles.</p>
             </div>
             <div className="note-box">
-              <strong>Pases 618 e INTIMA</strong>
-              <p className="mini-copy">
-                Separados por apartado, con agrupación por interno y menciones en sueltos.
-              </p>
+              <strong>Lectura protegida</strong>
+              <p className="mini-copy">Las rutas del sistema requieren sesion activa.</p>
             </div>
             <div className="note-box">
-              <strong>Alertas visuales</strong>
-              <p className="mini-copy">
-                Menores de 12 resaltados en rojo y visitas betadas bloqueadas visualmente.
-              </p>
+              <strong>Listado operativo</strong>
+              <p className="mini-copy">Pases e historial se construyen desde listado y listado_visitas.</p>
             </div>
           </div>
         </article>
 
         <article className="form-card">
-          <h3>Próximo paso al conectar Supabase</h3>
+          <h3>Lo que ya debes ver con tu base</h3>
           <div className="mini-list" style={{ marginTop: "1rem" }}>
             <div className="mini-row">
-              <span>Autenticación</span>
-              <strong>Supabase Auth + perfiles</strong>
+              <span>Usuarios</span>
+              <strong>Sesion persistente</strong>
             </div>
             <div className="mini-row">
               <span>Permisos</span>
-              <strong>RLS por rol operativo</strong>
+              <strong>RLS segun tu perfil</strong>
             </div>
             <div className="mini-row">
-              <span>Despliegue</span>
-              <strong>Vercel con variables de entorno</strong>
+              <span>Datos</span>
+              <strong>Tablas reales en pantalla</strong>
             </div>
           </div>
         </article>
