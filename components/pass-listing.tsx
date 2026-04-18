@@ -49,7 +49,6 @@ function renderCompactPass(pass: ListingRecord) {
             className={`compact-pass-visitor ${visitor.edad < 18 ? "minor" : ""}`}
           >
             <span>{visitor.nombre}</span>
-            {visitor.edad < 18 ? <strong>{visitor.edad}</strong> : null}
           </div>
         ))}
 
@@ -57,7 +56,9 @@ function renderCompactPass(pass: ListingRecord) {
           <div className="compact-pass-children">+ {underTwelveCount} menores</div>
         ) : null}
 
-        {pass.menciones ? <div className="compact-pass-note">{pass.menciones}</div> : null}
+        {pass.area === "INTIMA" && pass.menciones ? (
+          <div className="compact-pass-note">{pass.menciones}</div>
+        ) : null}
       </div>
     </article>
   );
@@ -242,11 +243,11 @@ export function PassListing({
                   {groups.map((group) => (
                     <div key={group.key} className="data-card" style={{ padding: "1rem" }}>
                       <h3 style={{ marginTop: 0 }}>{group.title}</h3>
-                      <div className="mini-list">
-                        {group.items.map((visitor) => (
-                          <div
-                            key={visitor.visitorId}
-                            className="mini-row"
+                    <div className="mini-list">
+                      {group.items.map((visitor) => (
+                        <div
+                          key={visitor.visitorId}
+                          className="mini-row"
                             style={{
                               background: visitor.edad < 12 ? "rgba(255,225,225,0.82)" : undefined,
                               color: visitor.edad < 12 ? "#7f1d1d" : undefined,
@@ -256,9 +257,6 @@ export function PassListing({
                           >
                             <div className="record-title">
                               <strong>{visitor.nombre}</strong>
-                              <span>
-                                {visitor.parentesco} - {visitor.edad} anos
-                              </span>
                             </div>
                           </div>
                         ))}
@@ -266,13 +264,6 @@ export function PassListing({
                     </div>
                   ))}
                 </div>
-
-                {pass.menciones ? (
-                  <div className="alert-box" style={{ marginTop: "1rem" }}>
-                    <strong>Mencion</strong>
-                    <p className="mini-copy">{pass.menciones}</p>
-                  </div>
-                ) : null}
               </article>
             );
           })
