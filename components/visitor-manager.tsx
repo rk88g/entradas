@@ -73,6 +73,7 @@ export function VisitorManager({
             value={query}
             onChange={(event) => setQuery(event.target.value)}
             placeholder="Buscar visita o interno"
+            autoComplete="off"
           />
         </div>
 
@@ -125,18 +126,23 @@ export function VisitorManager({
       <article className="form-card">
         <strong className="section-title">Nueva visita</strong>
         <MutationBanner state={createState} />
-        <form action={createAction} className="field-grid" style={{ marginTop: "1rem" }}>
+        <form
+          action={createAction}
+          className="field-grid"
+          style={{ marginTop: "1rem" }}
+          autoComplete="off"
+        >
           <div className="field">
-            <input name="nombres" placeholder="Nombres" />
+            <input name="nombres" placeholder="Nombres" autoComplete="off" />
           </div>
           <div className="field">
-            <input name="apellido_pat" placeholder="Apellido paterno" />
+            <input name="apellido_pat" placeholder="Apellido paterno" autoComplete="off" />
           </div>
           <div className="field">
-            <input name="apellido_mat" placeholder="Apellido materno" />
+            <input name="apellido_mat" placeholder="Apellido materno" autoComplete="off" />
           </div>
           <div className="field">
-            <input name="fecha_nacimiento" type="date" />
+            <input name="fecha_nacimiento" type="date" autoComplete="off" />
           </div>
           <div className="field">
             <select name="sexo" defaultValue="sin-definir">
@@ -146,10 +152,10 @@ export function VisitorManager({
             </select>
           </div>
           <div className="field">
-            <input name="parentesco" placeholder="Parentesco" />
+            <input name="parentesco" placeholder="Parentesco" autoComplete="off" />
           </div>
           <div className="field">
-            <input name="telefono" placeholder="Telefono" />
+            <input name="telefono" placeholder="Telefono" autoComplete="off" />
           </div>
           <div className="field">
             <select name="betada" defaultValue="false">
@@ -170,14 +176,14 @@ export function VisitorManager({
             </select>
           </div>
           <div className="field">
-            <input name="relation_parentesco" placeholder="Parentesco con interno" />
+            <input name="relation_parentesco" placeholder="Parentesco con interno" autoComplete="off" />
           </div>
           <label style={{ display: "flex", gap: "0.6rem", alignItems: "center" }}>
-            <input type="checkbox" name="titular" />
+            <input type="checkbox" name="titular" autoComplete="off" />
             Principal
           </label>
           <div className="field" style={{ gridColumn: "1 / -1" }}>
-            <textarea name="notas" placeholder="Notas" />
+            <textarea name="notas" placeholder="Notas" autoComplete="off" />
           </div>
           <div className="actions-row">
             <button type="submit" className="button" disabled={createPending}>
@@ -243,7 +249,12 @@ export function VisitorManager({
           {canReassign ? (
             <div style={{ marginTop: "1rem" }}>
               <MutationBanner state={reassignState} />
-              <form action={reassignAction} className="field-grid" style={{ marginTop: "1rem" }}>
+              <form
+                action={reassignAction}
+                className="field-grid"
+                style={{ marginTop: "1rem" }}
+                autoComplete="off"
+              >
                 <input type="hidden" name="visita_id" value={selected.id} />
                 <div className="field">
                   <select name="interno_id" defaultValue="" required>
@@ -260,7 +271,7 @@ export function VisitorManager({
                   </select>
                 </div>
                 <div className="field">
-                  <input name="parentesco" placeholder="Parentesco con nuevo interno" />
+                  <input name="parentesco" placeholder="Parentesco con nuevo interno" autoComplete="off" />
                 </div>
                 <div className="actions-row">
                   <button type="submit" className="button-secondary" disabled={reassignPending}>

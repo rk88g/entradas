@@ -6,6 +6,12 @@ import { MutationBanner } from "@/components/mutation-banner";
 import { DateRecord } from "@/lib/types";
 import { formatLongDate } from "@/lib/utils";
 
+const statusLabels = {
+  abierto: "Fecha operando",
+  proximo: "Fecha siguiente",
+  cerrado: "Fecha cerrada"
+} as const;
+
 export function DateOperations({
   dates,
   operatingDate
@@ -29,6 +35,21 @@ export function DateOperations({
           </div>
         </div>
 
+        <div className="mini-list" style={{ marginBottom: "1rem" }}>
+          <div className="mini-row">
+            <span>Abierta</span>
+            <strong>Fecha que se esta operando</strong>
+          </div>
+          <div className="mini-row">
+            <span>Proximo</span>
+            <strong>Fecha siguiente</strong>
+          </div>
+          <div className="mini-row">
+            <span>Cerrado</span>
+            <strong>Fecha finalizada</strong>
+          </div>
+        </div>
+
         <div className="calendar-grid" style={{ marginTop: "1rem" }}>
           {dates.map((date) => (
             <article key={date.id} className="calendar-card">
@@ -39,7 +60,7 @@ export function DateOperations({
                 </span>
               </div>
               <div className="chips-row">
-                <span className="chip">{date.estado}</span>
+                <span className="chip">{statusLabels[date.estado]}</span>
                 <span className="chip">{date.cierre ? "Cerrada" : "Abierta"}</span>
               </div>
             </article>
@@ -50,11 +71,18 @@ export function DateOperations({
       <article className="form-card">
         <strong className="section-title">Nueva fecha</strong>
         <MutationBanner state={createState} />
-        <form action={createAction} className="field-grid" style={{ marginTop: "1rem" }}>
+        <form
+          action={createAction}
+          className="field-grid"
+          style={{ marginTop: "1rem" }}
+          autoComplete="off"
+        >
           <div className="field">
-            <input id="fecha_completa" name="fecha_completa" type="date" />
+            <label htmlFor="fecha_completa">Fecha de visita</label>
+            <input id="fecha_completa" name="fecha_completa" type="date" autoComplete="off" />
           </div>
           <div className="field">
+            <label htmlFor="estado">Uso de la fecha</label>
             <select id="estado" name="estado" defaultValue="abierto">
               <option value="abierto">Abierto</option>
               <option value="proximo">Proximo</option>

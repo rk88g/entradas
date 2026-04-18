@@ -21,6 +21,7 @@ export interface InternalRecord {
   apellidoPat: string;
   apellidoMat: string;
   nacimiento: string;
+  edad: number;
   llego: string;
   libre: string;
   ubicacion: number;

@@ -18,6 +18,7 @@ import {
 } from "@/lib/types";
 import {
   fullNameFromParts,
+  getAgeFromDate,
   getStatsFromListings,
   getTodayDate,
   getTomorrowDate,
@@ -63,6 +64,7 @@ function mapInternalRecord(item: {
     apellidoPat: item.apellido_pat,
     apellidoMat: item.apellido_mat ?? "",
     nacimiento: item.nacimiento,
+    edad: getAgeFromDate(item.nacimiento),
     llego: item.llego,
     libre: item.libre ?? "",
     ubicacion: item.ubicacion,

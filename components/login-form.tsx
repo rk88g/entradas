@@ -28,7 +28,7 @@ export function LoginForm({
   const disabled = pending || !configured || !isSupabaseConfigured();
 
   return (
-    <form action={formAction} className="login-form stack">
+    <form action={formAction} className="login-form stack" autoComplete="off">
       {initialError ? (
         <div className="alert-box">
           <p className="mini-copy">{initialError}</p>
@@ -54,7 +54,7 @@ export function LoginForm({
             id="email"
             name="email"
             type="email"
-            autoComplete="email"
+            autoComplete="off"
             placeholder="usuario@institucion.mx"
             disabled={disabled}
           />
@@ -65,7 +65,7 @@ export function LoginForm({
             id="password"
             name="password"
             type="password"
-            autoComplete="current-password"
+            autoComplete="off"
             placeholder="********"
             disabled={disabled}
           />

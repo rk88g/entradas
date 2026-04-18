@@ -119,6 +119,7 @@ export function PassOperations({
               value={query}
               onChange={(event) => setQuery(event.target.value)}
               placeholder="Buscar interno"
+              autoComplete="off"
             />
           </div>
 
@@ -177,13 +178,19 @@ export function PassOperations({
           {(roleKey === "super-admin" || roleKey === "control") && operatingDate ? (
             <>
               <MutationBanner state={closeState} />
-              <form action={closeAction} className="field-grid" style={{ marginTop: "1rem" }}>
+              <form
+                action={closeAction}
+                className="field-grid"
+                style={{ marginTop: "1rem" }}
+                autoComplete="off"
+              >
                 <input type="hidden" name="fecha_completa" value={operatingDate.fechaCompleta} />
                 <div className="field">
                   <input
                     name="close_password"
                     type="password"
                     placeholder="Contrasena de cierre"
+                    autoComplete="off"
                   />
                 </div>
                 <div className="actions-row">
@@ -199,7 +206,12 @@ export function PassOperations({
             <>
               <div style={{ height: "1rem" }} />
               <MutationBanner state={passwordState} />
-              <form action={passwordAction} className="field-grid" style={{ marginTop: "1rem" }}>
+              <form
+                action={passwordAction}
+                className="field-grid"
+                style={{ marginTop: "1rem" }}
+                autoComplete="off"
+              >
                 <div className="field">
                   <input
                     name="close_password"
@@ -207,6 +219,7 @@ export function PassOperations({
                     placeholder={
                       closePasswordConfigured ? "Nueva contrasena de cierre" : "Crear contrasena de cierre"
                     }
+                    autoComplete="off"
                   />
                 </div>
                 <div className="actions-row">
@@ -297,7 +310,12 @@ export function PassOperations({
 
             <MutationBanner state={state} />
 
-            <form action={action} className="field-grid" style={{ marginTop: "1rem" }}>
+            <form
+              action={action}
+              className="field-grid"
+              style={{ marginTop: "1rem" }}
+              autoComplete="off"
+            >
               <input type="hidden" name="interno_id" value={selected.id} />
 
               {canChoosePassType(roleKey) ? (
@@ -362,6 +380,7 @@ export function PassOperations({
                     placeholder="Menciones"
                     defaultValue={selected.currentDatePass?.menciones ?? ""}
                     disabled={Boolean(operatingDate?.cierre)}
+                    autoComplete="off"
                   />
                 </div>
               ) : null}

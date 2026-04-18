@@ -30,6 +30,16 @@ function parseDateParts(dateValue: string) {
   };
 }
 
+function buildBirthDateFromAge(age: number) {
+  const today = new Date();
+  const birthDate = new Date(today.getFullYear() - age, today.getMonth(), today.getDate());
+  return birthDate.toISOString().slice(0, 10);
+}
+
+function buildInternalExpediente() {
+  return `INT-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+}
+
 async function requireProfile() {
   const profile = await getCurrentUserProfile();
   if (!profile?.active) {
@@ -188,31 +198,33 @@ export async function createInternalAction(
     const profile = await requireProfile();
     const supabase = await createServerSupabaseClient();
 
+    const age = Number(formData.get("edad") ?? 0);
     const payload = {
-      expediente: String(formData.get("expediente") ?? "").trim(),
+      expediente: String(formData.get("expediente") ?? "").trim() || buildInternalExpediente(),
       nombres: String(formData.get("nombres") ?? "").trim(),
       apellido_pat: String(formData.get("apellido_pat") ?? "").trim(),
       apellido_mat: String(formData.get("apellido_mat") ?? "").trim() || null,
-      nacimiento: String(formData.get("nacimiento") ?? "").trim(),
-      llego: String(formData.get("llego") ?? "").trim(),
+      nacimiento: String(formData.get("nacimiento") ?? "").trim() || buildBirthDateFromAge(age),
+      llego: String(formData.get("llego") ?? "").trim() || new Date().toISOString().slice(0, 10),
       libre: String(formData.get("libre") ?? "").trim() || null,
       ubicacion: Number(formData.get("ubicacion") ?? 0),
-      ubi_filiacion: String(formData.get("ubi_filiacion") ?? "").trim(),
+      ubi_filiacion: String(formData.get("ubi_filiacion") ?? "").trim() || "Sin dato",
       apartado: "618",
       observaciones: String(formData.get("observaciones") ?? "").trim() || null,
       created_by: profile.id
     };
 
     if (
-      !payload.expediente ||
       !payload.nombres ||
       !payload.apellido_pat ||
       !payload.nacimiento ||
-      !payload.llego ||
-      !payload.ubicacion ||
-      !payload.ubi_filiacion
+      !payload.ubicacion
     ) {
       return failure("Completa los datos obligatorios.");
+    }
+
+    if (!Number.isFinite(age) || age <= 0) {
+      return failure("La edad del interno debe ser mayor a cero.");
     }
 
     const { error } = await supabase.from("internos").insert(payload);

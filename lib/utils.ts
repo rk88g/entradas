@@ -1,5 +1,21 @@
 import { ListingRecord, PassVisitor, RoleKey, VisitorRecord } from "@/lib/types";
 
+export function getAgeFromDate(input: string) {
+  const date = new Date(input);
+  if (Number.isNaN(date.getTime())) {
+    return 0;
+  }
+
+  const today = new Date();
+  let age = today.getFullYear() - date.getFullYear();
+  const monthDiff = today.getMonth() - date.getMonth();
+  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < date.getDate())) {
+    age -= 1;
+  }
+
+  return Math.max(age, 0);
+}
+
 export function formatLongDate(input: string) {
   try {
     const value = new Date(input);

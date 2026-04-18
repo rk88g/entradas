@@ -3,9 +3,14 @@
 import { useMemo, useState } from "react";
 import { StatusBadge } from "@/components/status-badge";
 import { AccessArea, ListingRecord } from "@/lib/types";
-import { formatLongDate, formatShortDate, sortListingsForPrint } from "@/lib/utils";
+import {
+  formatLongDate,
+  formatShortDate,
+  getTomorrowDate,
+  sortListingsForPrint
+} from "@/lib/utils";
 
-type PrintMode = "agrupado" | "separado";
+type PrintMode = "agrupado" | "separado" | "entrega";
 
 const areaLabels: Record<AccessArea, string> = {
   "618": "Pases 618",
@@ -19,15 +24,24 @@ export function PassListing({
   listings: ListingRecord[];
   initialDate: string;
 }) {
+  const tomorrowDate = getTomorrowDate();
   const [activeArea, setActiveArea] = useState<AccessArea>("618");
   const [printMode, setPrintMode] = useState<PrintMode>("agrupado");
-  const [selectedDate, setSelectedDate] = useState(initialDate);
+  const [selectedDate, setSelectedDate] = useState(initialDate || tomorrowDate);
 
   const filtered = useMemo(() => {
-    const byDate = listings.filter((item) => item.fechaVisita === selectedDate);
+    const targetDate = printMode === "entrega" ? tomorrowDate : selectedDate;
+    const byDate = listings.filter((item) => item.fechaVisita === targetDate);
     const sorted = sortListingsForPrint(byDate);
     return activeArea === "618" ? sorted.byLocation : sorted.sueltos;
-  }, [activeArea, listings, selectedDate]);
+  }, [activeArea, listings, printMode, selectedDate, tomorrowDate]);
+
+  function printTomorrowList() {
+    setActiveArea("618");
+    setPrintMode("entrega");
+    setSelectedDate(tomorrowDate);
+    window.setTimeout(() => window.print(), 80);
+  }
 
   return (
     <section className="module-panel">
@@ -47,7 +61,7 @@ export function PassListing({
           </div>
 
           <div className="segmented">
-            {(["agrupado", "separado"] as PrintMode[]).map((mode) => (
+            {(["agrupado", "separado"] as Exclude<PrintMode, "entrega">[]).map((mode) => (
               <button
                 key={mode}
                 type="button"
@@ -60,16 +74,24 @@ export function PassListing({
           </div>
 
           <div className="field" style={{ minWidth: "220px" }}>
-            <label htmlFor="fecha-listado">Fecha</label>
+            <label htmlFor="fecha-listado">Fecha de pases</label>
             <input
               id="fecha-listado"
               type="date"
               value={selectedDate}
-              onChange={(event) => setSelectedDate(event.target.value)}
+              onChange={(event) => {
+                setPrintMode("agrupado");
+                setSelectedDate(event.target.value);
+              }}
+              autoComplete="off"
             />
           </div>
+
           <button type="button" className="button-secondary" onClick={() => window.print()}>
             Imprimir
+          </button>
+          <button type="button" className="button-secondary" onClick={printTomorrowList}>
+            Lista sig. dia
           </button>
         </div>
       </div>
@@ -79,6 +101,43 @@ export function PassListing({
           <div className="data-card">
             <h3>Sin pases</h3>
           </div>
+        ) : printMode === "entrega" ? (
+          <article className="pass-card">
+            <div className="pass-head">
+              <div>
+                <span className="eyebrow" style={{ color: "#7c2d12", background: "#fef3c7" }}>
+                  Lista de entrega
+                </span>
+                <h3 className="pass-title" style={{ marginTop: "0.7rem" }}>
+                  Pases del dia siguiente
+                </h3>
+                <div className="muted" style={{ color: "var(--muted)", marginTop: "0.4rem" }}>
+                  Fecha: {formatLongDate(tomorrowDate)}
+                </div>
+              </div>
+            </div>
+
+            <div className="table-wrap" style={{ marginTop: "1rem" }}>
+              <table>
+                <thead>
+                  <tr>
+                    <th>No.</th>
+                    <th>Ubicacion</th>
+                    <th>Interno</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {filtered.map((pass) => (
+                    <tr key={pass.id}>
+                      <td>{pass.numeroPase ?? "-"}</td>
+                      <td>{pass.internoUbicacion}</td>
+                      <td>{pass.internoNombre}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </article>
         ) : printMode === "agrupado" ? (
           filtered.map((pass) => (
             <article key={pass.id} className="pass-card">
@@ -117,7 +176,7 @@ export function PassListing({
               <div className="pass-body stack">
                 <div className="record-title">
                   <strong>
-                    {pass.internoNombre} · Ubicacion {pass.internoUbicacion}
+                    {pass.internoNombre} - Ubicacion {pass.internoUbicacion}
                   </strong>
                   <span>Listado del {formatShortDate(pass.fechaVisita)}</span>
                 </div>
@@ -130,7 +189,7 @@ export function PassListing({
                     >
                       <strong>{visitor.nombre}</strong>
                       <span>{visitor.parentesco}</span>
-                      <span>{visitor.edad} años</span>
+                      <span>{visitor.edad} anos</span>
                       <span>{visitor.menor ? "Menor" : "Adulto"}</span>
                       <span>{visitor.sexo}</span>
                     </div>
@@ -164,7 +223,7 @@ export function PassListing({
                       Registro por sexo
                     </h3>
                     <div className="muted" style={{ color: "var(--muted)", marginTop: "0.4rem" }}>
-                      {pass.internoNombre} · Ubicacion {pass.internoUbicacion}
+                      {pass.internoNombre} - Ubicacion {pass.internoUbicacion}
                     </div>
                   </div>
                   {pass.area === "618" && pass.numeroPase ? (
@@ -187,7 +246,7 @@ export function PassListing({
                             <div className="record-title">
                               <strong>{visitor.nombre}</strong>
                               <span>
-                                {visitor.parentesco} · {visitor.edad} años
+                                {visitor.parentesco} - {visitor.edad} anos
                               </span>
                             </div>
                           </div>
@@ -219,7 +278,7 @@ export function PassListing({
                             <div className="record-title">
                               <strong>{visitor.nombre}</strong>
                               <span>
-                                {visitor.parentesco} · {visitor.edad} años
+                                {visitor.parentesco} - {visitor.edad} anos
                               </span>
                             </div>
                           </div>
