@@ -70,7 +70,7 @@ export function AppShell({
         </aside>
 
         <main className="app-main">
-          <section className="app-panel">
+          <section className="app-panel hide-print">
             <div className="record-title">
               <strong className="module-title">{title}</strong>
               <span>{user.fullName}</span>

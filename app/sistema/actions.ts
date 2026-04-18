@@ -647,8 +647,22 @@ export async function createPassAction(
     }
 
     const allowedIds = new Set((relationRows ?? []).map((item) => item.visita_id));
-    if (visitorIds.some((id) => !allowedIds.has(id))) {
-      return failure("Una o mas visitas no pertenecen al interno.");
+    const missingVisitorIds = visitorIds.filter((id) => !allowedIds.has(id));
+    if (missingVisitorIds.length > 0) {
+      const { data: missingVisitors } = await supabase
+        .from("visitas")
+        .select("nombres, apellido_pat, apellido_mat")
+        .in("id", missingVisitorIds);
+
+      const missingNames = (missingVisitors ?? [])
+        .map((item) => [item.nombres, item.apellido_pat, item.apellido_mat].filter(Boolean).join(" "))
+        .filter(Boolean);
+
+      if (missingNames.length > 0) {
+        return failure(`Estas visitas ya no pertenecen al interno: ${missingNames.join(", ")}.`);
+      }
+
+      return failure("Una o mas visitas ya no pertenecen al interno.");
     }
 
     const { data: selectedVisitors, error: visitorError } = await supabase

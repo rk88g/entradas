@@ -120,17 +120,6 @@ export function InternalBrowser({
   }, [modalInternalId]);
 
   useEffect(() => {
-    if (!selected) {
-      return;
-    }
-
-    const pass = getPassForArea(selected, selectedArea);
-    if (pass) {
-      setSelectedVisitorIds(pass.visitantes.map((visitor) => visitor.visitorId));
-    }
-  }, [selected, selectedArea]);
-
-  useEffect(() => {
     setPage(1);
   }, [query]);
 
@@ -155,8 +144,7 @@ export function InternalBrowser({
   function openPassModal(profile: InternalProfile) {
     const defaultArea: "618" | "INTIMA" =
       profile.nextDatePass ? "618" : profile.openDatePass ? "INTIMA" : "618";
-    const pass = getPassForArea(profile, defaultArea);
-    setSelectedVisitorIds(pass?.visitantes.map((visitor) => visitor.visitorId) ?? []);
+    setSelectedVisitorIds([]);
     setSelectedArea(defaultArea);
     setModalInternalId(profile.id);
   }

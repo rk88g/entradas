@@ -128,45 +128,44 @@ function renderSeparatedCompactPass(pass: ListingRecord) {
   const { listedVisitors, underTwelveCount } = get618VisibleVisitors(pass);
   const men = listedVisitors.filter((visitor) => visitor.sexo === "hombre");
   const womenAndMinors = listedVisitors.filter((visitor) => visitor.sexo !== "hombre");
-  const columns = [
-    { key: "men", items: men },
-    { key: "women", items: womenAndMinors }
-  ].filter((column) => column.items.length > 0);
+  const sections = [
+    { key: "men", items: men, includeChildren: false },
+    { key: "women", items: womenAndMinors, includeChildren: underTwelveCount > 0 }
+  ].filter((section) => section.items.length > 0 || section.includeChildren);
 
   return (
-    <article key={pass.id} className="pass-card pass-card-618">
-      <div className="compact-pass-head">
-        <div className="compact-pass-title">
-          <strong>
-            {pass.internoUbicacion} {pass.internoNombre}
-          </strong>
-          <span>{formatShortDate(pass.fechaVisita)}</span>
-        </div>
-        <div className="compact-pass-number">{pass.area === "618" ? pass.numeroPase ?? "-" : ""}</div>
-      </div>
+    <>
+      {sections.map((section) => (
+        <article key={`${pass.id}-${section.key}`} className="pass-card pass-card-618">
+          <div className="compact-pass-head">
+            <div className="compact-pass-title">
+              <strong>
+                {pass.internoUbicacion} {pass.internoNombre}
+              </strong>
+              <span>{formatShortDate(pass.fechaVisita)}</span>
+            </div>
+            <div className="compact-pass-number">
+              {pass.area === "618" ? pass.numeroPase ?? "-" : ""}
+            </div>
+          </div>
 
-      <div
-        className="compact-pass-columns"
-        style={{ gridTemplateColumns: columns.length === 1 ? "minmax(0, 1fr)" : undefined }}
-      >
-        {columns.map((column) => (
-          <div key={column.key} className="compact-pass-column">
-            {column.items.map((visitor) => (
+          <div className="compact-pass-visitors">
+            {section.items.map((visitor) => (
               <div
-                key={`${pass.id}-${visitor.visitorId}`}
+                key={`${pass.id}-${section.key}-${visitor.visitorId}`}
                 className={`compact-pass-visitor ${visitor.edad < 18 ? "minor" : ""}`}
               >
                 <span>{formatCompactVisitorName(visitor)}</span>
               </div>
             ))}
-          </div>
-        ))}
-      </div>
 
-      {underTwelveCount > 0 ? (
-        <div className="compact-pass-children">+ {underTwelveCount} menores</div>
-      ) : null}
-    </article>
+            {section.includeChildren ? (
+              <div className="compact-pass-children">+ {underTwelveCount} menores</div>
+            ) : null}
+          </div>
+        </article>
+      ))}
+    </>
   );
 }
 

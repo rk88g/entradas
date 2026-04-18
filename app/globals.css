@@ -952,8 +952,8 @@ tr:last-child td {
   }
 
   .delivery-print-body {
-    column-count: 2;
-    column-gap: 0.35cm;
+    column-count: 1;
+    column-gap: 0;
   }
 
   .delivery-print-row {
