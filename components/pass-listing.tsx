@@ -173,8 +173,10 @@ export function PassListing({
               <article key={pass.id} className="pass-card pass-card-618">
                 <div className="compact-pass-head">
                   <div className="compact-pass-title">
-                    <strong>{pass.internoUbicacion}</strong>
-                    <span>{pass.internoNombre}</span>
+                    <strong>
+                      {pass.internoUbicacion} {pass.internoNombre}
+                    </strong>
+                    <span>{formatShortDate(pass.fechaVisita)}</span>
                   </div>
                   <div className="compact-pass-number">{pass.numeroPase ?? "-"}</div>
                 </div>
@@ -267,6 +269,10 @@ export function PassListing({
             const womenAndMinors = pass.visitantes.filter(
               (item) => item.sexo === "mujer" || item.menor || item.sexo === "sin-definir"
             );
+            const groups = [
+              { key: "hombres", title: "Hombres", items: men },
+              { key: "mujeres", title: "Mujeres y menores", items: womenAndMinors }
+            ].filter((group) => group.items.length > 0);
 
             return (
               <article key={pass.id} className="pass-card">
@@ -287,40 +293,15 @@ export function PassListing({
                   ) : null}
                 </div>
 
-                <div className="split-grid">
-                  <div className="data-card" style={{ padding: "1rem" }}>
-                    <h3 style={{ marginTop: 0 }}>Hombres</h3>
-                    <div className="mini-list">
-                      {men.length === 0 ? (
-                        <div className="mini-row">
-                          <span>Sin registros</span>
-                          <span className="chip">0</span>
-                        </div>
-                      ) : (
-                        men.map((visitor) => (
-                          <div key={visitor.visitorId} className="mini-row">
-                            <div className="record-title">
-                              <strong>{visitor.nombre}</strong>
-                              <span>
-                                {visitor.parentesco} - {visitor.edad} anos
-                              </span>
-                            </div>
-                          </div>
-                        ))
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="data-card" style={{ padding: "1rem" }}>
-                    <h3 style={{ marginTop: 0 }}>Mujeres y menores</h3>
-                    <div className="mini-list">
-                      {womenAndMinors.length === 0 ? (
-                        <div className="mini-row">
-                          <span>Sin registros</span>
-                          <span className="chip">0</span>
-                        </div>
-                      ) : (
-                        womenAndMinors.map((visitor) => (
+                <div
+                  className="split-grid"
+                  style={{ gridTemplateColumns: groups.length === 1 ? "minmax(0, 1fr)" : undefined }}
+                >
+                  {groups.map((group) => (
+                    <div key={group.key} className="data-card" style={{ padding: "1rem" }}>
+                      <h3 style={{ marginTop: 0 }}>{group.title}</h3>
+                      <div className="mini-list">
+                        {group.items.map((visitor) => (
                           <div
                             key={visitor.visitorId}
                             className="mini-row"
@@ -338,10 +319,10 @@ export function PassListing({
                               </span>
                             </div>
                           </div>
-                        ))
-                      )}
+                        ))}
+                      </div>
                     </div>
-                  </div>
+                  ))}
                 </div>
 
                 {pass.menciones ? (
