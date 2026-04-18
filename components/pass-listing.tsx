@@ -6,21 +6,6 @@ import { formatLongDate, formatShortDate, sortListingsForPrint } from "@/lib/uti
 
 type PrintMode = "agrupado" | "separado" | "entrega";
 
-const activeButtonStyle = {
-  background: "#dbe3ee",
-  color: "#12233c",
-  borderColor: "#dbe3ee"
-} as const;
-
-const listingButtonStyle = {
-  flex: "1 1 180px",
-  minWidth: "180px",
-  justifyContent: "center",
-  background: "var(--primary)",
-  color: "white",
-  borderColor: "var(--primary)"
-} as const;
-
 function get618VisibleVisitors(pass: ListingRecord) {
   const listedVisitors = pass.visitantes.filter((visitor) => visitor.edad >= 12);
   const underTwelveCount = pass.visitantes.filter((visitor) => visitor.edad < 12).length;
@@ -93,30 +78,26 @@ function renderLoosePass(pass: ListingRecord) {
         </div>
       </div>
 
-      <div className="visitor-stack">
+      <div className="visitor-list">
         {listedVisitors.map((visitor) => (
           <div
             key={`${pass.id}-${visitor.visitorId}`}
-            className={`visitor-pill ${visitor.edad < 18 ? "minor" : ""}`}
+            className={`visitor-row ${visitor.edad < 18 ? "minor" : ""}`}
+            style={{ gridTemplateColumns: "1fr" }}
           >
             {formatCompactVisitorName(visitor)}
           </div>
         ))}
 
         {underTwelveCount > 0 ? (
-          <div className="compact-pass-children">+ {underTwelveCount} menores</div>
+          <div className="visitor-row minor" style={{ gridTemplateColumns: "1fr" }}>
+            + {underTwelveCount} menores
+          </div>
         ) : null}
       </div>
 
       {pass.menciones ? (
-        <div
-          className="compact-pass-note"
-          style={{
-            marginTop: "1rem",
-            border: "1px solid rgba(15, 23, 42, 0.16)",
-            background: "#fff8e8"
-          }}
-        >
+        <div className="note-box" style={{ marginTop: "1rem" }}>
           {pass.menciones}
         </div>
       ) : null}
@@ -221,57 +202,40 @@ export function PassListing({
         <div className="toolbar">
           <button
             type="button"
-            className="button-secondary"
+            className={`button-secondary listing-toggle ${activeArea === "618" && printMode === "agrupado" ? "active" : ""}`}
             onClick={select618}
-            style={{
-              ...listingButtonStyle,
-              ...(activeArea === "618" && printMode === "agrupado" ? activeButtonStyle : {})
-            }}
           >
             618
           </button>
 
           <button
             type="button"
-            className="button-secondary"
+            className={`button-secondary listing-toggle ${activeArea === "618" && printMode === "separado" ? "active" : ""}`}
             onClick={selectSeparated618}
-            style={{
-              ...listingButtonStyle,
-              ...(activeArea === "618" && printMode === "separado" ? activeButtonStyle : {})
-            }}
           >
             Hombres / Mujeres
           </button>
 
           <button
             type="button"
-            className="button-secondary"
+            className={`button-secondary listing-toggle ${activeArea === "INTIMA" && printMode === "agrupado" ? "active" : ""}`}
             onClick={selectSueltos}
-            style={{
-              ...listingButtonStyle,
-              ...(activeArea === "INTIMA" && printMode === "agrupado" ? activeButtonStyle : {})
-            }}
           >
             Pases sueltos
           </button>
 
           <button
             type="button"
-            className="button-secondary"
+            className={`button-secondary listing-toggle ${printMode === "entrega" ? "active" : ""}`}
             onClick={selectDeliveryNumbers}
-            style={{
-              ...listingButtonStyle,
-              ...(printMode === "entrega" ? activeButtonStyle : {})
-            }}
           >
             Numeros de pase
           </button>
 
           <button
             type="button"
-            className="button-secondary"
+            className="button-secondary listing-toggle"
             onClick={() => window.print()}
-            style={listingButtonStyle}
           >
             Imprimir
           </button>

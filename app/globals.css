@@ -272,6 +272,32 @@ button {
   color: #f8fafc;
 }
 
+.listing-toggle {
+  flex: 1 1 180px;
+  min-width: 180px;
+  justify-content: center;
+  border: 2px solid #122033;
+  background: #122033 !important;
+  color: #f8fafc !important;
+  box-shadow: none;
+}
+
+.listing-toggle.active {
+  border-color: #8fa0b7;
+  background: #c7d1df !important;
+  color: #12233c !important;
+}
+
+.listing-toggle:hover {
+  background: #1a2b43 !important;
+  color: #f8fafc !important;
+}
+
+.listing-toggle.active:hover {
+  background: #bcc8d8 !important;
+  color: #12233c !important;
+}
+
 .button-soft,
 .segmented-button {
   background: #edf3f9;
