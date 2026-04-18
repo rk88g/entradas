@@ -17,6 +17,16 @@ const areaLabels: Record<AccessArea, string> = {
   INTIMA: "Pases sueltos"
 };
 
+function get618VisibleVisitors(pass: ListingRecord) {
+  const listedVisitors = pass.visitantes.filter((visitor) => visitor.edad >= 12);
+  const underTwelveCount = pass.visitantes.filter((visitor) => visitor.edad < 12).length;
+
+  return {
+    listedVisitors,
+    underTwelveCount
+  };
+}
+
 export function PassListing({
   listings,
   initialDate
@@ -96,7 +106,9 @@ export function PassListing({
         </div>
       </div>
 
-      <div className="print-zone passes-grid">
+      <div
+        className={`print-zone passes-grid ${printMode === "agrupado" && activeArea === "618" ? "compact-618" : ""}`}
+      >
         {filtered.length === 0 ? (
           <div className="data-card">
             <h3>Sin pases</h3>
@@ -157,70 +169,97 @@ export function PassListing({
           </article>
         ) : printMode === "agrupado" ? (
           filtered.map((pass) => (
-            <article key={pass.id} className="pass-card">
-              <div className="pass-head">
-                <div>
-                  <span className="eyebrow" style={{ color: "#7c2d12", background: "#fef3c7" }}>
-                    {areaLabels[pass.area]}
-                  </span>
-                  <h3 className="pass-title" style={{ marginTop: "0.7rem" }}>
-                    Pase de terraza
-                  </h3>
-                  <div className="muted" style={{ color: "var(--muted)", marginTop: "0.4rem" }}>
-                    Fecha: {formatLongDate(pass.fechaVisita)}
+            pass.area === "618" ? (
+              <article key={pass.id} className="pass-card pass-card-618">
+                <div className="compact-pass-head">
+                  <div className="compact-pass-title">
+                    <strong>{pass.internoUbicacion}</strong>
+                    <span>{pass.internoNombre}</span>
                   </div>
-                </div>
-                <div className="stack" style={{ justifyItems: "end" }}>
-                  {pass.area === "618" && pass.numeroPase ? (
-                    <span className="chip">No. {pass.numeroPase}</span>
-                  ) : null}
-                  <StatusBadge
-                    variant={
-                      pass.status === "impreso"
-                        ? "ok"
-                        : pass.status === "autorizado"
-                          ? "warn"
-                          : pass.status === "cancelado"
-                            ? "danger"
-                            : "off"
-                    }
-                  >
-                    {pass.status}
-                  </StatusBadge>
-                </div>
-              </div>
-
-              <div className="pass-body stack">
-                <div className="record-title">
-                  <strong>
-                    {pass.internoNombre} - Ubicacion {pass.internoUbicacion}
-                  </strong>
-                  <span>Listado del {formatShortDate(pass.fechaVisita)}</span>
+                  <div className="compact-pass-number">{pass.numeroPase ?? "-"}</div>
                 </div>
 
-                <div className="visitor-list">
-                  {pass.visitantes.map((visitor) => (
+                <div className="compact-pass-visitors">
+                  {get618VisibleVisitors(pass).listedVisitors.map((visitor) => (
                     <div
                       key={`${pass.id}-${visitor.visitorId}`}
-                      className={`visitor-row ${visitor.edad < 12 ? "minor" : ""}`}
+                      className={`compact-pass-visitor ${visitor.edad < 18 ? "minor" : ""}`}
                     >
-                      <strong>{visitor.nombre}</strong>
-                      <span>{visitor.parentesco}</span>
-                      <span>{visitor.edad} anos</span>
-                      <span>{visitor.menor ? "Menor" : "Adulto"}</span>
-                      <span>{visitor.sexo}</span>
+                      <span>{visitor.nombre}</span>
+                      {visitor.edad < 18 ? <strong>{visitor.edad}</strong> : null}
                     </div>
                   ))}
+
+                  {get618VisibleVisitors(pass).underTwelveCount > 0 ? (
+                    <div className="compact-pass-children">
+                      + {get618VisibleVisitors(pass).underTwelveCount} menores
+                    </div>
+                  ) : null}
+                </div>
+              </article>
+            ) : (
+              <article key={pass.id} className="pass-card">
+                <div className="pass-head">
+                  <div>
+                    <span className="eyebrow" style={{ color: "#7c2d12", background: "#fef3c7" }}>
+                      {areaLabels[pass.area]}
+                    </span>
+                    <h3 className="pass-title" style={{ marginTop: "0.7rem" }}>
+                      Pase de terraza
+                    </h3>
+                    <div className="muted" style={{ color: "var(--muted)", marginTop: "0.4rem" }}>
+                      Fecha: {formatLongDate(pass.fechaVisita)}
+                    </div>
+                  </div>
+                  <div className="stack" style={{ justifyItems: "end" }}>
+                    <StatusBadge
+                      variant={
+                        pass.status === "impreso"
+                          ? "ok"
+                          : pass.status === "autorizado"
+                            ? "warn"
+                            : pass.status === "cancelado"
+                              ? "danger"
+                              : "off"
+                      }
+                    >
+                      {pass.status}
+                    </StatusBadge>
+                  </div>
                 </div>
 
-                {pass.menciones ? (
-                  <div className="alert-box">
-                    <strong>Mencion</strong>
-                    <p className="mini-copy">{pass.menciones}</p>
+                <div className="pass-body stack">
+                  <div className="record-title">
+                    <strong>
+                      {pass.internoNombre} - Ubicacion {pass.internoUbicacion}
+                    </strong>
+                    <span>Listado del {formatShortDate(pass.fechaVisita)}</span>
                   </div>
-                ) : null}
-              </div>
-            </article>
+
+                  <div className="visitor-list">
+                    {pass.visitantes.map((visitor) => (
+                      <div
+                        key={`${pass.id}-${visitor.visitorId}`}
+                        className={`visitor-row ${visitor.edad < 12 ? "minor" : ""}`}
+                      >
+                        <strong>{visitor.nombre}</strong>
+                        <span>{visitor.parentesco}</span>
+                        <span>{visitor.edad} anos</span>
+                        <span>{visitor.menor ? "Menor" : "Adulto"}</span>
+                        <span>{visitor.sexo}</span>
+                      </div>
+                    ))}
+                  </div>
+
+                  {pass.menciones ? (
+                    <div className="alert-box">
+                      <strong>Mencion</strong>
+                      <p className="mini-copy">{pass.menciones}</p>
+                    </div>
+                  ) : null}
+                </div>
+              </article>
+            )
           ))
         ) : (
           filtered.map((pass) => {

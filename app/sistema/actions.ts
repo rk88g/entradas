@@ -581,6 +581,11 @@ export async function createPassAction(
       return failure("Debes incluir al menos un adulto en el pase.");
     }
 
+    const listedVisitorCountFor618 = selectedVisitors.filter((item) => (item.edad ?? 0) >= 12).length;
+    if (area === "618" && listedVisitorCountFor618 > 8) {
+      return failure("El pase 618 solo permite 8 visitas visibles por pase.");
+    }
+
     let passId = existingPass?.id ?? "";
 
     if (canEditExisting && existingPass) {

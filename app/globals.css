@@ -655,6 +655,73 @@ tr:last-child td {
   display: none;
 }
 
+.pass-card-618 {
+  background: #fffefa;
+  border: 1px solid #eadcc0;
+}
+
+.compact-pass-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  margin-bottom: 0.9rem;
+}
+
+.compact-pass-title {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.compact-pass-title strong {
+  font-size: 1.3rem;
+  line-height: 1;
+}
+
+.compact-pass-title span {
+  font-size: 1.15rem;
+  font-weight: 700;
+  line-height: 1.15;
+}
+
+.compact-pass-number {
+  font-size: 2.4rem;
+  font-weight: 900;
+  line-height: 1;
+  color: #122033;
+}
+
+.compact-pass-visitors {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.compact-pass-visitor,
+.compact-pass-children {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.45rem 0.55rem;
+  border-radius: 12px;
+  background: rgba(250, 245, 235, 0.92);
+}
+
+.compact-pass-visitor span {
+  font-weight: 700;
+  line-height: 1.15;
+}
+
+.compact-pass-visitor strong {
+  font-size: 0.95rem;
+}
+
+.compact-pass-visitor.minor,
+.compact-pass-children {
+  color: #b91c1c;
+  background: rgba(255, 225, 225, 0.82);
+}
+
 @media (min-width: 900px) {
   .login-grid {
     grid-template-columns: minmax(0, 1.2fr) minmax(420px, 0.8fr);
@@ -843,6 +910,60 @@ tr:last-child td {
 
   .table-wrap table {
     min-width: 0;
+  }
+
+  .print-zone.compact-618 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.2cm;
+  }
+
+  .print-zone.compact-618 .pass-card-618 {
+    height: 7.95cm;
+    min-height: 7.95cm;
+    padding: 0.32cm;
+    overflow: hidden;
+    break-inside: avoid;
+    page-break-inside: avoid;
+    box-shadow: none;
+    border: 1px solid #d6c4a2;
+  }
+
+  .print-zone.compact-618 .compact-pass-head {
+    margin-bottom: 0.18cm;
+    gap: 0.25cm;
+  }
+
+  .print-zone.compact-618 .compact-pass-title strong {
+    font-size: 1rem;
+  }
+
+  .print-zone.compact-618 .compact-pass-title span {
+    font-size: 0.85rem;
+    line-height: 1.05;
+  }
+
+  .print-zone.compact-618 .compact-pass-number {
+    font-size: 1.9rem;
+  }
+
+  .print-zone.compact-618 .compact-pass-visitors {
+    gap: 0.1cm;
+  }
+
+  .print-zone.compact-618 .compact-pass-visitor,
+  .print-zone.compact-618 .compact-pass-children {
+    padding: 0.12cm 0.14cm;
+    border-radius: 6px;
+    font-size: 0.72rem;
+    line-height: 1.02;
+  }
+
+  .print-zone.compact-618 .compact-pass-visitor span {
+    font-size: 0.72rem;
+  }
+
+  .print-zone.compact-618 .compact-pass-visitor strong {
+    font-size: 0.7rem;
   }
 
   @page {
