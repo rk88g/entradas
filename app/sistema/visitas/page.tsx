@@ -1,19 +1,26 @@
 import { VisitorManager } from "@/components/visitor-manager";
-import { getCurrentUserProfile, getInternos, getOperatingDate, getVisitas } from "@/lib/supabase/queries";
+import {
+  getCurrentUserProfile,
+  getInternos,
+  getNextDate,
+  getOpenDate,
+  getVisitas
+} from "@/lib/supabase/queries";
 
 export default async function VisitasPage() {
-  const [profile, visitors, internals, operatingDate] = await Promise.all([
+  const [profile, visitors, internals, nextDate, openDate] = await Promise.all([
     getCurrentUserProfile(),
     getVisitas(),
     getInternos(),
-    getOperatingDate()
+    getNextDate(),
+    getOpenDate()
   ]);
 
   return (
     <VisitorManager
       visitors={visitors}
       internals={internals}
-      operatingDate={operatingDate?.fechaCompleta ?? null}
+      operatingDate={nextDate?.fechaCompleta ?? openDate?.fechaCompleta ?? null}
       roleKey={profile?.roleKey ?? "capturador"}
     />
   );

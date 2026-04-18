@@ -2,7 +2,13 @@
 
 import { revalidatePath } from "next/cache";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
-import { getCurrentUserProfile, getDateByValue, getListado, getOperatingDate } from "@/lib/supabase/queries";
+import {
+  getCurrentUserProfile,
+  getDateByValue,
+  getListado,
+  getNextDate,
+  getOpenDate
+} from "@/lib/supabase/queries";
 import { MutationState } from "@/lib/types";
 import { canChoosePassType, canManageMentions, nextPassNumber } from "@/lib/utils";
 
@@ -72,15 +78,13 @@ export async function createDateAction(
       return failure("Esa fecha ya esta registrada.");
     }
 
-    if (status === "abierto") {
-      const { error: openError } = await supabase
-        .from("fechas")
-        .update({ estado: "proximo" })
-        .eq("estado", "abierto");
+    const [openDate, nextDate] = await Promise.all([getOpenDate(), getNextDate()]);
+    if (status === "abierto" && openDate) {
+      return failure("Ya existe una fecha abierta para pases sueltos.");
+    }
 
-      if (openError) {
-        return failure(openError.message || "No se pudo preparar la fecha actual.");
-      }
+    if (status === "proximo" && nextDate) {
+      return failure("Ya existe una fecha proximo para la oficina 618.");
     }
 
     const { error } = await supabase.from("fechas").insert({
@@ -116,9 +120,10 @@ export async function closeDateAction(
       return failure("Tu rol no puede cerrar la fecha.");
     }
 
-    const dateValue = String(formData.get("fecha_completa") ?? "").trim();
+    const nextDate = await getNextDate();
+    const dateValue = String(formData.get("fecha_completa") ?? "").trim() || nextDate?.fechaCompleta || "";
     if (!dateValue) {
-      return failure("No se encontro la fecha.");
+      return failure("No se encontro la fecha proximo de la oficina 618.");
     }
 
     const supabase = await createServerSupabaseClient();
@@ -544,12 +549,6 @@ export async function createPassAction(
   try {
     const profile = await requireProfile();
     const supabase = await createServerSupabaseClient();
-    const operatingDate = await getOperatingDate();
-
-    if (!operatingDate || operatingDate.estado !== "abierto") {
-      return failure("No hay una fecha abierta para operar.");
-    }
-
     const internoId = String(formData.get("interno_id") ?? "").trim();
     const visitorIds = formData.getAll("visitor_ids").map((item) => String(item));
     const requestedArea = String(formData.get("apartado") ?? "618").trim();
@@ -558,9 +557,26 @@ export async function createPassAction(
       canChoosePassType(profile.roleKey) && (requestedArea === "INTIMA" || requestedArea === "618")
         ? requestedArea
         : "618";
+    const targetDate = area === "618" ? await getNextDate() : await getOpenDate();
 
     if (!internoId) {
       return failure("Debes seleccionar un interno.");
+    }
+
+    if (!targetDate) {
+      return failure(
+        area === "618"
+          ? "No hay una fecha proximo disponible para la oficina 618."
+          : "No hay una fecha abierta disponible para pases sueltos."
+      );
+    }
+
+    if (area === "618" && (targetDate.cierre || targetDate.estado !== "proximo")) {
+      return failure("La fecha proximo del 618 ya esta cerrada o no esta disponible.");
+    }
+
+    if (area === "INTIMA" && targetDate.estado !== "abierto") {
+      return failure("La fecha abierta para pases sueltos no esta disponible.");
     }
 
     if (visitorIds.length === 0) {
@@ -579,14 +595,15 @@ export async function createPassAction(
       .from("listado")
       .select("id, status")
       .eq("interno_id", internoId)
-      .eq("fecha_id", operatingDate.id)
+      .eq("fecha_id", targetDate.id)
+      .eq("apartado", area)
       .neq("status", "cancelado")
       .maybeSingle();
 
     const canEditExisting =
       existingPass &&
       ["super-admin", "control"].includes(profile.roleKey) &&
-      !operatingDate.cierre &&
+      !targetDate.cierre &&
       existingPass.status !== "impreso";
 
     if (existingPass && !canEditExisting) {
@@ -662,8 +679,8 @@ export async function createPassAction(
         .from("listado")
         .insert({
           interno_id: internoId,
-          fecha_id: operatingDate.id,
-          fecha_visita: operatingDate.fechaCompleta,
+          fecha_id: targetDate.id,
+          fecha_visita: targetDate.fechaCompleta,
           apartado: area,
           status: "capturado",
           numero_pase: null,

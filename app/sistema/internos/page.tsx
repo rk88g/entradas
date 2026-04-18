@@ -1,17 +1,27 @@
 import { InternalBrowser } from "@/components/internal-browser";
-import { getCurrentUserProfile, getInternalProfiles, getOperatingDate } from "@/lib/supabase/queries";
+import {
+  getCurrentUserProfile,
+  getInternalProfiles,
+  getNextDate,
+  getOpenDate
+} from "@/lib/supabase/queries";
 
 export default async function InternosPage() {
-  const operatingDate = await getOperatingDate();
-  const [profile, profiles] = await Promise.all([
+  const [profile, nextDate, openDate] = await Promise.all([
     getCurrentUserProfile(),
-    getInternalProfiles(operatingDate?.fechaCompleta)
+    getNextDate(),
+    getOpenDate()
   ]);
+  const profiles = await getInternalProfiles({
+    nextDateValue: nextDate?.fechaCompleta,
+    openDateValue: openDate?.fechaCompleta
+  });
 
   return (
     <InternalBrowser
       profiles={profiles}
-      operatingDate={operatingDate?.fechaCompleta ?? null}
+      nextDate={nextDate?.fechaCompleta ?? null}
+      openDate={openDate?.fechaCompleta ?? null}
       roleKey={profile?.roleKey ?? "capturador"}
     />
   );

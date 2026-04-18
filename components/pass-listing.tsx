@@ -2,12 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { AccessArea, ListingRecord } from "@/lib/types";
-import {
-  formatLongDate,
-  formatShortDate,
-  getTomorrowDate,
-  sortListingsForPrint
-} from "@/lib/utils";
+import { formatLongDate, formatShortDate, sortListingsForPrint } from "@/lib/utils";
 
 type PrintMode = "agrupado" | "separado" | "entrega";
 
@@ -15,6 +10,12 @@ const activeButtonStyle = {
   background: "var(--primary)",
   color: "white",
   borderColor: "var(--primary)"
+} as const;
+
+const listingButtonStyle = {
+  flex: "1 1 180px",
+  minWidth: "180px",
+  justifyContent: "center"
 } as const;
 
 function get618VisibleVisitors(pass: ListingRecord) {
@@ -120,18 +121,18 @@ function renderSeparatedCompactPass(pass: ListingRecord) {
 
 export function PassListing({
   listings,
-  initialDate
+  nextDate,
+  openDate
 }: {
   listings: ListingRecord[];
-  initialDate: string;
+  nextDate: string;
+  openDate: string;
 }) {
-  const tomorrowDate = getTomorrowDate();
   const [activeArea, setActiveArea] = useState<AccessArea>("618");
   const [printMode, setPrintMode] = useState<PrintMode>("agrupado");
-  const [selectedDate, setSelectedDate] = useState(initialDate || tomorrowDate);
 
   const filtered = useMemo(() => {
-    const targetDate = printMode === "entrega" ? tomorrowDate : selectedDate;
+    const targetDate = printMode === "entrega" || activeArea === "618" ? nextDate : openDate;
     const byDate = listings.filter((item) => item.fechaVisita === targetDate);
     const sorted = sortListingsForPrint(byDate);
     if (printMode === "entrega") {
@@ -141,12 +142,11 @@ export function PassListing({
     return activeArea === "618"
       ? sorted.byLocation.filter((item) => item.area === "618")
       : sorted.sueltos.filter((item) => item.area === "INTIMA");
-  }, [activeArea, listings, printMode, selectedDate, tomorrowDate]);
+  }, [activeArea, listings, nextDate, openDate, printMode]);
 
   function printTomorrowList() {
     setActiveArea("618");
     setPrintMode("entrega");
-    setSelectedDate(tomorrowDate);
     window.setTimeout(() => window.print(), 80);
   }
 
@@ -173,7 +173,10 @@ export function PassListing({
             type="button"
             className="button-secondary"
             onClick={select618}
-            style={activeArea === "618" && printMode === "agrupado" ? activeButtonStyle : undefined}
+            style={{
+              ...listingButtonStyle,
+              ...(activeArea === "618" && printMode === "agrupado" ? activeButtonStyle : {})
+            }}
           >
             618
           </button>
@@ -182,7 +185,10 @@ export function PassListing({
             type="button"
             className="button-secondary"
             onClick={selectSeparated618}
-            style={activeArea === "618" && printMode === "separado" ? activeButtonStyle : undefined}
+            style={{
+              ...listingButtonStyle,
+              ...(activeArea === "618" && printMode === "separado" ? activeButtonStyle : {})
+            }}
           >
             Hombres / Mujeres
           </button>
@@ -191,32 +197,38 @@ export function PassListing({
             type="button"
             className="button-secondary"
             onClick={selectSueltos}
-            style={activeArea === "INTIMA" && printMode === "agrupado" ? activeButtonStyle : undefined}
+            style={{
+              ...listingButtonStyle,
+              ...(activeArea === "INTIMA" && printMode === "agrupado" ? activeButtonStyle : {})
+            }}
           >
             Pases sueltos
           </button>
 
-          <button type="button" className="button-secondary" onClick={printTomorrowList}>
+          <button
+            type="button"
+            className="button-secondary"
+            onClick={printTomorrowList}
+            style={{
+              ...listingButtonStyle,
+              ...(printMode === "entrega" ? activeButtonStyle : {})
+            }}
+          >
             Numeros de pase
           </button>
 
-          <div className="field" style={{ minWidth: "220px" }}>
-            <label htmlFor="fecha-listado">Fecha de pases</label>
-            <input
-              id="fecha-listado"
-              type="date"
-              value={selectedDate}
-              onChange={(event) => {
-                setPrintMode("agrupado");
-                setSelectedDate(event.target.value);
-              }}
-              autoComplete="off"
-            />
-          </div>
-
-          <button type="button" className="button-secondary" onClick={() => window.print()}>
+          <button
+            type="button"
+            className="button-secondary"
+            onClick={() => window.print()}
+            style={listingButtonStyle}
+          >
             Imprimir
           </button>
+        </div>
+        <div className="tag-row" style={{ marginTop: "0.75rem" }}>
+          {nextDate ? <span className="chip">618 {nextDate}</span> : null}
+          {openDate ? <span className="chip">Sueltos {openDate}</span> : null}
         </div>
       </div>
 
@@ -238,7 +250,7 @@ export function PassListing({
                   Pases del dia siguiente
                 </h3>
                 <div className="muted" style={{ color: "var(--muted)", marginTop: "0.4rem" }}>
-                  Fecha: {formatLongDate(tomorrowDate)}
+                  Fecha: {formatLongDate(nextDate)}
                 </div>
               </div>
             </div>

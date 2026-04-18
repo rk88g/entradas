@@ -17,27 +17,38 @@ const mutationInitialState: MutationState = {
   error: null
 };
 
-function getPassLock(profile: InternalProfile, roleKey: RoleKey, operatingDate?: string | null) {
-  const currentPass = profile.currentDatePass;
-  const canEditExisting =
-    Boolean(currentPass) &&
-    (roleKey === "super-admin" || roleKey === "control") &&
-    Boolean(operatingDate);
+function getPassForArea(profile: InternalProfile, area: "618" | "INTIMA") {
+  return area === "618" ? profile.nextDatePass : profile.openDatePass;
+}
 
+function getTargetDate(area: "618" | "INTIMA", nextDate?: string | null, openDate?: string | null) {
+  return area === "618" ? nextDate : openDate;
+}
+
+function getPassLock(
+  profile: InternalProfile,
+  area: "618" | "INTIMA",
+  _roleKey: RoleKey,
+  nextDate?: string | null,
+  openDate?: string | null
+) {
+  const currentPass = getPassForArea(profile, area);
   return {
     currentPass,
-    canEditExisting,
-    blocked: Boolean(currentPass) && !canEditExisting
+    blocked: Boolean(currentPass),
+    targetDate: getTargetDate(area, nextDate, openDate)
   };
 }
 
 export function InternalBrowser({
   profiles,
-  operatingDate,
+  nextDate,
+  openDate,
   roleKey
 }: {
   profiles: InternalProfile[];
-  operatingDate?: string | null;
+  nextDate?: string | null;
+  openDate?: string | null;
   roleKey: RoleKey;
 }) {
   const router = useRouter();
@@ -71,7 +82,9 @@ export function InternalBrowser({
   }, [profiles, query]);
 
   const selected = profiles.find((item) => item.id === modalInternalId) ?? null;
-  const selectedLock = selected ? getPassLock(selected, roleKey, operatingDate) : null;
+  const selectedLock = selected
+    ? getPassLock(selected, selectedArea, roleKey, nextDate, openDate)
+    : null;
 
   useEffect(() => {
     if (passState.success) {
@@ -101,6 +114,17 @@ export function InternalBrowser({
     return () => window.removeEventListener("keydown", handleEscape);
   }, [modalInternalId]);
 
+  useEffect(() => {
+    if (!selected) {
+      return;
+    }
+
+    const pass = getPassForArea(selected, selectedArea);
+    if (pass) {
+      setSelectedVisitorIds(pass.visitantes.map((visitor) => visitor.visitorId));
+    }
+  }, [selected, selectedArea]);
+
   const selectedVisitors =
     selected?.visitors.filter((item) => selectedVisitorIds.includes(item.visitaId)) ?? [];
   const availableVisitors =
@@ -111,11 +135,14 @@ export function InternalBrowser({
     selectedVisitors.length > 0 &&
     selectedAdults.length > 0 &&
     !selectedLock?.blocked &&
-    Boolean(operatingDate);
+    Boolean(selectedLock?.targetDate);
 
   function openPassModal(profile: InternalProfile) {
-    setSelectedVisitorIds(profile.currentDatePass?.visitantes.map((visitor) => visitor.visitorId) ?? []);
-    setSelectedArea(profile.currentDatePass?.area ?? "618");
+    const defaultArea: "618" | "INTIMA" =
+      profile.nextDatePass ? "618" : profile.openDatePass ? "INTIMA" : "618";
+    const pass = getPassForArea(profile, defaultArea);
+    setSelectedVisitorIds(pass?.visitantes.map((visitor) => visitor.visitorId) ?? []);
+    setSelectedArea(defaultArea);
     setModalInternalId(profile.id);
   }
 
@@ -137,7 +164,8 @@ export function InternalBrowser({
           >
             <strong className="section-title">Internos</strong>
             <div className="tag-row">
-              {operatingDate ? <span className="chip">{operatingDate}</span> : null}
+              {nextDate ? <span className="chip">618 {nextDate}</span> : null}
+              {openDate ? <span className="chip">Sueltos {openDate}</span> : null}
               <span className="chip">{profiles.length}</span>
             </div>
           </div>
@@ -176,7 +204,11 @@ export function InternalBrowser({
                       <td>
                         <div className="record-title">
                           <strong>{profile.fullName}</strong>
-                          <span>{profile.currentDatePass ? "Pase registrado" : "Sin pase"}</span>
+                          <span>
+                            {profile.nextDatePass || profile.openDatePass
+                              ? "Con pase registrado"
+                              : "Sin pase"}
+                          </span>
                         </div>
                       </td>
                       <td>{profile.ubicacion}</td>
@@ -273,8 +305,12 @@ export function InternalBrowser({
                     <strong>{selected.telefono || "-"}</strong>
                   </div>
                   <div className="mini-row">
-                    <span>Fecha activa</span>
-                    <strong>{operatingDate ?? "-"}</strong>
+                    <span>Fecha 618</span>
+                    <strong>{nextDate ?? "-"}</strong>
+                  </div>
+                  <div className="mini-row">
+                    <span>Fecha sueltos</span>
+                    <strong>{openDate ?? "-"}</strong>
                   </div>
                   <div className="mini-row">
                     <span>Familiares</span>
@@ -295,11 +331,15 @@ export function InternalBrowser({
                   </div>
                   <div className="mini-row">
                     <span>Estatus</span>
-                    {selected.currentDatePass ? (
+                    {selectedLock?.currentPass ? (
                       <StatusBadge variant="warn">Pase registrado</StatusBadge>
                     ) : (
                       <StatusBadge variant="ok">Sin pase</StatusBadge>
                     )}
+                  </div>
+                  <div className="mini-row">
+                    <span>Fecha del pase</span>
+                    <strong>{selectedLock?.targetDate ?? "-"}</strong>
                   </div>
                 </div>
               </div>
@@ -308,7 +348,13 @@ export function InternalBrowser({
             {selectedLock?.blocked ? (
               <div style={{ marginTop: "1rem" }}>
                 <MutationBanner
-                  state={{ success: null, error: "Ese interno ya tiene pase para la fecha activa." }}
+                  state={{
+                    success: null,
+                    error:
+                      selectedArea === "618"
+                        ? "Ese interno ya tiene pase 618 para la fecha proximo."
+                        : "Ese interno ya tiene pase suelto para la fecha abierta."
+                  }}
                 />
               </div>
             ) : null}
@@ -469,11 +515,11 @@ export function InternalBrowser({
                         value={selectedArea}
                         onChange={(event) => setSelectedArea(event.target.value as "618" | "INTIMA")}
                       >
-                        <option value="618">618</option>
-                        <option value="INTIMA">Suelto</option>
-                      </select>
-                    </div>
-                  ) : (
+                      <option value="618">618</option>
+                      <option value="INTIMA">Suelto</option>
+                    </select>
+                  </div>
+                ) : (
                     <input type="hidden" name="apartado" value="618" />
                   )}
 
@@ -482,13 +528,13 @@ export function InternalBrowser({
                       <textarea
                         name="menciones"
                         placeholder="Menciones"
-                        defaultValue={selected.currentDatePass?.area === "INTIMA" ? selected.currentDatePass?.menciones ?? "" : ""}
+                        defaultValue={selected.openDatePass?.menciones ?? ""}
                         autoComplete="off"
                       />
                     </div>
                   ) : null}
 
-                  {!selected.currentDatePass ? (
+                  {!selectedLock?.currentPass ? (
                     <div className="actions-row">
                       <button
                         type="submit"
@@ -503,7 +549,10 @@ export function InternalBrowser({
                       <MutationBanner
                         state={{
                           success: null,
-                          error: "Ese interno ya tiene pase creado para la fecha activa."
+                          error:
+                            selectedArea === "618"
+                              ? "Ese interno ya tiene pase 618 creado para la fecha proximo."
+                              : "Ese interno ya tiene pase suelto creado para la fecha abierta."
                         }}
                       />
                     </div>

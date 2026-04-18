@@ -19,12 +19,14 @@ const mutationInitialState: MutationState = {
 
 export function DateOperations({
   dates,
-  operatingDate,
+  nextDate,
+  openDate,
   roleKey,
   closePasswordConfigured
 }: {
   dates: DateRecord[];
-  operatingDate: DateRecord | null;
+  nextDate: DateRecord | null;
+  openDate: DateRecord | null;
   roleKey: RoleKey;
   closePasswordConfigured: boolean;
 }) {
@@ -44,23 +46,24 @@ export function DateOperations({
         <div className="actions-row" style={{ justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
           <strong className="section-title">Fechas</strong>
           <div className="tag-row">
-            {operatingDate ? <span className="chip">{operatingDate.fechaCompleta}</span> : null}
+            {nextDate ? <span className="chip">618 {nextDate.fechaCompleta}</span> : null}
+            {openDate ? <span className="chip">Sueltos {openDate.fechaCompleta}</span> : null}
             <span className="chip">{dates.length}</span>
           </div>
         </div>
 
         <div className="mini-list" style={{ marginBottom: "1rem" }}>
           <div className="mini-row">
-            <span>Abierta</span>
-            <strong>Fecha que se esta operando</strong>
+            <span>Proximo</span>
+            <strong>Fecha de visita para la oficina 618</strong>
           </div>
           <div className="mini-row">
-            <span>Proximo</span>
-            <strong>Fecha siguiente</strong>
+            <span>Abierto</span>
+            <strong>Fecha de visita para pases sueltos</strong>
           </div>
           <div className="mini-row">
             <span>Cerrado</span>
-            <strong>Fecha finalizada</strong>
+            <strong>Fecha 618 ya numerada y cerrada</strong>
           </div>
         </div>
 
@@ -109,7 +112,7 @@ export function DateOperations({
           </div>
         </form>
 
-        {roleKey === "control" && operatingDate ? (
+        {roleKey === "control" && nextDate ? (
           <>
             <div style={{ height: "1rem" }} />
             <strong className="section-title">Cierre</strong>
@@ -120,7 +123,7 @@ export function DateOperations({
               style={{ marginTop: "1rem" }}
               autoComplete="off"
             >
-              <input type="hidden" name="fecha_completa" value={operatingDate.fechaCompleta} />
+              <input type="hidden" name="fecha_completa" value={nextDate.fechaCompleta} />
               <div className="field">
                 <label htmlFor="close_password">Contrasena de cierre</label>
                 <input
@@ -133,7 +136,7 @@ export function DateOperations({
               </div>
               <div className="actions-row">
                 <button className="button-secondary" type="submit" disabled={closePending}>
-                  Cerrar fecha
+                  Cerrar fecha 618
                 </button>
               </div>
             </form>

@@ -4,36 +4,55 @@ import { getStatsFromListings } from "@/lib/utils";
 
 export default async function ListadoPage() {
   const builderData = await getListingBuilderData();
-  const selectedDate = builderData.operatingDate?.fechaCompleta ?? builderData.todayDate?.fechaCompleta ?? "";
-  const listado = await getListado(selectedDate ? { fechaVisita: selectedDate } : undefined);
+  const listado = await getListado();
   const stats = getStatsFromListings(listado);
+  const nextDateValue = builderData.nextDate?.fechaCompleta ?? "";
+  const openDateValue = builderData.openDate?.fechaCompleta ?? "";
+  const nextDateListings = listado.filter(
+    (item) => item.fechaVisita === nextDateValue && item.area === "618"
+  );
+  const openDateListings = listado.filter(
+    (item) => item.fechaVisita === openDateValue && item.area === "INTIMA"
+  );
 
   return (
     <>
       <section className="quick-grid hide-print">
         <article className="quick-card">
-          <h3>Fecha</h3>
+          <h3>618</h3>
           <div className="mini-list">
             <div className="mini-row">
-              <strong>{builderData.operatingDate?.fechaCompleta ?? "Sin fecha abierta"}</strong>
+              <strong>{builderData.nextDate?.fechaCompleta ?? "Sin fecha proximo"}</strong>
             </div>
             <div className="mini-row">
               <span>Pases</span>
-              <strong>{stats.totalPasses}</strong>
+              <strong>{nextDateListings.length}</strong>
             </div>
           </div>
         </article>
         <article className="quick-card">
-          <h3>618</h3>
-          <strong style={{ fontSize: "2rem" }}>{stats.areas["618"] ?? 0}</strong>
+          <h3>Sueltos</h3>
+          <div className="mini-list">
+            <div className="mini-row">
+              <strong>{builderData.openDate?.fechaCompleta ?? "Sin fecha abierta"}</strong>
+            </div>
+            <div className="mini-row">
+              <span>Pases</span>
+              <strong>{openDateListings.length}</strong>
+            </div>
+          </div>
         </article>
         <article className="quick-card">
-          <h3>Sueltos</h3>
-          <strong style={{ fontSize: "2rem" }}>{stats.areas.INTIMA ?? 0}</strong>
+          <h3>Total</h3>
+          <strong style={{ fontSize: "2rem" }}>{stats.totalPasses}</strong>
         </article>
       </section>
 
-      <PassListing listings={listado} initialDate={selectedDate} />
+      <PassListing
+        listings={listado}
+        nextDate={nextDateValue}
+        openDate={openDateValue}
+      />
     </>
   );
 }

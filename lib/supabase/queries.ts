@@ -489,9 +489,18 @@ export async function getFechas(): Promise<DateRecord[]> {
   }));
 }
 
-export async function getOperatingDate(): Promise<DateRecord | null> {
+export async function getOpenDate(): Promise<DateRecord | null> {
   const fechas = await getFechas();
-  return fechas.find((item) => item.estado === "abierto") ?? fechas[0] ?? null;
+  return fechas.find((item) => item.estado === "abierto") ?? null;
+}
+
+export async function getNextDate(): Promise<DateRecord | null> {
+  const fechas = await getFechas();
+  return fechas.find((item) => item.estado === "proximo") ?? null;
+}
+
+export async function getOperatingDate(): Promise<DateRecord | null> {
+  return getOpenDate();
 }
 
 export async function getDateByValue(dateValue: string): Promise<DateRecord | null> {
@@ -549,12 +558,24 @@ export async function getListado(filters?: {
   return buildListingsForRows(supabase, data);
 }
 
-export async function getInternalProfiles(dateValue?: string): Promise<InternalProfile[]> {
+export async function getInternalProfiles(options?: {
+  nextDateValue?: string | null;
+  openDateValue?: string | null;
+}): Promise<InternalProfile[]> {
   const supabase = await createServerSupabaseClient();
-  const [internos, operatingDate] = await Promise.all([getInternos(), dateValue ? getDateByValue(dateValue) : getOperatingDate()]);
+  const [internos, nextDate, openDate] = await Promise.all([
+    getInternos(),
+    options?.nextDateValue ? getDateByValue(options.nextDateValue) : getNextDate(),
+    options?.openDateValue ? getDateByValue(options.openDateValue) : getOpenDate()
+  ]);
 
   const internalIds = internos.map((item) => item.id);
-  const [{ data: relationRows, error: relationError }, currentDatePasses, allListingsForRecent] =
+  const [nextDatePasses, openDatePasses] = await Promise.all([
+    nextDate ? getListado({ fechaVisita: nextDate.fechaCompleta, area: "618" }) : Promise.resolve([]),
+    openDate ? getListado({ fechaVisita: openDate.fechaCompleta, area: "INTIMA" }) : Promise.resolve([])
+  ]);
+
+  const [{ data: relationRows, error: relationError }, allListingsForRecent] =
     await Promise.all([
       internalIds.length
         ? supabase
@@ -562,7 +583,6 @@ export async function getInternalProfiles(dateValue?: string): Promise<InternalP
             .select("id, interno_id, visita_id, parentesco, titular")
             .in("interno_id", internalIds)
         : Promise.resolve({ data: [], error: null }),
-      operatingDate ? getListado({ fechaVisita: operatingDate.fechaCompleta }) : Promise.resolve([]),
       getListado()
     ]);
 
@@ -570,7 +590,8 @@ export async function getInternalProfiles(dateValue?: string): Promise<InternalP
     return internos.map((interno) => ({
       ...interno,
       visitors: [],
-      currentDatePass: null,
+      nextDatePass: null,
+      openDatePass: null,
       recentPasses: []
     }));
   }
@@ -597,7 +618,8 @@ export async function getInternalProfiles(dateValue?: string): Promise<InternalP
     relationMap.set(item.interno_id, current);
   });
 
-  const currentPassMap = new Map(currentDatePasses.map((item) => [item.internoId, item]));
+  const nextPassMap = new Map(nextDatePasses.map((item) => [item.internoId, item]));
+  const openPassMap = new Map(openDatePasses.map((item) => [item.internoId, item]));
   const recentPassMap = new Map<string, ListingRecord[]>();
 
   allListingsForRecent.forEach((item) => {
@@ -613,23 +635,26 @@ export async function getInternalProfiles(dateValue?: string): Promise<InternalP
     visitors: [...(relationMap.get(interno.id) ?? [])].sort(
       (a, b) => b.visitor.edad - a.visitor.edad
     ) as InternalVisitorLink[],
-    currentDatePass: currentPassMap.get(interno.id) ?? null,
+    nextDatePass: nextPassMap.get(interno.id) ?? null,
+    openDatePass: openPassMap.get(interno.id) ?? null,
     recentPasses: recentPassMap.get(interno.id) ?? []
   }));
 }
 
 export async function getListingBuilderData(): Promise<ListingBuilderData> {
-  const operatingDate = await getOperatingDate();
-  const todayDate = await getDateByValue(getTodayDate());
+  const [openDate, nextDate] = await Promise.all([getOpenDate(), getNextDate()]);
   const [closePasswordConfigured, internalProfiles, todaysPasses] = await Promise.all([
     getClosePasswordConfigured(),
-    getInternalProfiles(operatingDate?.fechaCompleta),
+    getInternalProfiles({
+      nextDateValue: nextDate?.fechaCompleta,
+      openDateValue: openDate?.fechaCompleta
+    }),
     getListado({ fechaVisita: getTodayDate() })
   ]);
 
   return {
-    operatingDate,
-    todayDate,
+    openDate,
+    nextDate,
     internalProfiles,
     todaysPasses,
     closePasswordConfigured

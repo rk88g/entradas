@@ -45,7 +45,8 @@ export interface InternalVisitorLink {
 
 export interface InternalProfile extends InternalRecord {
   visitors: InternalVisitorLink[];
-  currentDatePass?: ListingRecord | null;
+  nextDatePass?: ListingRecord | null;
+  openDatePass?: ListingRecord | null;
   recentPasses: ListingRecord[];
 }
 
@@ -136,8 +137,8 @@ export interface DashboardStat {
 }
 
 export interface ListingBuilderData {
-  operatingDate: DateRecord | null;
-  todayDate: DateRecord | null;
+  openDate: DateRecord | null;
+  nextDate: DateRecord | null;
   internalProfiles: InternalProfile[];
   todaysPasses: ListingRecord[];
   closePasswordConfigured: boolean;
