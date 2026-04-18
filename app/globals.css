@@ -731,6 +731,18 @@ tr:last-child td {
   line-height: 1.15;
 }
 
+.compact-pass-columns {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.45rem;
+}
+
+.compact-pass-column {
+  display: grid;
+  gap: 0.45rem;
+  align-content: start;
+}
+
 @media (min-width: 900px) {
   .login-grid {
     grid-template-columns: minmax(0, 1.2fr) minmax(420px, 0.8fr);
@@ -969,6 +981,15 @@ tr:last-child td {
   }
 
   .print-zone.compact-pass-grid .compact-pass-visitors {
+    gap: 0.1cm;
+  }
+
+  .print-zone.compact-pass-grid .compact-pass-columns {
+    gap: 0.12cm;
+    margin-top: 0.06cm;
+  }
+
+  .print-zone.compact-pass-grid .compact-pass-column {
     gap: 0.1cm;
   }
 

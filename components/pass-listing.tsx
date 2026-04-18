@@ -27,6 +27,14 @@ function get618VisibleVisitors(pass: ListingRecord) {
   };
 }
 
+function formatCompactVisitorName(visitor: ListingRecord["visitantes"][number]) {
+  if (visitor.edad >= 12 && visitor.edad <= 17) {
+    return `${visitor.nombre} ${visitor.edad}`;
+  }
+
+  return visitor.nombre;
+}
+
 function renderCompactPass(pass: ListingRecord) {
   const { listedVisitors, underTwelveCount } = get618VisibleVisitors(pass);
 
@@ -48,7 +56,7 @@ function renderCompactPass(pass: ListingRecord) {
             key={`${pass.id}-${visitor.visitorId}`}
             className={`compact-pass-visitor ${visitor.edad < 18 ? "minor" : ""}`}
           >
-            <span>{visitor.nombre}</span>
+            <span>{formatCompactVisitorName(visitor)}</span>
           </div>
         ))}
 
@@ -60,6 +68,52 @@ function renderCompactPass(pass: ListingRecord) {
           <div className="compact-pass-note">{pass.menciones}</div>
         ) : null}
       </div>
+    </article>
+  );
+}
+
+function renderSeparatedCompactPass(pass: ListingRecord) {
+  const { listedVisitors, underTwelveCount } = get618VisibleVisitors(pass);
+  const men = listedVisitors.filter((visitor) => visitor.sexo === "hombre");
+  const womenAndMinors = listedVisitors.filter((visitor) => visitor.sexo !== "hombre");
+  const columns = [
+    { key: "men", items: men },
+    { key: "women", items: womenAndMinors }
+  ].filter((column) => column.items.length > 0);
+
+  return (
+    <article key={pass.id} className="pass-card pass-card-618">
+      <div className="compact-pass-head">
+        <div className="compact-pass-title">
+          <strong>
+            {pass.internoUbicacion} {pass.internoNombre}
+          </strong>
+          <span>{formatShortDate(pass.fechaVisita)}</span>
+        </div>
+        <div className="compact-pass-number">{pass.area === "618" ? pass.numeroPase ?? "-" : ""}</div>
+      </div>
+
+      <div
+        className="compact-pass-columns"
+        style={{ gridTemplateColumns: columns.length === 1 ? "minmax(0, 1fr)" : undefined }}
+      >
+        {columns.map((column) => (
+          <div key={column.key} className="compact-pass-column">
+            {column.items.map((visitor) => (
+              <div
+                key={`${pass.id}-${visitor.visitorId}`}
+                className={`compact-pass-visitor ${visitor.edad < 18 ? "minor" : ""}`}
+              >
+                <span>{formatCompactVisitorName(visitor)}</span>
+              </div>
+            ))}
+          </div>
+        ))}
+      </div>
+
+      {underTwelveCount > 0 ? (
+        <div className="compact-pass-children">+ {underTwelveCount} menores</div>
+      ) : null}
     </article>
   );
 }
@@ -144,7 +198,7 @@ export function PassListing({
       </div>
 
       <div
-        className={`print-zone passes-grid ${printMode === "agrupado" ? "compact-pass-grid" : ""}`}
+        className={`print-zone passes-grid ${printMode !== "entrega" ? "compact-pass-grid" : ""}`}
       >
         {filtered.length === 0 ? (
           <div className="data-card">
@@ -207,66 +261,7 @@ export function PassListing({
         ) : printMode === "agrupado" ? (
           filtered.map((pass) => renderCompactPass(pass))
         ) : (
-          filtered.map((pass) => {
-            const men = pass.visitantes.filter((item) => item.sexo === "hombre" && !item.menor);
-            const womenAndMinors = pass.visitantes.filter(
-              (item) => item.sexo === "mujer" || item.menor || item.sexo === "sin-definir"
-            );
-            const groups = [
-              { key: "hombres", title: "Hombres", items: men },
-              { key: "mujeres", title: "Mujeres y menores", items: womenAndMinors }
-            ].filter((group) => group.items.length > 0);
-
-            return (
-              <article key={pass.id} className="pass-card">
-                <div className="pass-head">
-                  <div>
-                    <span className="eyebrow" style={{ color: "#7c2d12", background: "#fef3c7" }}>
-                      {areaLabels[pass.area]}
-                    </span>
-                    <h3 className="pass-title" style={{ marginTop: "0.7rem" }}>
-                      Registro por sexo
-                    </h3>
-                    <div className="muted" style={{ color: "var(--muted)", marginTop: "0.4rem" }}>
-                      {pass.internoNombre} - Ubicacion {pass.internoUbicacion}
-                    </div>
-                  </div>
-                  {pass.area === "618" && pass.numeroPase ? (
-                    <span className="chip">No. {pass.numeroPase}</span>
-                  ) : null}
-                </div>
-
-                <div
-                  className="split-grid"
-                  style={{ gridTemplateColumns: groups.length === 1 ? "minmax(0, 1fr)" : undefined }}
-                >
-                  {groups.map((group) => (
-                    <div key={group.key} className="data-card" style={{ padding: "1rem" }}>
-                      <h3 style={{ marginTop: 0 }}>{group.title}</h3>
-                    <div className="mini-list">
-                      {group.items.map((visitor) => (
-                        <div
-                          key={visitor.visitorId}
-                          className="mini-row"
-                            style={{
-                              background: visitor.edad < 12 ? "rgba(255,225,225,0.82)" : undefined,
-                              color: visitor.edad < 12 ? "#7f1d1d" : undefined,
-                              borderRadius: "12px",
-                              paddingInline: "0.75rem"
-                            }}
-                          >
-                            <div className="record-title">
-                              <strong>{visitor.nombre}</strong>
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </article>
-            );
-          })
+          filtered.map((pass) => renderSeparatedCompactPass(pass))
         )}
       </div>
     </section>
