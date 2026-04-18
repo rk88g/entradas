@@ -27,6 +27,42 @@ function get618VisibleVisitors(pass: ListingRecord) {
   };
 }
 
+function renderCompactPass(pass: ListingRecord) {
+  const { listedVisitors, underTwelveCount } = get618VisibleVisitors(pass);
+
+  return (
+    <article key={pass.id} className="pass-card pass-card-618">
+      <div className="compact-pass-head">
+        <div className="compact-pass-title">
+          <strong>
+            {pass.internoUbicacion} {pass.internoNombre}
+          </strong>
+          <span>{formatShortDate(pass.fechaVisita)}</span>
+        </div>
+        <div className="compact-pass-number">{pass.area === "618" ? pass.numeroPase ?? "-" : ""}</div>
+      </div>
+
+      <div className="compact-pass-visitors">
+        {listedVisitors.map((visitor) => (
+          <div
+            key={`${pass.id}-${visitor.visitorId}`}
+            className={`compact-pass-visitor ${visitor.edad < 18 ? "minor" : ""}`}
+          >
+            <span>{visitor.nombre}</span>
+            {visitor.edad < 18 ? <strong>{visitor.edad}</strong> : null}
+          </div>
+        ))}
+
+        {underTwelveCount > 0 ? (
+          <div className="compact-pass-children">+ {underTwelveCount} menores</div>
+        ) : null}
+
+        {pass.menciones ? <div className="compact-pass-note">{pass.menciones}</div> : null}
+      </div>
+    </article>
+  );
+}
+
 export function PassListing({
   listings,
   initialDate
@@ -107,7 +143,7 @@ export function PassListing({
       </div>
 
       <div
-        className={`print-zone passes-grid ${printMode === "agrupado" && activeArea === "618" ? "compact-618" : ""}`}
+        className={`print-zone passes-grid ${printMode === "agrupado" ? "compact-pass-grid" : ""}`}
       >
         {filtered.length === 0 ? (
           <div className="data-card">
@@ -168,101 +204,7 @@ export function PassListing({
             </div>
           </article>
         ) : printMode === "agrupado" ? (
-          filtered.map((pass) => (
-            pass.area === "618" ? (
-              <article key={pass.id} className="pass-card pass-card-618">
-                <div className="compact-pass-head">
-                  <div className="compact-pass-title">
-                    <strong>
-                      {pass.internoUbicacion} {pass.internoNombre}
-                    </strong>
-                    <span>{formatShortDate(pass.fechaVisita)}</span>
-                  </div>
-                  <div className="compact-pass-number">{pass.numeroPase ?? "-"}</div>
-                </div>
-
-                <div className="compact-pass-visitors">
-                  {get618VisibleVisitors(pass).listedVisitors.map((visitor) => (
-                    <div
-                      key={`${pass.id}-${visitor.visitorId}`}
-                      className={`compact-pass-visitor ${visitor.edad < 18 ? "minor" : ""}`}
-                    >
-                      <span>{visitor.nombre}</span>
-                      {visitor.edad < 18 ? <strong>{visitor.edad}</strong> : null}
-                    </div>
-                  ))}
-
-                  {get618VisibleVisitors(pass).underTwelveCount > 0 ? (
-                    <div className="compact-pass-children">
-                      + {get618VisibleVisitors(pass).underTwelveCount} menores
-                    </div>
-                  ) : null}
-                </div>
-              </article>
-            ) : (
-              <article key={pass.id} className="pass-card">
-                <div className="pass-head">
-                  <div>
-                    <span className="eyebrow" style={{ color: "#7c2d12", background: "#fef3c7" }}>
-                      {areaLabels[pass.area]}
-                    </span>
-                    <h3 className="pass-title" style={{ marginTop: "0.7rem" }}>
-                      Pase de terraza
-                    </h3>
-                    <div className="muted" style={{ color: "var(--muted)", marginTop: "0.4rem" }}>
-                      Fecha: {formatLongDate(pass.fechaVisita)}
-                    </div>
-                  </div>
-                  <div className="stack" style={{ justifyItems: "end" }}>
-                    <StatusBadge
-                      variant={
-                        pass.status === "impreso"
-                          ? "ok"
-                          : pass.status === "autorizado"
-                            ? "warn"
-                            : pass.status === "cancelado"
-                              ? "danger"
-                              : "off"
-                      }
-                    >
-                      {pass.status}
-                    </StatusBadge>
-                  </div>
-                </div>
-
-                <div className="pass-body stack">
-                  <div className="record-title">
-                    <strong>
-                      {pass.internoNombre} - Ubicacion {pass.internoUbicacion}
-                    </strong>
-                    <span>Listado del {formatShortDate(pass.fechaVisita)}</span>
-                  </div>
-
-                  <div className="visitor-list">
-                    {pass.visitantes.map((visitor) => (
-                      <div
-                        key={`${pass.id}-${visitor.visitorId}`}
-                        className={`visitor-row ${visitor.edad < 12 ? "minor" : ""}`}
-                      >
-                        <strong>{visitor.nombre}</strong>
-                        <span>{visitor.parentesco}</span>
-                        <span>{visitor.edad} anos</span>
-                        <span>{visitor.menor ? "Menor" : "Adulto"}</span>
-                        <span>{visitor.sexo}</span>
-                      </div>
-                    ))}
-                  </div>
-
-                  {pass.menciones ? (
-                    <div className="alert-box">
-                      <strong>Mencion</strong>
-                      <p className="mini-copy">{pass.menciones}</p>
-                    </div>
-                  ) : null}
-                </div>
-              </article>
-            )
-          ))
+          filtered.map((pass) => renderCompactPass(pass))
         ) : (
           filtered.map((pass) => {
             const men = pass.visitantes.filter((item) => item.sexo === "hombre" && !item.menor);
