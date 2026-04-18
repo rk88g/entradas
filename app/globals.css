@@ -651,6 +651,10 @@ tr:last-child td {
   gap: 1rem;
 }
 
+.delivery-print-list {
+  display: none;
+}
+
 @media (min-width: 900px) {
   .login-grid {
     grid-template-columns: minmax(0, 1.2fr) minmax(420px, 0.8fr);
@@ -741,19 +745,108 @@ tr:last-child td {
   }
 
   .print-zone {
-    gap: 0.5cm;
+    gap: 0.25cm;
   }
 
   .pass-card {
     box-shadow: none;
     break-inside: avoid;
-    min-height: 16cm;
+    min-height: auto;
     width: 100%;
     page-break-inside: avoid;
+    padding: 0.45cm;
+    border-radius: 0;
+  }
+
+  .pass-head {
+    padding-bottom: 0.35cm;
+    margin-bottom: 0.35cm;
+  }
+
+  .pass-title {
+    font-size: 1.1rem;
+  }
+
+  .visitor-list {
+    gap: 0.2cm;
+  }
+
+  .visitor-row {
+    padding: 0.25cm 0.3cm;
+    border-radius: 8px;
+    gap: 0.3cm;
+    font-size: 0.82rem;
+    line-height: 1.1;
+  }
+
+  .delivery-print {
+    border: 1px solid #cbd5e1;
+    background: white;
+  }
+
+  .delivery-print .pass-head {
+    border-bottom: 1px solid #cbd5e1;
+  }
+
+  .delivery-print .eyebrow {
+    display: none;
+  }
+
+  .delivery-print .pass-title {
+    font-size: 0.95rem;
+    margin-top: 0;
+  }
+
+  .delivery-print .muted {
+    font-size: 0.72rem;
+    margin-top: 0.1cm;
+  }
+
+  .delivery-print-list {
+    display: block;
+    margin-top: 0.2cm;
+    font-size: 0.72rem;
+    line-height: 1.05;
+  }
+
+  .delivery-print-head,
+  .delivery-print-row {
+    display: grid;
+    grid-template-columns: 1.1cm 1.8cm minmax(0, 1fr);
+    gap: 0.2cm;
+    align-items: start;
+  }
+
+  .delivery-print-head {
+    font-weight: 700;
+    text-transform: uppercase;
+    border-bottom: 1px solid #cbd5e1;
+    padding-bottom: 0.1cm;
+    margin-bottom: 0.12cm;
+  }
+
+  .delivery-print-body {
+    column-count: 2;
+    column-gap: 0.35cm;
+  }
+
+  .delivery-print-row {
+    break-inside: avoid;
+    border-bottom: 1px dotted #dbe4ef;
+    padding: 0.07cm 0;
+    margin-bottom: 0.04cm;
+  }
+
+  .delivery-print-row span:last-child {
+    word-break: break-word;
+  }
+
+  .table-wrap table {
+    min-width: 0;
   }
 
   @page {
     size: legal portrait;
-    margin: 1cm;
+    margin: 0.55cm;
   }
 }

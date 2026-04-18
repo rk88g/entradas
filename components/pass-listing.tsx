@@ -102,7 +102,7 @@ export function PassListing({
             <h3>Sin pases</h3>
           </div>
         ) : printMode === "entrega" ? (
-          <article className="pass-card">
+          <article className="pass-card delivery-print">
             <div className="pass-head">
               <div>
                 <span className="eyebrow" style={{ color: "#7c2d12", background: "#fef3c7" }}>
@@ -117,7 +117,7 @@ export function PassListing({
               </div>
             </div>
 
-            <div className="table-wrap" style={{ marginTop: "1rem" }}>
+            <div className="table-wrap hide-print" style={{ marginTop: "1rem" }}>
               <table>
                 <thead>
                   <tr>
@@ -136,6 +136,23 @@ export function PassListing({
                   ))}
                 </tbody>
               </table>
+            </div>
+
+            <div className="delivery-print-list">
+              <div className="delivery-print-head">
+                <span>No.</span>
+                <span>Ubicacion</span>
+                <span>Interno</span>
+              </div>
+              <div className="delivery-print-body">
+                {filtered.map((pass) => (
+                  <div key={pass.id} className="delivery-print-row">
+                    <span>{pass.numeroPase ?? "-"}</span>
+                    <span>{pass.internoUbicacion}</span>
+                    <span>{pass.internoNombre}</span>
+                  </div>
+                ))}
+              </div>
             </div>
           </article>
         ) : printMode === "agrupado" ? (
