@@ -1,7 +1,6 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { StatusBadge } from "@/components/status-badge";
 import { AccessArea, ListingRecord } from "@/lib/types";
 import {
   formatLongDate,
@@ -12,10 +11,11 @@ import {
 
 type PrintMode = "agrupado" | "separado" | "entrega";
 
-const areaLabels: Record<AccessArea, string> = {
-  "618": "Pases 618",
-  INTIMA: "Pases sueltos"
-};
+const activeButtonStyle = {
+  background: "var(--primary)",
+  color: "white",
+  borderColor: "var(--primary)"
+} as const;
 
 function get618VisibleVisitors(pass: ListingRecord) {
   const listedVisitors = pass.visitantes.filter((visitor) => visitor.edad >= 12);
@@ -29,7 +29,7 @@ function get618VisibleVisitors(pass: ListingRecord) {
 
 function formatCompactVisitorName(visitor: ListingRecord["visitantes"][number]) {
   if (visitor.edad >= 12 && visitor.edad <= 17) {
-    return `${visitor.nombre} ${visitor.edad}`;
+    return `${visitor.nombre} ${visitor.edad} años`;
   }
 
   return visitor.nombre;
@@ -134,7 +134,13 @@ export function PassListing({
     const targetDate = printMode === "entrega" ? tomorrowDate : selectedDate;
     const byDate = listings.filter((item) => item.fechaVisita === targetDate);
     const sorted = sortListingsForPrint(byDate);
-    return activeArea === "618" ? sorted.byLocation : sorted.sueltos;
+    if (printMode === "entrega") {
+      return sorted.byLocation.filter((item) => item.area === "618");
+    }
+
+    return activeArea === "618"
+      ? sorted.byLocation.filter((item) => item.area === "618")
+      : sorted.sueltos.filter((item) => item.area === "INTIMA");
   }, [activeArea, listings, printMode, selectedDate, tomorrowDate]);
 
   function printTomorrowList() {
@@ -144,35 +150,55 @@ export function PassListing({
     window.setTimeout(() => window.print(), 80);
   }
 
+  function select618() {
+    setActiveArea("618");
+    setPrintMode("agrupado");
+  }
+
+  function selectSeparated618() {
+    setActiveArea("618");
+    setPrintMode("separado");
+  }
+
+  function selectSueltos() {
+    setActiveArea("INTIMA");
+    setPrintMode("agrupado");
+  }
+
   return (
     <section className="module-panel">
       <div className="pass-controls hide-print">
         <div className="toolbar">
-          <div className="segmented">
-            {(["618", "INTIMA"] as AccessArea[]).map((area) => (
-              <button
-                key={area}
-                type="button"
-                className={`segmented-button ${area === activeArea ? "active" : ""}`}
-                onClick={() => setActiveArea(area)}
-              >
-                {areaLabels[area]}
-              </button>
-            ))}
-          </div>
+          <button
+            type="button"
+            className="button-secondary"
+            onClick={select618}
+            style={activeArea === "618" && printMode === "agrupado" ? activeButtonStyle : undefined}
+          >
+            618
+          </button>
 
-          <div className="segmented">
-            {(["agrupado", "separado"] as Exclude<PrintMode, "entrega">[]).map((mode) => (
-              <button
-                key={mode}
-                type="button"
-                className={`segmented-button ${mode === printMode ? "active" : ""}`}
-                onClick={() => setPrintMode(mode)}
-              >
-                {mode === "agrupado" ? "Por interno" : "Hombres / Mujeres"}
-              </button>
-            ))}
-          </div>
+          <button
+            type="button"
+            className="button-secondary"
+            onClick={selectSeparated618}
+            style={activeArea === "618" && printMode === "separado" ? activeButtonStyle : undefined}
+          >
+            Hombres / Mujeres
+          </button>
+
+          <button
+            type="button"
+            className="button-secondary"
+            onClick={selectSueltos}
+            style={activeArea === "INTIMA" && printMode === "agrupado" ? activeButtonStyle : undefined}
+          >
+            Pases sueltos
+          </button>
+
+          <button type="button" className="button-secondary" onClick={printTomorrowList}>
+            Numeros de pase
+          </button>
 
           <div className="field" style={{ minWidth: "220px" }}>
             <label htmlFor="fecha-listado">Fecha de pases</label>
@@ -190,9 +216,6 @@ export function PassListing({
 
           <button type="button" className="button-secondary" onClick={() => window.print()}>
             Imprimir
-          </button>
-          <button type="button" className="button-secondary" onClick={printTomorrowList}>
-            Lista sig. dia
           </button>
         </div>
       </div>

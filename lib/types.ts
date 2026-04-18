@@ -62,12 +62,20 @@ export interface VisitorRecord {
   parentesco: string;
   betada: boolean;
   historialInterno: string[];
+  historial: VisitorHistoryEntry[];
   currentInternalId?: string;
   currentInternalName?: string;
   telefono?: string;
   createdAt: string;
   updatedAt: string;
   motivoBetado?: string;
+}
+
+export interface VisitorHistoryEntry {
+  id: string;
+  internalName: string;
+  date: string;
+  type: "visita" | "reasignacion";
 }
 
 export interface DateRecord {

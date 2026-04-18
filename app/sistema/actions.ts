@@ -112,7 +112,7 @@ export async function closeDateAction(
 ): Promise<MutationState> {
   try {
     const profile = await requireProfile();
-    if (!["super-admin", "control"].includes(profile.roleKey)) {
+    if (profile.roleKey !== "control") {
       return failure("Tu rol no puede cerrar la fecha.");
     }
 
@@ -274,6 +274,50 @@ export async function createVisitorAction(
 
     if (!internalId) {
       return failure("Debes asignar la visita a un interno.");
+    }
+
+    const normalizedApellidoMat = (visitorPayload.apellido_mat ?? "").trim().toLowerCase();
+    const { data: duplicateVisitors, error: existingVisitorError } = await supabase
+      .from("visitas")
+      .select("id, apellido_mat")
+      .ilike("nombres", visitorPayload.nombres)
+      .ilike("apellido_pat", visitorPayload.apellido_pat)
+      .order("created_at", { ascending: false });
+
+    if (existingVisitorError) {
+      return failure(existingVisitorError.message || "No se pudo validar la visita.");
+    }
+
+    const existingVisitor =
+      duplicateVisitors?.find(
+        (item) => (item.apellido_mat ?? "").trim().toLowerCase() === normalizedApellidoMat
+      ) ??
+      null;
+
+    if (existingVisitor) {
+      const { data: existingRelation } = await supabase
+        .from("interno_visitas")
+        .select("interno_id")
+        .eq("visita_id", existingVisitor.id)
+        .maybeSingle();
+
+      if (existingRelation?.interno_id) {
+        const { data: internal } = await supabase
+          .from("internos")
+          .select("nombres, apellido_pat, apellido_mat, ubicacion")
+          .eq("id", existingRelation.interno_id)
+          .maybeSingle();
+
+        if (internal) {
+          return failure(
+            `La visita ya esta asignada a ${internal.nombres} ${internal.apellido_pat} ${internal.apellido_mat ?? ""} - ubicacion ${internal.ubicacion}.`
+              .replace(/\s+/g, " ")
+              .trim()
+          );
+        }
+      }
+
+      return failure("La visita ya existe y ya fue registrada previamente.");
     }
 
     const { data: insertedVisitor, error: visitorError } = await supabase

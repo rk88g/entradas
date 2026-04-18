@@ -1,6 +1,7 @@
 "use client";
 
 import { useActionState, useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import {
   createInternalAction,
   createPassAction,
@@ -39,6 +40,7 @@ export function InternalBrowser({
   operatingDate?: string | null;
   roleKey: RoleKey;
 }) {
+  const router = useRouter();
   const [query, setQuery] = useState("");
   const [modalInternalId, setModalInternalId] = useState<string | null>(null);
   const [selectedVisitorIds, setSelectedVisitorIds] = useState<string[]>([]);
@@ -80,8 +82,9 @@ export function InternalBrowser({
   useEffect(() => {
     if (visitorState.success) {
       visitorFormRef.current?.reset();
+      router.refresh();
     }
-  }, [visitorState.success]);
+  }, [router, visitorState.success]);
 
   useEffect(() => {
     if (!modalInternalId) {
@@ -485,11 +488,26 @@ export function InternalBrowser({
                     </div>
                   ) : null}
 
-                  <div className="actions-row">
-                    <button type="submit" className="button" disabled={passPending || !canSubmitPass}>
-                      CREAR PASE
-                    </button>
-                  </div>
+                  {!selected.currentDatePass ? (
+                    <div className="actions-row">
+                      <button
+                        type="submit"
+                        className="button"
+                        disabled={passPending || !canSubmitPass}
+                      >
+                        CREAR PASE
+                      </button>
+                    </div>
+                  ) : (
+                    <div style={{ gridColumn: "1 / -1" }}>
+                      <MutationBanner
+                        state={{
+                          success: null,
+                          error: "Ese interno ya tiene pase creado para la fecha activa."
+                        }}
+                      />
+                    </div>
+                  )}
                 </form>
               </div>
             </div>

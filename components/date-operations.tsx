@@ -109,7 +109,7 @@ export function DateOperations({
           </div>
         </form>
 
-        {(roleKey === "super-admin" || roleKey === "control") && operatingDate ? (
+        {roleKey === "control" && operatingDate ? (
           <>
             <div style={{ height: "1rem" }} />
             <strong className="section-title">Cierre</strong>

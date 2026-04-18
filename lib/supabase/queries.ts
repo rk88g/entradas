@@ -13,6 +13,7 @@ import {
   PassVisitor,
   RoleKey,
   UserProfile,
+  VisitorHistoryEntry,
   VisitorRecord,
   VisitorSex
 } from "@/lib/types";
@@ -95,7 +96,8 @@ function mapVisitorRecord(
     created_at: string;
     updated_at: string;
   },
-  historialInterno: string[] = []
+  historialInterno: string[] = [],
+  historial: VisitorHistoryEntry[] = []
 ): VisitorRecord {
   return {
     id: item.id,
@@ -110,19 +112,21 @@ function mapVisitorRecord(
     parentesco: item.parentesco,
     betada: Boolean(item.betada),
     historialInterno,
+    historial,
     telefono: item.telefono ?? undefined,
     createdAt: item.created_at,
     updatedAt: item.updated_at
   };
 }
 
-async function getVisitorHistoryMap(supabase: SupabaseClient) {
-  const [{ data }, { data: transferHistory }, { data: internals }] = await Promise.all([
-    supabase.from("historial_ingresos").select("visita_id, interno_nombre"),
-    supabase.from("visita_interno_historial").select("visita_id, interno_id"),
+async function getVisitorHistoryData(supabase: SupabaseClient) {
+  const [{ data: visitHistory }, { data: transferHistory }, { data: internals }] = await Promise.all([
+    supabase.from("historial_ingresos").select("listado_id, visita_id, interno_nombre, fecha_visita"),
+    supabase.from("visita_interno_historial").select("id, visita_id, interno_id, created_at"),
     supabase.from("internos").select("id, nombres, apellido_pat, apellido_mat")
   ]);
   const historyMap = new Map<string, string[]>();
+  const detailedHistoryMap = new Map<string, VisitorHistoryEntry[]>();
   const internalNameMap = new Map(
     (internals ?? []).map((item) => [
       item.id,
@@ -130,7 +134,7 @@ async function getVisitorHistoryMap(supabase: SupabaseClient) {
     ])
   );
 
-  (data ?? []).forEach((item) => {
+  (visitHistory ?? []).forEach((item) => {
     if (!item.visita_id || !item.interno_nombre) {
       return;
     }
@@ -140,6 +144,15 @@ async function getVisitorHistoryMap(supabase: SupabaseClient) {
       current.push(item.interno_nombre);
       historyMap.set(item.visita_id, current);
     }
+
+    const historyEntries = detailedHistoryMap.get(item.visita_id) ?? [];
+    historyEntries.push({
+      id: item.listado_id,
+      internalName: item.interno_nombre,
+      date: item.fecha_visita,
+      type: "visita"
+    });
+    detailedHistoryMap.set(item.visita_id, historyEntries);
   });
 
   (transferHistory ?? []).forEach((item) => {
@@ -153,9 +166,25 @@ async function getVisitorHistoryMap(supabase: SupabaseClient) {
       current.push(name);
       historyMap.set(item.visita_id, current);
     }
+
+    const historyEntries = detailedHistoryMap.get(item.visita_id) ?? [];
+    historyEntries.push({
+      id: item.id,
+      internalName: name,
+      date: item.created_at,
+      type: "reasignacion"
+    });
+    detailedHistoryMap.set(item.visita_id, historyEntries);
   });
 
-  return historyMap;
+  detailedHistoryMap.forEach((entries, visitorId) => {
+    detailedHistoryMap.set(
+      visitorId,
+      [...entries].sort((a, b) => b.date.localeCompare(a.date))
+    );
+  });
+
+  return { historyMap, detailedHistoryMap };
 }
 
 async function getInternosMap(
@@ -188,8 +217,8 @@ async function getVisitorsMap(
     return new Map();
   }
 
-  const [historyMap, { data, error }] = await Promise.all([
-    getVisitorHistoryMap(supabase),
+  const [{ historyMap, detailedHistoryMap }, { data, error }] = await Promise.all([
+    getVisitorHistoryData(supabase),
     supabase
       .from("visitas")
       .select(
@@ -202,7 +231,16 @@ async function getVisitorsMap(
     return new Map();
   }
 
-  return new Map(data.map((item) => [item.id, mapVisitorRecord(item, historyMap.get(item.id) ?? [])]));
+  return new Map(
+    data.map((item) => [
+      item.id,
+      mapVisitorRecord(
+        item,
+        historyMap.get(item.id) ?? [],
+        detailedHistoryMap.get(item.id) ?? []
+      )
+    ])
+  );
 }
 
 async function buildListingsForRows(
@@ -351,7 +389,7 @@ export async function getInternos(): Promise<InternalRecord[]> {
 
 export async function getVisitas(): Promise<VisitorRecord[]> {
   const supabase = await createServerSupabaseClient();
-  const historyMap = await getVisitorHistoryMap(supabase);
+  const { historyMap, detailedHistoryMap } = await getVisitorHistoryData(supabase);
   const [{ data, error }, { data: currentRelations, error: relationError }, internals] = await Promise.all([
     supabase
       .from("visitas")
@@ -389,7 +427,11 @@ export async function getVisitas(): Promise<VisitorRecord[]> {
     data.map((item) => {
       const currentRelation = currentRelationMap.get(item.id);
       return {
-        ...mapVisitorRecord(item, historyMap.get(item.id) ?? []),
+        ...mapVisitorRecord(
+          item,
+          historyMap.get(item.id) ?? [],
+          detailedHistoryMap.get(item.id) ?? []
+        ),
         currentInternalId: currentRelation?.internoId,
         currentInternalName: currentRelation?.internoName
       };
