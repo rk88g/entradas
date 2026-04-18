@@ -40,6 +40,7 @@ export default async function ListadoPage() {
         profiles={builderData.internalProfiles}
         todaysPasses={builderData.todaysPasses}
         roleKey={profile?.roleKey ?? "capturador"}
+        closePasswordConfigured={builderData.closePasswordConfigured}
       />
 
       <PassListing listings={listado} initialDate={selectedDate} />

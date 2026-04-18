@@ -1,7 +1,7 @@
 "use client";
 
 import { useActionState } from "react";
-import { closeDateAction, createDateAction, mutationInitialState } from "@/app/sistema/actions";
+import { createDateAction, mutationInitialState } from "@/app/sistema/actions";
 import { MutationBanner } from "@/components/mutation-banner";
 import { DateRecord } from "@/lib/types";
 import { formatLongDate } from "@/lib/utils";
@@ -17,20 +17,17 @@ export function DateOperations({
     createDateAction,
     mutationInitialState
   );
-  const [closeState, closeAction, closePending] = useActionState(
-    closeDateAction,
-    mutationInitialState
-  );
 
   return (
     <section className="module-grid">
       <article className="data-card">
         <div className="actions-row" style={{ justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
           <strong className="section-title">Fechas</strong>
-          <span className="chip">{dates.length}</span>
+          <div className="tag-row">
+            {operatingDate ? <span className="chip">{operatingDate.fechaCompleta}</span> : null}
+            <span className="chip">{dates.length}</span>
+          </div>
         </div>
-
-        <MutationBanner state={closeState} />
 
         <div className="calendar-grid" style={{ marginTop: "1rem" }}>
           {dates.map((date) => (
@@ -45,14 +42,6 @@ export function DateOperations({
                 <span className="chip">{date.estado}</span>
                 <span className="chip">{date.cierre ? "Cerrada" : "Abierta"}</span>
               </div>
-              {!date.cierre && operatingDate?.id === date.id ? (
-                <form action={closeAction}>
-                  <input type="hidden" name="fecha_completa" value={date.fechaCompleta} />
-                  <button className="button-secondary" type="submit" disabled={closePending}>
-                    Cerrar
-                  </button>
-                </form>
-              ) : null}
             </article>
           ))}
         </div>

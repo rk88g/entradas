@@ -1,26 +1,66 @@
 "use client";
 
-import { useActionState } from "react";
-import { createVisitorAction, mutationInitialState } from "@/app/sistema/actions";
+import { useActionState, useMemo, useState } from "react";
+import {
+  createVisitorAction,
+  mutationInitialState,
+  reassignVisitorAction
+} from "@/app/sistema/actions";
 import { MutationBanner } from "@/components/mutation-banner";
 import { StatusBadge } from "@/components/status-badge";
-import { InternalRecord, VisitorRecord } from "@/lib/types";
+import { InternalRecord, RoleKey, VisitorRecord } from "@/lib/types";
 
 export function VisitorManager({
   visitors,
   internals,
-  operatingDate
+  operatingDate,
+  roleKey
 }: {
   visitors: VisitorRecord[];
   internals: InternalRecord[];
   operatingDate?: string | null;
+  roleKey: RoleKey;
 }) {
-  const [state, action, pending] = useActionState(createVisitorAction, mutationInitialState);
+  const [query, setQuery] = useState("");
+  const [selectedId, setSelectedId] = useState(visitors[0]?.id ?? "");
+  const [createState, createAction, createPending] = useActionState(
+    createVisitorAction,
+    mutationInitialState
+  );
+  const [reassignState, reassignAction, reassignPending] = useActionState(
+    reassignVisitorAction,
+    mutationInitialState
+  );
+
+  const filtered = useMemo(() => {
+    const normalized = query.trim().toLowerCase();
+    if (!normalized) {
+      return visitors;
+    }
+
+    return visitors.filter((visitor) => {
+      return (
+        visitor.fullName.toLowerCase().includes(normalized) ||
+        (visitor.currentInternalName ?? "").toLowerCase().includes(normalized)
+      );
+    });
+  }, [query, visitors]);
+
+  const selected =
+    filtered.find((visitor) => visitor.id === selectedId) ??
+    visitors.find((visitor) => visitor.id === selectedId) ??
+    filtered[0] ??
+    null;
+
+  const canReassign = roleKey === "super-admin" || roleKey === "control";
 
   return (
     <section className="module-grid">
       <article className="data-card">
-        <div className="actions-row" style={{ justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
+        <div
+          className="actions-row"
+          style={{ justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}
+        >
           <strong className="section-title">Visitas</strong>
           <div className="tag-row">
             {operatingDate ? <span className="chip">{operatingDate}</span> : null}
@@ -28,34 +68,47 @@ export function VisitorManager({
           </div>
         </div>
 
+        <div className="field" style={{ marginBottom: "1rem" }}>
+          <input
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Buscar visita o interno"
+          />
+        </div>
+
         <div className="table-wrap">
           <table>
             <thead>
               <tr>
                 <th>Visita</th>
-                <th>Sexo</th>
+                <th>Interno</th>
                 <th>Edad</th>
-                <th>Parentesco</th>
                 <th>Estatus</th>
               </tr>
             </thead>
             <tbody>
-              {visitors.length === 0 ? (
+              {filtered.length === 0 ? (
                 <tr>
-                  <td colSpan={5}>Sin visitas.</td>
+                  <td colSpan={4}>Sin visitas.</td>
                 </tr>
               ) : (
-                visitors.map((visitor) => (
-                  <tr key={visitor.id}>
+                filtered.map((visitor) => (
+                  <tr
+                    key={visitor.id}
+                    onClick={() => setSelectedId(visitor.id)}
+                    style={{
+                      background: selected?.id === visitor.id ? "rgba(15,118,110,0.08)" : undefined,
+                      cursor: "pointer"
+                    }}
+                  >
                     <td>
                       <div className="record-title">
                         <strong>{visitor.fullName}</strong>
-                        <span>{visitor.historialInterno.join(", ") || "-"}</span>
+                        <span>{visitor.parentesco}</span>
                       </div>
                     </td>
-                    <td>{visitor.sexo}</td>
+                    <td>{visitor.currentInternalName ?? "-"}</td>
                     <td>{visitor.edad}</td>
-                    <td>{visitor.parentesco}</td>
                     <td>
                       <StatusBadge variant={visitor.betada ? "danger" : "ok"}>
                         {visitor.betada ? "Betada" : "Activa"}
@@ -71,8 +124,8 @@ export function VisitorManager({
 
       <article className="form-card">
         <strong className="section-title">Nueva visita</strong>
-        <MutationBanner state={state} />
-        <form action={action} className="field-grid" style={{ marginTop: "1rem" }}>
+        <MutationBanner state={createState} />
+        <form action={createAction} className="field-grid" style={{ marginTop: "1rem" }}>
           <div className="field">
             <input name="nombres" placeholder="Nombres" />
           </div>
@@ -105,11 +158,13 @@ export function VisitorManager({
             </select>
           </div>
           <div className="field">
-            <select name="interno_id" defaultValue="">
-              <option value="">Asignar a interno</option>
+            <select name="interno_id" defaultValue="" required>
+              <option value="" disabled>
+                Interno
+              </option>
               {internals.map((internal) => (
                 <option key={internal.id} value={internal.id}>
-                  {internal.fullName} · {internal.ubicacion}
+                  {internal.fullName} - {internal.ubicacion}
                 </option>
               ))}
             </select>
@@ -125,12 +180,98 @@ export function VisitorManager({
             <textarea name="notas" placeholder="Notas" />
           </div>
           <div className="actions-row">
-            <button type="submit" className="button" disabled={pending}>
+            <button type="submit" className="button" disabled={createPending}>
               Guardar
             </button>
           </div>
         </form>
       </article>
+
+      {selected ? (
+        <article className="data-card" style={{ gridColumn: "1 / -1" }}>
+          <div
+            className="actions-row"
+            style={{ justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}
+          >
+            <div className="record-title">
+              <strong className="section-title">{selected.fullName}</strong>
+              <span>{selected.currentInternalName ?? "-"}</span>
+            </div>
+            <div className="tag-row">
+              <span className="chip">{selected.sexo}</span>
+              <span className="chip">{selected.edad}</span>
+            </div>
+          </div>
+
+          <div className="split-grid">
+            <div className="data-card" style={{ padding: "1rem" }}>
+              <div className="mini-list">
+                <div className="mini-row">
+                  <span>Interno actual</span>
+                  <strong>{selected.currentInternalName ?? "-"}</strong>
+                </div>
+                <div className="mini-row">
+                  <span>Parentesco</span>
+                  <strong>{selected.parentesco}</strong>
+                </div>
+                <div className="mini-row">
+                  <span>Telefono</span>
+                  <strong>{selected.telefono ?? "-"}</strong>
+                </div>
+              </div>
+            </div>
+
+            <div className="data-card" style={{ padding: "1rem" }}>
+              <strong style={{ display: "block", marginBottom: "0.75rem" }}>Historial</strong>
+              <div className="mini-list">
+                {selected.historialInterno.length === 0 ? (
+                  <div className="mini-row">
+                    <span>Sin historial</span>
+                    <span className="chip">0</span>
+                  </div>
+                ) : (
+                  selected.historialInterno.map((internalName) => (
+                    <div key={internalName} className="mini-row">
+                      <span>{internalName}</span>
+                    </div>
+                  ))
+                )}
+              </div>
+            </div>
+          </div>
+
+          {canReassign ? (
+            <div style={{ marginTop: "1rem" }}>
+              <MutationBanner state={reassignState} />
+              <form action={reassignAction} className="field-grid" style={{ marginTop: "1rem" }}>
+                <input type="hidden" name="visita_id" value={selected.id} />
+                <div className="field">
+                  <select name="interno_id" defaultValue="" required>
+                    <option value="" disabled>
+                      Reasignar a interno
+                    </option>
+                    {internals
+                      .filter((internal) => internal.id !== selected.currentInternalId)
+                      .map((internal) => (
+                        <option key={internal.id} value={internal.id}>
+                          {internal.fullName} - {internal.ubicacion}
+                        </option>
+                      ))}
+                  </select>
+                </div>
+                <div className="field">
+                  <input name="parentesco" placeholder="Parentesco con nuevo interno" />
+                </div>
+                <div className="actions-row">
+                  <button type="submit" className="button-secondary" disabled={reassignPending}>
+                    Reasignar
+                  </button>
+                </div>
+              </form>
+            </div>
+          ) : null}
+        </article>
+      ) : null}
     </section>
   );
 }

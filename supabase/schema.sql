@@ -152,6 +152,22 @@ create table if not exists public.interno_visitas (
   unique (interno_id, visita_id)
 );
 
+create table if not exists public.visita_interno_historial (
+  id uuid primary key default gen_random_uuid(),
+  visita_id uuid not null references public.visitas (id) on delete cascade,
+  interno_id uuid not null references public.internos (id) on delete cascade,
+  accion text not null default 'reasignacion',
+  created_by uuid references public.user_profiles (id),
+  created_at timestamptz not null default timezone('utc', now())
+);
+
+create table if not exists public.app_settings (
+  key text primary key,
+  value text,
+  updated_by uuid references public.user_profiles (id),
+  updated_at timestamptz not null default timezone('utc', now())
+);
+
 create table if not exists public.listado_visitas (
   id uuid primary key default gen_random_uuid(),
   listado_id uuid not null references public.listado (id) on delete cascade,
@@ -168,6 +184,7 @@ create index if not exists idx_fechas_fecha_completa on public.fechas (fecha_com
 create index if not exists idx_listado_fecha_visita on public.listado (fecha_visita, apartado);
 create index if not exists idx_listado_numero_pase on public.listado (fecha_visita, numero_pase);
 create index if not exists idx_interno_visitas_interno on public.interno_visitas (interno_id);
+create index if not exists idx_visita_interno_historial_visita on public.visita_interno_historial (visita_id);
 
 create or replace view public.historial_ingresos as
 select
@@ -267,6 +284,8 @@ alter table public.fechas enable row level security;
 alter table public.listado enable row level security;
 alter table public.listado_visitas enable row level security;
 alter table public.interno_visitas enable row level security;
+alter table public.visita_interno_historial enable row level security;
+alter table public.app_settings enable row level security;
 
 create or replace function public.current_role_key()
 returns text
@@ -335,6 +354,20 @@ for select
 to authenticated
 using (true);
 
+drop policy if exists "read access visita_interno_historial" on public.visita_interno_historial;
+create policy "read access visita_interno_historial"
+on public.visita_interno_historial
+for select
+to authenticated
+using (true);
+
+drop policy if exists "read access app_settings" on public.app_settings;
+create policy "read access app_settings"
+on public.app_settings
+for select
+to authenticated
+using (true);
+
 drop policy if exists "read access betadas" on public.betadas;
 create policy "read access betadas"
 on public.betadas
@@ -389,6 +422,22 @@ for all
 to authenticated
 using (public.current_role_key() in ('super-admin', 'control', 'supervisor', 'capturador'))
 with check (public.current_role_key() in ('super-admin', 'control', 'supervisor', 'capturador'));
+
+drop policy if exists "manage visitor transfer history" on public.visita_interno_historial;
+create policy "manage visitor transfer history"
+on public.visita_interno_historial
+for all
+to authenticated
+using (public.current_role_key() in ('super-admin', 'control'))
+with check (public.current_role_key() in ('super-admin', 'control'));
+
+drop policy if exists "manage app settings" on public.app_settings;
+create policy "manage app settings"
+on public.app_settings
+for all
+to authenticated
+using (public.current_role_key() = 'super-admin')
+with check (public.current_role_key() = 'super-admin');
 
 drop policy if exists "manage betadas by privileged roles" on public.betadas;
 create policy "manage betadas by privileged roles"

@@ -104,7 +104,7 @@ export async function closeDateAction(
 ): Promise<MutationState> {
   try {
     const profile = await requireProfile();
-    if (!["super-admin", "control", "supervisor"].includes(profile.roleKey)) {
+    if (!["super-admin", "control"].includes(profile.roleKey)) {
       return failure("Tu rol no puede cerrar la fecha.");
     }
 
@@ -114,6 +114,21 @@ export async function closeDateAction(
     }
 
     const supabase = await createServerSupabaseClient();
+    const closePassword = String(formData.get("close_password") ?? "").trim();
+    const { data: setting } = await supabase
+      .from("app_settings")
+      .select("value")
+      .eq("key", "close_password")
+      .maybeSingle();
+
+    if (!setting?.value) {
+      return failure("No hay contraseña de cierre configurada.");
+    }
+
+    if (setting.value !== closePassword) {
+      return failure("Contraseña incorrecta.");
+    }
+
     const selectedDate = await getDateByValue(dateValue);
     if (!selectedDate) {
       return failure("La fecha ya no existe.");
@@ -183,7 +198,7 @@ export async function createInternalAction(
       libre: String(formData.get("libre") ?? "").trim() || null,
       ubicacion: Number(formData.get("ubicacion") ?? 0),
       ubi_filiacion: String(formData.get("ubi_filiacion") ?? "").trim(),
-      apartado: String(formData.get("apartado") ?? "618").trim(),
+      apartado: "618",
       observaciones: String(formData.get("observaciones") ?? "").trim() || null,
       created_by: profile.id
     };
@@ -248,6 +263,10 @@ export async function createVisitorAction(
       return failure("Completa los datos obligatorios.");
     }
 
+    if (!internalId) {
+      return failure("Debes asignar la visita a un interno.");
+    }
+
     const { data: insertedVisitor, error: visitorError } = await supabase
       .from("visitas")
       .insert(visitorPayload)
@@ -284,6 +303,121 @@ export async function createVisitorAction(
   }
 }
 
+export async function reassignVisitorAction(
+  _prevState: MutationState,
+  formData: FormData
+): Promise<MutationState> {
+  try {
+    const profile = await requireProfile();
+    if (!["super-admin", "control"].includes(profile.roleKey)) {
+      return failure("Tu rol no puede reasignar visitas.");
+    }
+
+    const supabase = await createServerSupabaseClient();
+    const visitaId = String(formData.get("visita_id") ?? "").trim();
+    const internoId = String(formData.get("interno_id") ?? "").trim();
+    const parentesco = String(formData.get("parentesco") ?? "").trim();
+
+    if (!visitaId || !internoId) {
+      return failure("Debes elegir la visita y el interno destino.");
+    }
+
+    const { data: currentRelations, error: currentError } = await supabase
+      .from("interno_visitas")
+      .select("interno_id")
+      .eq("visita_id", visitaId);
+
+    if (currentError) {
+      return failure(currentError.message || "No se pudo revisar la asignacion actual.");
+    }
+
+    const previousInternalIds = (currentRelations ?? [])
+      .map((item) => item.interno_id)
+      .filter((id) => id !== internoId);
+
+    if ((currentRelations ?? []).some((item) => item.interno_id === internoId)) {
+      return failure("La visita ya pertenece a ese interno.");
+    }
+
+    for (const previousInternalId of previousInternalIds) {
+      const { error: historyError } = await supabase.from("visita_interno_historial").insert({
+        visita_id: visitaId,
+        interno_id: previousInternalId,
+        accion: "reasignacion",
+        created_by: profile.id
+      });
+
+      if (historyError) {
+        return failure(historyError.message || "No se pudo guardar el historial de la visita.");
+      }
+    }
+
+    const { error: deleteError } = await supabase
+      .from("interno_visitas")
+      .delete()
+      .eq("visita_id", visitaId);
+
+    if (deleteError) {
+      return failure(deleteError.message || "No se pudo limpiar la asignacion anterior.");
+    }
+
+    const { error: insertError } = await supabase.from("interno_visitas").insert({
+      interno_id: internoId,
+      visita_id: visitaId,
+      parentesco: parentesco || null,
+      titular: true,
+      created_by: profile.id
+    });
+
+    if (insertError) {
+      return failure(insertError.message || "No se pudo reasignar la visita.");
+    }
+
+    revalidatePath("/sistema/internos");
+    revalidatePath("/sistema/visitas");
+    revalidatePath("/sistema/listado");
+    return success("Visita reasignada.");
+  } catch (error) {
+    return failure(error instanceof Error ? error.message : "No se pudo reasignar la visita.");
+  }
+}
+
+export async function updateClosePasswordAction(
+  _prevState: MutationState,
+  formData: FormData
+): Promise<MutationState> {
+  try {
+    const profile = await requireProfile();
+    if (profile.roleKey !== "super-admin") {
+      return failure("Solo super-admin puede cambiar la contraseña.");
+    }
+
+    const value = String(formData.get("close_password") ?? "").trim();
+    if (!value) {
+      return failure("Escribe una contraseña.");
+    }
+
+    const supabase = await createServerSupabaseClient();
+    const { error } = await supabase.from("app_settings").upsert(
+      {
+        key: "close_password",
+        value,
+        updated_by: profile.id
+      },
+      { onConflict: "key" }
+    );
+
+    if (error) {
+      return failure(error.message || "No se pudo guardar la contraseña.");
+    }
+
+    revalidatePath("/sistema/listado");
+    return success("Contraseña guardada.");
+  } catch (error) {
+    return failure(error instanceof Error ? error.message : "No se pudo guardar la contraseña.");
+  }
+}
+
 export async function linkVisitorAction(
   _prevState: MutationState,
   formData: FormData
@@ -313,6 +447,20 @@ export async function linkVisitorAction(
 
     if (visitor.betada) {
       return failure("No puedes vincular una visita betada.");
+    }
+
+    const { data: currentRelation, error: relationLookupError } = await supabase
+      .from("interno_visitas")
+      .select("interno_id")
+      .eq("visita_id", visitaId)
+      .maybeSingle();
+
+    if (relationLookupError) {
+      return failure(relationLookupError.message || "No se pudo revisar la asignacion actual.");
+    }
+
+    if (currentRelation?.interno_id && currentRelation.interno_id !== internoId) {
+      return failure("La visita ya pertenece a otro interno.");
     }
 
     const { error } = await supabase.from("interno_visitas").upsert(
@@ -374,13 +522,19 @@ export async function createPassAction(
 
     const { data: existingPass } = await supabase
       .from("listado")
-      .select("id")
+      .select("id, status")
       .eq("interno_id", internoId)
       .eq("fecha_id", operatingDate.id)
       .neq("status", "cancelado")
       .maybeSingle();
 
-    if (existingPass) {
+    const canEditExisting =
+      existingPass &&
+      ["super-admin", "control"].includes(profile.roleKey) &&
+      !operatingDate.cierre &&
+      existingPass.status !== "impreso";
+
+    if (existingPass && !canEditExisting) {
       return failure("Ese interno ya tiene pase para la fecha abierta.");
     }
 
@@ -412,29 +566,59 @@ export async function createPassAction(
       return failure("No puedes generar un pase con visitas betadas.");
     }
 
-    const { data: insertedPass, error: insertError } = await supabase
-      .from("listado")
-      .insert({
-        interno_id: internoId,
-        fecha_id: operatingDate.id,
-        fecha_visita: operatingDate.fechaCompleta,
-        apartado: area,
-        status: "capturado",
-        numero_pase: null,
-        cierre_aplicado: false,
-        menciones: canManageMentions(profile.roleKey) && mentions ? mentions : null,
-        created_by: profile.id
-      })
-      .select("id")
-      .single();
+    let passId = existingPass?.id ?? "";
 
-    if (insertError || !insertedPass) {
-      return failure(insertError?.message || "No se pudo crear el pase.");
+    if (canEditExisting && existingPass) {
+      const { error: resetError } = await supabase
+        .from("listado_visitas")
+        .delete()
+        .eq("listado_id", existingPass.id);
+
+      if (resetError) {
+        return failure(resetError.message || "No se pudo limpiar el pase actual.");
+      }
+
+      const { error: updateError } = await supabase
+        .from("listado")
+        .update({
+          apartado: area,
+          menciones: canManageMentions(profile.roleKey) && mentions ? mentions : null,
+          updated_at: new Date().toISOString()
+        })
+        .eq("id", existingPass.id);
+
+      if (updateError) {
+        return failure(updateError.message || "No se pudo actualizar el pase.");
+      }
+
+      passId = existingPass.id;
+    } else {
+      const { data: insertedPass, error: insertError } = await supabase
+        .from("listado")
+        .insert({
+          interno_id: internoId,
+          fecha_id: operatingDate.id,
+          fecha_visita: operatingDate.fechaCompleta,
+          apartado: area,
+          status: "capturado",
+          numero_pase: null,
+          cierre_aplicado: false,
+          menciones: canManageMentions(profile.roleKey) && mentions ? mentions : null,
+          created_by: profile.id
+        })
+        .select("id")
+        .single();
+
+      if (insertError || !insertedPass) {
+        return failure(insertError?.message || "No se pudo crear el pase.");
+      }
+
+      passId = insertedPass.id;
     }
 
     const orderedVisitors = [...selectedVisitors].sort((a, b) => (b.edad ?? 0) - (a.edad ?? 0));
     const payload = orderedVisitors.map((visitor, index) => ({
-      listado_id: insertedPass.id,
+      listado_id: passId,
       visita_id: visitor.id,
       orden: index + 1,
       validada: false
@@ -450,7 +634,7 @@ export async function createPassAction(
     revalidatePath("/sistema");
     revalidatePath("/sistema/internos");
     revalidatePath("/sistema/listado");
-    return success("Pase creado.");
+    return success(canEditExisting ? "Pase actualizado." : "Pase creado.");
   } catch (error) {
     return failure(error instanceof Error ? error.message : "No se pudo crear el pase.");
   }

@@ -50,7 +50,7 @@ export function InternalBrowser({
 
   const linkedVisitorIds = new Set(selected?.visitors.map((item) => item.visitaId) ?? []);
   const candidateVisitors = availableVisitors.filter(
-    (visitor) => !linkedVisitorIds.has(visitor.id) && !visitor.betada
+    (visitor) => !linkedVisitorIds.has(visitor.id) && !visitor.betada && !visitor.currentInternalId
   );
 
   return (
@@ -149,12 +149,6 @@ export function InternalBrowser({
           </div>
           <div className="field">
             <input name="ubi_filiacion" placeholder="Filiacion" />
-          </div>
-          <div className="field">
-            <select name="apartado" defaultValue="618">
-              <option value="618">618</option>
-              <option value="INTIMA">Suelto</option>
-            </select>
           </div>
           <div className="field" style={{ gridColumn: "1 / -1" }}>
             <textarea name="observaciones" placeholder="Observaciones" />

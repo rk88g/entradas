@@ -113,8 +113,18 @@ function mapVisitorRecord(
 }
 
 async function getVisitorHistoryMap(supabase: SupabaseClient) {
-  const { data } = await supabase.from("historial_ingresos").select("visita_id, interno_nombre");
+  const [{ data }, { data: transferHistory }, { data: internals }] = await Promise.all([
+    supabase.from("historial_ingresos").select("visita_id, interno_nombre"),
+    supabase.from("visita_interno_historial").select("visita_id, interno_id"),
+    supabase.from("internos").select("id, nombres, apellido_pat, apellido_mat")
+  ]);
   const historyMap = new Map<string, string[]>();
+  const internalNameMap = new Map(
+    (internals ?? []).map((item) => [
+      item.id,
+      fullNameFromParts(item.nombres, item.apellido_pat, item.apellido_mat)
+    ])
+  );
 
   (data ?? []).forEach((item) => {
     if (!item.visita_id || !item.interno_nombre) {
@@ -124,6 +134,19 @@ async function getVisitorHistoryMap(supabase: SupabaseClient) {
     const current = historyMap.get(item.visita_id) ?? [];
     if (!current.includes(item.interno_nombre)) {
       current.push(item.interno_nombre);
+      historyMap.set(item.visita_id, current);
+    }
+  });
+
+  (transferHistory ?? []).forEach((item) => {
+    const name = internalNameMap.get(item.interno_id);
+    if (!item.visita_id || !name) {
+      return;
+    }
+
+    const current = historyMap.get(item.visita_id) ?? [];
+    if (!current.includes(name)) {
+      current.push(name);
       historyMap.set(item.visita_id, current);
     }
   });
@@ -325,19 +348,48 @@ export async function getInternos(): Promise<InternalRecord[]> {
 export async function getVisitas(): Promise<VisitorRecord[]> {
   const supabase = await createServerSupabaseClient();
   const historyMap = await getVisitorHistoryMap(supabase);
-  const { data, error } = await supabase
-    .from("visitas")
-    .select(
-      "id, nombres, apellido_pat, apellido_mat, fecha_nacimiento, edad, menor, sexo, parentesco, betada, telefono, created_at, updated_at"
-    )
-    .order("updated_at", { ascending: false });
+  const [{ data, error }, { data: currentRelations, error: relationError }, internals] = await Promise.all([
+    supabase
+      .from("visitas")
+      .select(
+        "id, nombres, apellido_pat, apellido_mat, fecha_nacimiento, edad, menor, sexo, parentesco, betada, telefono, created_at, updated_at"
+      )
+      .order("updated_at", { ascending: false }),
+    supabase
+      .from("interno_visitas")
+      .select("visita_id, interno_id"),
+    getInternos()
+  ]);
 
   if (error || !data) {
     return [];
   }
 
+  const internalMap = new Map(internals.map((internal) => [internal.id, internal]));
+  const currentRelationMap = new Map<string, { internoId: string; internoName: string }>();
+  if (!relationError) {
+    (currentRelations ?? []).forEach((item) => {
+      const interno = internalMap.get(item.interno_id);
+      if (!interno) {
+        return;
+      }
+
+      currentRelationMap.set(item.visita_id, {
+        internoId: item.interno_id,
+        internoName: interno.fullName
+      });
+    });
+  }
+
   return sortVisitorsByAge(
-    data.map((item) => mapVisitorRecord(item, historyMap.get(item.id) ?? []))
+    data.map((item) => {
+      const currentRelation = currentRelationMap.get(item.id);
+      return {
+        ...mapVisitorRecord(item, historyMap.get(item.id) ?? []),
+        currentInternalId: currentRelation?.internoId,
+        currentInternalName: currentRelation?.internoName
+      };
+    })
   );
 }
 
@@ -523,7 +575,9 @@ export async function getInternalProfiles(dateValue?: string): Promise<InternalP
 export async function getListingBuilderData(): Promise<ListingBuilderData> {
   const operatingDate = await getOperatingDate();
   const todayDate = await getDateByValue(getTodayDate());
-  const [internalProfiles, todaysPasses] = await Promise.all([
+  const supabase = await createServerSupabaseClient();
+  const [{ data: closePasswordSetting }, internalProfiles, todaysPasses] = await Promise.all([
+    supabase.from("app_settings").select("key").eq("key", "close_password").maybeSingle(),
     getInternalProfiles(operatingDate?.fechaCompleta),
     getListado({ fechaVisita: getTodayDate() })
   ]);
@@ -532,7 +586,8 @@ export async function getListingBuilderData(): Promise<ListingBuilderData> {
     operatingDate,
     todayDate,
     internalProfiles,
-    todaysPasses
+    todaysPasses,
+    closePasswordConfigured: Boolean(closePasswordSetting)
   };
 }
 

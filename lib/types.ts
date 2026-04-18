@@ -60,6 +60,8 @@ export interface VisitorRecord {
   parentesco: string;
   betada: boolean;
   historialInterno: string[];
+  currentInternalId?: string;
+  currentInternalName?: string;
   telefono?: string;
   createdAt: string;
   updatedAt: string;
@@ -128,6 +130,7 @@ export interface ListingBuilderData {
   todayDate: DateRecord | null;
   internalProfiles: InternalProfile[];
   todaysPasses: ListingRecord[];
+  closePasswordConfigured: boolean;
 }
 
 export interface MutationState {
