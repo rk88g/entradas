@@ -10,7 +10,7 @@ import {
 import { MutationBanner } from "@/components/mutation-banner";
 import { StatusBadge } from "@/components/status-badge";
 import { InternalProfile, MutationState, RoleKey } from "@/lib/types";
-import { canChoosePassType, canManageMentions } from "@/lib/utils";
+import { canChoosePassType, canManageMentions, formatLongDate } from "@/lib/utils";
 
 const mutationInitialState: MutationState = {
   success: null,
@@ -345,11 +345,25 @@ export function InternalBrowser({
                 <div className="mini-list">
                   <div className="mini-row">
                     <span>Estatus</span>
-                    {selectedLock?.currentPass ? (
-                      <StatusBadge variant="warn">Pase registrado</StatusBadge>
-                    ) : (
-                      <StatusBadge variant="ok">Sin pase</StatusBadge>
-                    )}
+                    <div
+                      style={{
+                        display: "flex",
+                        flexDirection: "column",
+                        alignItems: "flex-end",
+                        gap: "0.35rem"
+                      }}
+                    >
+                      {selectedLock?.currentPass ? (
+                        <>
+                          <StatusBadge variant="warn">Pase registrado</StatusBadge>
+                          <span className="muted" style={{ fontSize: "0.88rem" }}>
+                            {formatLongDate(selectedLock.currentPass.fechaVisita)}
+                          </span>
+                        </>
+                      ) : (
+                        <StatusBadge variant="ok">Sin pase</StatusBadge>
+                      )}
+                    </div>
                   </div>
                 </div>
               </div>
@@ -527,11 +541,22 @@ export function InternalBrowser({
                       >
                       <option value="618">618</option>
                       <option value="INTIMA">Suelto</option>
-                    </select>
-                  </div>
-                ) : (
+                      </select>
+                      <span className="field-hint" style={{ color: "var(--muted)" }}>
+                        Se creara para {selectedLock?.targetDate ? formatLongDate(selectedLock.targetDate) : "la fecha configurada"}
+                      </span>
+                    </div>
+                  ) : (
                     <input type="hidden" name="apartado" value="618" />
                   )}
+
+                  {!canChoosePassType(roleKey) ? (
+                    <div className="field" style={{ gridColumn: "1 / -1" }}>
+                      <span className="field-hint" style={{ color: "var(--muted)" }}>
+                        Se creara para {selectedLock?.targetDate ? formatLongDate(selectedLock.targetDate) : "la fecha configurada"}
+                      </span>
+                    </div>
+                  ) : null}
 
                   {canManageMentions(roleKey) && selectedArea === "INTIMA" ? (
                     <div className="field" style={{ gridColumn: "1 / -1" }}>
