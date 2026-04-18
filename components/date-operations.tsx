@@ -7,8 +7,8 @@ import { DateRecord, MutationState, RoleKey } from "@/lib/types";
 import { formatLongDate, getDateOffset } from "@/lib/utils";
 
 const statusLabels = {
-  abierto: "Fecha operando",
-  proximo: "Fecha siguiente",
+  abierto: "Pases sueltos",
+  proximo: "Fecha 618",
   cerrado: "Fecha cerrada"
 } as const;
 

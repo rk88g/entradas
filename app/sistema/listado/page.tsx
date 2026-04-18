@@ -1,6 +1,6 @@
 import { PassListing } from "@/components/pass-listing";
 import { getListingBuilderData, getListado } from "@/lib/supabase/queries";
-import { getStatsFromListings } from "@/lib/utils";
+import { formatLongDate, getStatsFromListings } from "@/lib/utils";
 
 export default async function ListadoPage() {
   const builderData = await getListingBuilderData();
@@ -19,10 +19,12 @@ export default async function ListadoPage() {
     <>
       <section className="quick-grid hide-print">
         <article className="quick-card">
-          <h3>618</h3>
+          <h3>Fecha 618</h3>
           <div className="mini-list">
             <div className="mini-row">
-              <strong>{builderData.nextDate?.fechaCompleta ?? "Sin fecha proximo"}</strong>
+              <strong>
+                {builderData.nextDate ? formatLongDate(builderData.nextDate.fechaCompleta) : "Sin fecha proximo"}
+              </strong>
             </div>
             <div className="mini-row">
               <span>Pases</span>
@@ -31,10 +33,12 @@ export default async function ListadoPage() {
           </div>
         </article>
         <article className="quick-card">
-          <h3>Sueltos</h3>
+          <h3>Pases sueltos</h3>
           <div className="mini-list">
             <div className="mini-row">
-              <strong>{builderData.openDate?.fechaCompleta ?? "Sin fecha abierta"}</strong>
+              <strong>
+                {builderData.openDate ? formatLongDate(builderData.openDate.fechaCompleta) : "Sin fecha abierta"}
+              </strong>
             </div>
             <div className="mini-row">
               <span>Pases</span>

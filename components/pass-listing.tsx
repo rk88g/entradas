@@ -63,6 +63,12 @@ function renderCompactPass(pass: ListingRecord) {
 
 function renderLoosePass(pass: ListingRecord) {
   const { listedVisitors, underTwelveCount } = get618VisibleVisitors(pass);
+  const minorTextStyle = {
+    color: "#b91c1c",
+    background: "transparent",
+    border: "none",
+    padding: 0
+  } as const;
 
   return (
     <article key={pass.id} className="pass-card">
@@ -83,22 +89,35 @@ function renderLoosePass(pass: ListingRecord) {
           <div
             key={`${pass.id}-${visitor.visitorId}`}
             className={`visitor-row ${visitor.edad < 18 ? "minor" : ""}`}
-            style={{ gridTemplateColumns: "1fr" }}
+            style={{
+              gridTemplateColumns: "1fr",
+              ...(visitor.edad < 18 ? minorTextStyle : {})
+            }}
           >
             {formatCompactVisitorName(visitor)}
           </div>
         ))}
 
         {underTwelveCount > 0 ? (
-          <div className="visitor-row minor" style={{ gridTemplateColumns: "1fr" }}>
+          <div
+            className="visitor-row minor"
+            style={{ gridTemplateColumns: "1fr", ...minorTextStyle }}
+          >
             + {underTwelveCount} menores
           </div>
         ) : null}
       </div>
 
       {pass.menciones ? (
-        <div className="note-box" style={{ marginTop: "1rem" }}>
-          {pass.menciones}
+        <div
+          style={{
+            marginTop: "1rem",
+            paddingTop: "0.8rem",
+            borderTop: "1px dashed #c9b48b"
+          }}
+        >
+          <strong style={{ display: "block", marginBottom: "0.45rem" }}>Mencion</strong>
+          <div>{pass.menciones}</div>
         </div>
       ) : null}
     </article>
