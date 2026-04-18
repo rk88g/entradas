@@ -179,10 +179,6 @@ export function VisitorManager({
               ))}
             </select>
           </div>
-          <label style={{ display: "flex", gap: "0.6rem", alignItems: "center" }}>
-            <input type="checkbox" name="titular" autoComplete="off" />
-            Principal
-          </label>
           <div className="field" style={{ gridColumn: "1 / -1" }}>
             <textarea name="notas" placeholder="Notas" autoComplete="off" />
           </div>
@@ -270,9 +266,6 @@ export function VisitorManager({
                         </option>
                       ))}
                   </select>
-                </div>
-                <div className="field">
-                  <input name="parentesco" placeholder="Parentesco con nuevo interno" autoComplete="off" />
                 </div>
                 <div className="actions-row">
                   <button type="submit" className="button-secondary" disabled={reassignPending}>

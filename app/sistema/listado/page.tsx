@@ -1,10 +1,8 @@
 import { PassListing } from "@/components/pass-listing";
-import { PassOperations } from "@/components/pass-operations";
-import { getCurrentUserProfile, getListingBuilderData, getListado } from "@/lib/supabase/queries";
+import { getListingBuilderData, getListado } from "@/lib/supabase/queries";
 import { getStatsFromListings } from "@/lib/utils";
 
 export default async function ListadoPage() {
-  const profile = await getCurrentUserProfile();
   const builderData = await getListingBuilderData();
   const selectedDate = builderData.operatingDate?.fechaCompleta ?? builderData.todayDate?.fechaCompleta ?? "";
   const listado = await getListado(selectedDate ? { fechaVisita: selectedDate } : undefined);
@@ -34,13 +32,6 @@ export default async function ListadoPage() {
           <strong style={{ fontSize: "2rem" }}>{stats.areas.INTIMA ?? 0}</strong>
         </article>
       </section>
-
-      <PassOperations
-        operatingDate={builderData.operatingDate}
-        profiles={builderData.internalProfiles}
-        todaysPasses={builderData.todaysPasses}
-        roleKey={profile?.roleKey ?? "capturador"}
-      />
 
       <PassListing listings={listado} initialDate={selectedDate} />
     </>

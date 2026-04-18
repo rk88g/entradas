@@ -1,47 +1,48 @@
 "use client";
 
 import { useActionState, useEffect, useMemo, useState } from "react";
-import { createInternalAction, linkVisitorAction } from "@/app/sistema/actions";
+import { createInternalAction, createPassAction } from "@/app/sistema/actions";
 import { MutationBanner } from "@/components/mutation-banner";
 import { StatusBadge } from "@/components/status-badge";
-import { InternalProfile, MutationState, VisitorRecord } from "@/lib/types";
+import { InternalProfile, MutationState, RoleKey } from "@/lib/types";
+import { canChoosePassType, canManageMentions } from "@/lib/utils";
 
 const mutationInitialState: MutationState = {
   success: null,
   error: null
 };
 
+function getPassLock(profile: InternalProfile, roleKey: RoleKey, operatingDate?: string | null) {
+  const currentPass = profile.currentDatePass;
+  const canEditExisting =
+    Boolean(currentPass) &&
+    (roleKey === "super-admin" || roleKey === "control") &&
+    Boolean(operatingDate);
+
+  return {
+    currentPass,
+    canEditExisting,
+    blocked: Boolean(currentPass) && !canEditExisting
+  };
+}
+
 export function InternalBrowser({
   profiles,
-  availableVisitors,
-  operatingDate
+  operatingDate,
+  roleKey
 }: {
   profiles: InternalProfile[];
-  availableVisitors: VisitorRecord[];
   operatingDate?: string | null;
+  roleKey: RoleKey;
 }) {
   const [query, setQuery] = useState("");
   const [modalInternalId, setModalInternalId] = useState<string | null>(null);
-  const [linkState, linkAction, linkPending] = useActionState(linkVisitorAction, mutationInitialState);
+  const [selectedVisitorIds, setSelectedVisitorIds] = useState<string[]>([]);
   const [createState, createAction, createPending] = useActionState(
     createInternalAction,
     mutationInitialState
   );
-
-  useEffect(() => {
-    if (!modalInternalId) {
-      return;
-    }
-
-    const handleEscape = (event: KeyboardEvent) => {
-      if (event.key === "Escape") {
-        setModalInternalId(null);
-      }
-    };
-
-    window.addEventListener("keydown", handleEscape);
-    return () => window.removeEventListener("keydown", handleEscape);
-  }, [modalInternalId]);
+  const [passState, passAction, passPending] = useActionState(createPassAction, mutationInitialState);
 
   const filtered = useMemo(() => {
     const normalized = query.trim().toLowerCase();
@@ -58,10 +59,59 @@ export function InternalBrowser({
   }, [profiles, query]);
 
   const selected = profiles.find((item) => item.id === modalInternalId) ?? null;
-  const linkedVisitorIds = new Set(selected?.visitors.map((item) => item.visitaId) ?? []);
-  const candidateVisitors = availableVisitors.filter(
-    (visitor) => !linkedVisitorIds.has(visitor.id) && !visitor.betada && !visitor.currentInternalId
-  );
+  const selectedLock = selected ? getPassLock(selected, roleKey, operatingDate) : null;
+
+  useEffect(() => {
+    if (passState.success) {
+      setModalInternalId(null);
+    }
+  }, [passState.success]);
+
+  useEffect(() => {
+    if (!modalInternalId) {
+      return;
+    }
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setModalInternalId(null);
+      }
+    };
+
+    window.addEventListener("keydown", handleEscape);
+    return () => window.removeEventListener("keydown", handleEscape);
+  }, [modalInternalId]);
+
+  useEffect(() => {
+    if (!selected) {
+      setSelectedVisitorIds([]);
+      return;
+    }
+
+    const currentSelection =
+      selected.currentDatePass?.visitantes.map((visitor) => visitor.visitorId) ?? [];
+    setSelectedVisitorIds(currentSelection);
+  }, [selected]);
+
+  const selectedVisitors =
+    selected?.visitors.filter((item) => selectedVisitorIds.includes(item.visitaId)) ?? [];
+  const availableVisitors =
+    selected?.visitors.filter((item) => !selectedVisitorIds.includes(item.visitaId)) ?? [];
+  const selectedAdults = selectedVisitors.filter((item) => item.visitor.edad >= 18);
+  const canSubmitPass =
+    Boolean(selected) &&
+    selectedVisitors.length > 0 &&
+    selectedAdults.length > 0 &&
+    !selectedLock?.blocked &&
+    Boolean(operatingDate);
+
+  function toggleVisitor(visitaId: string) {
+    setSelectedVisitorIds((current) =>
+      current.includes(visitaId)
+        ? current.filter((item) => item !== visitaId)
+        : [...current, visitaId]
+    );
+  }
 
   return (
     <>
@@ -110,7 +160,10 @@ export function InternalBrowser({
                       style={{ cursor: "pointer" }}
                     >
                       <td>
-                        <strong>{profile.fullName}</strong>
+                        <div className="record-title">
+                          <strong>{profile.fullName}</strong>
+                          <span>{profile.currentDatePass ? "Pase registrado" : "Sin pase"}</span>
+                        </div>
                       </td>
                       <td>{profile.ubicacion}</td>
                       <td>{profile.edad}</td>
@@ -176,7 +229,7 @@ export function InternalBrowser({
         >
           <div
             className="form-card"
-            style={{ width: "min(100%, 760px)", maxHeight: "90vh", overflow: "auto" }}
+            style={{ width: "min(100%, 980px)", maxHeight: "90vh", overflow: "auto" }}
             onClick={(event) => event.stopPropagation()}
           >
             <div
@@ -206,6 +259,10 @@ export function InternalBrowser({
                     <strong>{selected.telefono || "-"}</strong>
                   </div>
                   <div className="mini-row">
+                    <span>Fecha activa</span>
+                    <strong>{operatingDate ?? "-"}</strong>
+                  </div>
+                  <div className="mini-row">
                     <span>Familiares</span>
                     <strong>{selected.visitors.length}</strong>
                   </div>
@@ -213,70 +270,159 @@ export function InternalBrowser({
               </div>
 
               <div className="data-card" style={{ padding: "1rem" }}>
-                <strong style={{ display: "block", marginBottom: "0.75rem" }}>Familiares</strong>
                 <div className="mini-list">
-                  {selected.visitors.length === 0 ? (
-                    <div className="mini-row">
-                      <span>Sin familiares</span>
-                      <span className="chip">0</span>
-                    </div>
-                  ) : (
-                    selected.visitors.map((item) => (
-                      <div key={item.id} className="mini-row">
-                        <div className="record-title">
-                          <strong>{item.visitor.fullName}</strong>
-                          <span>
-                            {item.parentesco} - {item.visitor.edad} anos
-                          </span>
-                        </div>
-                        {item.visitor.betada ? (
-                          <StatusBadge variant="danger">Betada</StatusBadge>
-                        ) : (
-                          <StatusBadge variant="ok">Activa</StatusBadge>
-                        )}
-                      </div>
-                    ))
-                  )}
+                  <div className="mini-row">
+                    <span>Adultos seleccionados</span>
+                    <strong>{selectedAdults.length}</strong>
+                  </div>
+                  <div className="mini-row">
+                    <span>Incluidos en el pase</span>
+                    <strong>{selectedVisitors.length}</strong>
+                  </div>
+                  <div className="mini-row">
+                    <span>Estatus</span>
+                    {selected.currentDatePass ? (
+                      <StatusBadge variant="warn">Pase registrado</StatusBadge>
+                    ) : (
+                      <StatusBadge variant="ok">Sin pase</StatusBadge>
+                    )}
+                  </div>
                 </div>
               </div>
             </div>
 
-            <div style={{ marginTop: "1rem" }}>
-              <strong style={{ display: "block", marginBottom: "0.75rem" }}>Asignar visita</strong>
-              <MutationBanner state={linkState} />
-              <form
-                action={linkAction}
-                className="field-grid"
-                style={{ marginTop: "1rem" }}
-                autoComplete="off"
-              >
-                <input type="hidden" name="interno_id" value={selected.id} />
+            {selectedLock?.blocked ? (
+              <div style={{ marginTop: "1rem" }}>
+                <MutationBanner
+                  state={{ success: null, error: "Ese interno ya tiene pase para la fecha activa." }}
+                />
+              </div>
+            ) : null}
+
+            {!canSubmitPass && selectedVisitors.length > 0 && selectedAdults.length === 0 ? (
+              <div style={{ marginTop: "1rem" }}>
+                <MutationBanner
+                  state={{ success: null, error: "Debes incluir al menos un adulto en el pase." }}
+                />
+              </div>
+            ) : null}
+
+            <MutationBanner state={passState} />
+
+            <form
+              action={passAction}
+              className="field-grid"
+              style={{ marginTop: "1rem" }}
+              autoComplete="off"
+            >
+              <input type="hidden" name="interno_id" value={selected.id} />
+
+              {selectedVisitorIds.map((visitorId) => (
+                <input key={visitorId} type="hidden" name="visitor_ids" value={visitorId} />
+              ))}
+
+              {canChoosePassType(roleKey) ? (
                 <div className="field">
-                  <select name="visita_id" defaultValue="" autoComplete="off">
-                    <option value="" disabled>
-                      Selecciona una visita
-                    </option>
-                    {candidateVisitors.map((visitor) => (
-                      <option key={visitor.id} value={visitor.id}>
-                        {visitor.fullName}
-                      </option>
-                    ))}
+                  <select name="apartado" defaultValue={selected.currentDatePass?.area ?? "618"}>
+                    <option value="618">618</option>
+                    <option value="INTIMA">Suelto</option>
                   </select>
                 </div>
-                <div className="field">
-                  <input name="parentesco" placeholder="Parentesco" autoComplete="off" />
+              ) : (
+                <input type="hidden" name="apartado" value="618" />
+              )}
+
+              <div className="field" style={{ gridColumn: "1 / -1" }}>
+                <div className="split-grid">
+                  <div className="data-card" style={{ padding: "1rem" }}>
+                    <strong style={{ display: "block", marginBottom: "0.75rem" }}>No vendran</strong>
+                    <div className="mini-list">
+                      {availableVisitors.length === 0 ? (
+                        <div className="mini-row">
+                          <span>Sin registros</span>
+                          <span className="chip">0</span>
+                        </div>
+                      ) : (
+                        availableVisitors.map((item) => (
+                          <button
+                            key={item.id}
+                            type="button"
+                            className="mini-row"
+                            onClick={() => toggleVisitor(item.visitaId)}
+                            style={{
+                              border: "1px solid var(--line)",
+                              borderRadius: "16px",
+                              padding: "0.9rem 1rem",
+                              background: "white",
+                              width: "100%",
+                              textAlign: "left",
+                              cursor: "pointer"
+                            }}
+                          >
+                            <div className="record-title">
+                              <strong>{item.visitor.fullName}</strong>
+                              <span>{item.visitor.edad} anos</span>
+                            </div>
+                          </button>
+                        ))
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="data-card" style={{ padding: "1rem" }}>
+                    <strong style={{ display: "block", marginBottom: "0.75rem" }}>Vendran</strong>
+                    <div className="mini-list">
+                      {selectedVisitors.length === 0 ? (
+                        <div className="mini-row">
+                          <span>Sin registros</span>
+                          <span className="chip">0</span>
+                        </div>
+                      ) : (
+                        selectedVisitors.map((item) => (
+                          <button
+                            key={item.id}
+                            type="button"
+                            className="mini-row"
+                            onClick={() => toggleVisitor(item.visitaId)}
+                            style={{
+                              border: "1px solid var(--line)",
+                              borderRadius: "16px",
+                              padding: "0.9rem 1rem",
+                              background: "white",
+                              width: "100%",
+                              textAlign: "left",
+                              cursor: "pointer"
+                            }}
+                          >
+                            <div className="record-title">
+                              <strong>{item.visitor.fullName}</strong>
+                              <span>{item.visitor.edad} anos</span>
+                            </div>
+                          </button>
+                        ))
+                      )}
+                    </div>
+                  </div>
                 </div>
-                <label style={{ display: "flex", gap: "0.6rem", alignItems: "center" }}>
-                  <input type="checkbox" name="titular" autoComplete="off" />
-                  Principal
-                </label>
-                <div className="actions-row">
-                  <button type="submit" className="button" disabled={linkPending}>
-                    Asignar
-                  </button>
+              </div>
+
+              {canManageMentions(roleKey) ? (
+                <div className="field" style={{ gridColumn: "1 / -1" }}>
+                  <textarea
+                    name="menciones"
+                    placeholder="Menciones"
+                    defaultValue={selected.currentDatePass?.menciones ?? ""}
+                    autoComplete="off"
+                  />
                 </div>
-              </form>
-            </div>
+              ) : null}
+
+              <div className="actions-row">
+                <button type="submit" className="button" disabled={passPending || !canSubmitPass}>
+                  {selectedLock?.canEditExisting ? "ACTUALIZAR PASE" : "CREAR PASE"}
+                </button>
+              </div>
+            </form>
           </div>
         </div>
       ) : null}

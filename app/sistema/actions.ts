@@ -262,7 +262,6 @@ export async function createVisitorAction(
     };
 
     const internalId = String(formData.get("interno_id") ?? "").trim();
-    const titular = String(formData.get("titular") ?? "") === "on";
 
     if (
       !visitorPayload.nombres ||
@@ -292,7 +291,7 @@ export async function createVisitorAction(
         interno_id: internalId,
         visita_id: insertedVisitor.id,
         parentesco: visitorPayload.parentesco,
-        titular,
+        titular: false,
         created_by: profile.id
       });
 
@@ -326,8 +325,6 @@ export async function reassignVisitorAction(
     const supabase = await createServerSupabaseClient();
     const visitaId = String(formData.get("visita_id") ?? "").trim();
     const internoId = String(formData.get("interno_id") ?? "").trim();
-    const parentesco = String(formData.get("parentesco") ?? "").trim();
-
     if (!visitaId || !internoId) {
       return failure("Debes elegir la visita y el interno destino.");
     }
@@ -374,8 +371,8 @@ export async function reassignVisitorAction(
     const { error: insertError } = await supabase.from("interno_visitas").insert({
       interno_id: internoId,
       visita_id: visitaId,
-      parentesco: parentesco || null,
-      titular: true,
+      parentesco: null,
+      titular: false,
       created_by: profile.id
     });
 
@@ -574,6 +571,10 @@ export async function createPassAction(
 
     if (selectedVisitors.some((item) => item.betada)) {
       return failure("No puedes generar un pase con visitas betadas.");
+    }
+
+    if (selectedVisitors.every((item) => (item.edad ?? 0) < 18)) {
+      return failure("Debes incluir al menos un adulto en el pase.");
     }
 
     let passId = existingPass?.id ?? "";
