@@ -3,12 +3,16 @@
 import { useActionState, useMemo, useState } from "react";
 import {
   createInternalAction,
-  linkVisitorAction,
-  mutationInitialState
+  linkVisitorAction
 } from "@/app/sistema/actions";
 import { MutationBanner } from "@/components/mutation-banner";
 import { StatusBadge } from "@/components/status-badge";
-import { InternalProfile, VisitorRecord } from "@/lib/types";
+import { InternalProfile, MutationState, VisitorRecord } from "@/lib/types";
+
+const mutationInitialState: MutationState = {
+  success: null,
+  error: null
+};
 
 export function InternalBrowser({
   profiles,

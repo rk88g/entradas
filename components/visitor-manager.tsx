@@ -3,12 +3,16 @@
 import { useActionState, useMemo, useState } from "react";
 import {
   createVisitorAction,
-  mutationInitialState,
   reassignVisitorAction
 } from "@/app/sistema/actions";
 import { MutationBanner } from "@/components/mutation-banner";
 import { StatusBadge } from "@/components/status-badge";
-import { InternalRecord, RoleKey, VisitorRecord } from "@/lib/types";
+import { InternalRecord, MutationState, RoleKey, VisitorRecord } from "@/lib/types";
+
+const mutationInitialState: MutationState = {
+  success: null,
+  error: null
+};
 
 export function VisitorManager({
   visitors,

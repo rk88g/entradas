@@ -6,8 +6,6 @@ import { getCurrentUserProfile, getDateByValue, getListado, getOperatingDate } f
 import { MutationState } from "@/lib/types";
 import { canChoosePassType, canManageMentions, nextPassNumber } from "@/lib/utils";
 
-const initialState = { success: null, error: null };
-
 function success(message: string): MutationState {
   return { success: message, error: null };
 }
@@ -651,5 +649,3 @@ export async function createPassAction(
     return failure(error instanceof Error ? error.message : "No se pudo crear el pase.");
   }
 }
-
-export const mutationInitialState: MutationState = initialState;

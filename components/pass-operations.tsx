@@ -4,13 +4,17 @@ import { useActionState, useEffect, useMemo, useState } from "react";
 import {
   closeDateAction,
   createPassAction,
-  mutationInitialState,
   updateClosePasswordAction
 } from "@/app/sistema/actions";
 import { MutationBanner } from "@/components/mutation-banner";
 import { StatusBadge } from "@/components/status-badge";
 import { DateRecord, InternalProfile, ListingRecord, MutationState, RoleKey } from "@/lib/types";
 import { canChoosePassType, canManageMentions } from "@/lib/utils";
+
+const mutationInitialState: MutationState = {
+  success: null,
+  error: null
+};
 
 function getPassLock(profile: InternalProfile, roleKey: RoleKey, operatingDate: DateRecord | null) {
   const currentPass = profile.currentDatePass;

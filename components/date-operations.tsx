@@ -1,9 +1,9 @@
 "use client";
 
 import { useActionState } from "react";
-import { createDateAction, mutationInitialState } from "@/app/sistema/actions";
+import { createDateAction } from "@/app/sistema/actions";
 import { MutationBanner } from "@/components/mutation-banner";
-import { DateRecord } from "@/lib/types";
+import { DateRecord, MutationState } from "@/lib/types";
 import { formatLongDate } from "@/lib/utils";
 
 const statusLabels = {
@@ -11,6 +11,11 @@ const statusLabels = {
   proximo: "Fecha siguiente",
   cerrado: "Fecha cerrada"
 } as const;
+
+const mutationInitialState: MutationState = {
+  success: null,
+  error: null
+};
 
 export function DateOperations({
   dates,
