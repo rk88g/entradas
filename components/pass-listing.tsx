@@ -77,10 +77,7 @@ export function PassListing({
       <div className="print-zone passes-grid">
         {filtered.length === 0 ? (
           <div className="data-card">
-            <h3>Sin pases para esta fecha</h3>
-            <p className="muted" style={{ color: "var(--muted)" }}>
-              No hay registros para la combinación seleccionada.
-            </p>
+            <h3>Sin pases</h3>
           </div>
         ) : printMode === "agrupado" ? (
           filtered.map((pass) => (

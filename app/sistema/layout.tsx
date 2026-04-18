@@ -15,12 +15,10 @@ export default async function SistemaLayout({
 
   return (
     <AppShell
-      title="Centro de operacion de pases"
-      subtitle="Sesion activa, lectura real de tablas y vista diaria para captura e impresion."
+      title="Sistema"
       user={profile}
     >
       {children}
     </AppShell>
   );
 }
-

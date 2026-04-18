@@ -14,30 +14,24 @@ export default async function ListadoPage() {
     <>
       <section className="quick-grid hide-print">
         <article className="quick-card">
-          <h3>Fecha en operación</h3>
+          <h3>Fecha</h3>
           <div className="mini-list">
             <div className="mini-row">
-              <span>Fecha</span>
               <strong>{builderData.operatingDate?.fechaCompleta ?? "Sin fecha abierta"}</strong>
             </div>
             <div className="mini-row">
-              <span>Pases en listado</span>
+              <span>Pases</span>
               <strong>{stats.totalPasses}</strong>
             </div>
           </div>
         </article>
         <article className="quick-card">
-          <h3>Operación diaria</h3>
-          <p className="muted" style={{ color: "var(--muted)" }}>
-            El sistema ya indica duplicados para la fecha abierta y muestra las visitas del día
-            actual para aclaraciones rápidas.
-          </p>
+          <h3>618</h3>
+          <strong style={{ fontSize: "2rem" }}>{stats.areas["618"] ?? 0}</strong>
         </article>
         <article className="quick-card">
-          <h3>Reglas activas</h3>
-          <p className="muted" style={{ color: "var(--muted)" }}>
-            Menciones solo para control y super-admin. El capturador genera únicamente pases 618.
-          </p>
+          <h3>Sueltos</h3>
+          <strong style={{ fontSize: "2rem" }}>{stats.areas.INTIMA ?? 0}</strong>
         </article>
       </section>
 

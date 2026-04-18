@@ -8,12 +8,5 @@ export default async function InternosPage() {
     getVisitas()
   ]);
 
-  return (
-    <InternalBrowser
-      profiles={profiles}
-      availableVisitors={visitors}
-      operatingDateLabel={operatingDate?.fechaCompleta ?? "Sin fecha abierta"}
-    />
-  );
+  return <InternalBrowser profiles={profiles} availableVisitors={visitors} />;
 }
-

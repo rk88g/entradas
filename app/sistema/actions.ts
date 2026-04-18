@@ -16,10 +16,24 @@ function failure(message: string): MutationState {
   return { success: null, error: message };
 }
 
+function parseDateParts(dateValue: string) {
+  const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(dateValue);
+  if (!match) {
+    return null;
+  }
+
+  const [, year, month, day] = match;
+  return {
+    year: Number(year),
+    month: Number(month),
+    day: Number(day)
+  };
+}
+
 async function requireProfile() {
   const profile = await getCurrentUserProfile();
   if (!profile?.active) {
-    throw new Error("Tu sesión no tiene un perfil activo.");
+    throw new Error("Tu sesion no tiene un perfil activo.");
   }
 
   return profile;
@@ -39,32 +53,32 @@ export async function createDateAction(
 
     const dateValue = String(formData.get("fecha_completa") ?? "").trim();
     const status = String(formData.get("estado") ?? "abierto").trim();
+    const parsedDate = parseDateParts(dateValue);
 
-    if (!dateValue) {
-      return failure("Debes seleccionar una fecha.");
-    }
-
-    const date = new Date(dateValue);
-    if (Number.isNaN(date.getTime())) {
-      return failure("La fecha no es válida.");
+    if (!parsedDate) {
+      return failure("La fecha no es valida.");
     }
 
     const existing = await getDateByValue(dateValue);
     if (existing) {
-      return failure("Esa fecha ya está registrada.");
+      return failure("Esa fecha ya esta registrada.");
     }
 
     if (status === "abierto") {
-      await supabase
+      const { error: openError } = await supabase
         .from("fechas")
         .update({ estado: "proximo" })
         .eq("estado", "abierto");
+
+      if (openError) {
+        return failure(openError.message || "No se pudo preparar la fecha actual.");
+      }
     }
 
     const { error } = await supabase.from("fechas").insert({
-      dia: date.getDate(),
-      mes: date.getMonth() + 1,
-      anio: date.getFullYear(),
+      dia: parsedDate.day,
+      mes: parsedDate.month,
+      anio: parsedDate.year,
       fecha_completa: dateValue,
       cierre: false,
       estado: status,
@@ -72,15 +86,15 @@ export async function createDateAction(
     });
 
     if (error) {
-      return failure("No se pudo registrar la nueva fecha.");
+      return failure(error.message || "No se pudo registrar la fecha.");
     }
 
     revalidatePath("/sistema");
     revalidatePath("/sistema/fechas");
     revalidatePath("/sistema/listado");
-    return success("Fecha registrada correctamente.");
-  } catch {
-    return failure("Ocurrió un problema al registrar la fecha.");
+    return success("Fecha registrada.");
+  } catch (error) {
+    return failure(error instanceof Error ? error.message : "No se pudo registrar la fecha.");
   }
 }
 
@@ -96,7 +110,7 @@ export async function closeDateAction(
 
     const dateValue = String(formData.get("fecha_completa") ?? "").trim();
     if (!dateValue) {
-      return failure("No se encontró la fecha a cerrar.");
+      return failure("No se encontro la fecha.");
     }
 
     const supabase = await createServerSupabaseClient();
@@ -125,7 +139,7 @@ export async function closeDateAction(
         .eq("id", pass.id);
 
       if (error) {
-        return failure("No se pudo aplicar la numeración de cierre.");
+        return failure(error.message || "No se pudo numerar el cierre.");
       }
     }
 
@@ -138,16 +152,135 @@ export async function closeDateAction(
       .eq("id", selectedDate.id);
 
     if (closeError) {
-      return failure("No se pudo cerrar la fecha.");
+      return failure(closeError.message || "No se pudo cerrar la fecha.");
     }
 
     revalidatePath("/sistema");
     revalidatePath("/sistema/fechas");
     revalidatePath("/sistema/listado");
     revalidatePath("/sistema/internos");
-    return success("Fecha cerrada y pases 618 numerados correctamente.");
-  } catch {
-    return failure("Ocurrió un problema al cerrar la fecha.");
+    return success("Fecha cerrada.");
+  } catch (error) {
+    return failure(error instanceof Error ? error.message : "No se pudo cerrar la fecha.");
+  }
+}
+
+export async function createInternalAction(
+  _prevState: MutationState,
+  formData: FormData
+): Promise<MutationState> {
+  try {
+    const profile = await requireProfile();
+    const supabase = await createServerSupabaseClient();
+
+    const payload = {
+      expediente: String(formData.get("expediente") ?? "").trim(),
+      nombres: String(formData.get("nombres") ?? "").trim(),
+      apellido_pat: String(formData.get("apellido_pat") ?? "").trim(),
+      apellido_mat: String(formData.get("apellido_mat") ?? "").trim() || null,
+      nacimiento: String(formData.get("nacimiento") ?? "").trim(),
+      llego: String(formData.get("llego") ?? "").trim(),
+      libre: String(formData.get("libre") ?? "").trim() || null,
+      ubicacion: Number(formData.get("ubicacion") ?? 0),
+      ubi_filiacion: String(formData.get("ubi_filiacion") ?? "").trim(),
+      apartado: String(formData.get("apartado") ?? "618").trim(),
+      observaciones: String(formData.get("observaciones") ?? "").trim() || null,
+      created_by: profile.id
+    };
+
+    if (
+      !payload.expediente ||
+      !payload.nombres ||
+      !payload.apellido_pat ||
+      !payload.nacimiento ||
+      !payload.llego ||
+      !payload.ubicacion ||
+      !payload.ubi_filiacion
+    ) {
+      return failure("Completa los datos obligatorios.");
+    }
+
+    const { error } = await supabase.from("internos").insert(payload);
+    if (error) {
+      return failure(error.message || "No se pudo guardar el interno.");
+    }
+
+    revalidatePath("/sistema");
+    revalidatePath("/sistema/internos");
+    revalidatePath("/sistema/listado");
+    return success("Interno guardado.");
+  } catch (error) {
+    return failure(error instanceof Error ? error.message : "No se pudo guardar el interno.");
+  }
+}
+
+export async function createVisitorAction(
+  _prevState: MutationState,
+  formData: FormData
+): Promise<MutationState> {
+  try {
+    const profile = await requireProfile();
+    const supabase = await createServerSupabaseClient();
+
+    const visitorPayload = {
+      nombres: String(formData.get("nombres") ?? "").trim(),
+      apellido_pat: String(formData.get("apellido_pat") ?? "").trim(),
+      apellido_mat: String(formData.get("apellido_mat") ?? "").trim() || null,
+      fecha_nacimiento: String(formData.get("fecha_nacimiento") ?? "").trim(),
+      sexo: String(formData.get("sexo") ?? "sin-definir").trim(),
+      parentesco: String(formData.get("parentesco") ?? "").trim(),
+      telefono: String(formData.get("telefono") ?? "").trim() || null,
+      betada: String(formData.get("betada") ?? "false") === "true",
+      notas: String(formData.get("notas") ?? "").trim() || null,
+      created_by: profile.id
+    };
+
+    const internalId = String(formData.get("interno_id") ?? "").trim();
+    const relationParentesco = String(formData.get("relation_parentesco") ?? "").trim();
+    const titular = String(formData.get("titular") ?? "") === "on";
+
+    if (
+      !visitorPayload.nombres ||
+      !visitorPayload.apellido_pat ||
+      !visitorPayload.fecha_nacimiento ||
+      !visitorPayload.parentesco
+    ) {
+      return failure("Completa los datos obligatorios.");
+    }
+
+    const { data: insertedVisitor, error: visitorError } = await supabase
+      .from("visitas")
+      .insert(visitorPayload)
+      .select("id")
+      .single();
+
+    if (visitorError || !insertedVisitor) {
+      return failure(visitorError?.message || "No se pudo guardar la visita.");
+    }
+
+    if (internalId) {
+      const { error: relationError } = await supabase.from("interno_visitas").insert({
+        interno_id: internalId,
+        visita_id: insertedVisitor.id,
+        parentesco: relationParentesco || visitorPayload.parentesco,
+        titular,
+        created_by: profile.id
+      });
+
+      if (relationError) {
+        return failure(
+          relationError.message || "La visita se guardo, pero no se pudo asignar al interno."
+        );
+      }
+    }
+
+    revalidatePath("/sistema");
+    revalidatePath("/sistema/internos");
+    revalidatePath("/sistema/visitas");
+    revalidatePath("/sistema/listado");
+    return success("Visita guardada.");
+  } catch (error) {
+    return failure(error instanceof Error ? error.message : "No se pudo guardar la visita.");
   }
 }
 
@@ -194,14 +327,14 @@ export async function linkVisitorAction(
     );
 
     if (error) {
-      return failure("No se pudo vincular la visita al interno.");
+      return failure(error.message || "No se pudo vincular la visita.");
     }
 
     revalidatePath("/sistema/internos");
     revalidatePath("/sistema/listado");
-    return success("Visita vinculada correctamente al interno.");
-  } catch {
-    return failure("Ocurrió un problema al vincular la visita.");
+    return success("Visita vinculada.");
+  } catch (error) {
+    return failure(error instanceof Error ? error.message : "No se pudo vincular la visita.");
   }
 }
 
@@ -248,7 +381,7 @@ export async function createPassAction(
       .maybeSingle();
 
     if (existingPass) {
-      return failure("Ese interno ya tiene un pase registrado para la fecha en operación.");
+      return failure("Ese interno ya tiene pase para la fecha abierta.");
     }
 
     const { data: relationRows, error: relationError } = await supabase
@@ -258,12 +391,12 @@ export async function createPassAction(
       .in("visita_id", visitorIds);
 
     if (relationError) {
-      return failure("No se pudieron validar las visitas disponibles para el interno.");
+      return failure(relationError.message || "No se pudieron validar las visitas.");
     }
 
     const allowedIds = new Set((relationRows ?? []).map((item) => item.visita_id));
     if (visitorIds.some((id) => !allowedIds.has(id))) {
-      return failure("Una o más visitas no pertenecen al perfil del interno.");
+      return failure("Una o mas visitas no pertenecen al interno.");
     }
 
     const { data: selectedVisitors, error: visitorError } = await supabase
@@ -272,7 +405,7 @@ export async function createPassAction(
       .in("id", visitorIds);
 
     if (visitorError || !selectedVisitors) {
-      return failure("No se pudieron validar las visitas seleccionadas.");
+      return failure(visitorError?.message || "No se pudieron validar las visitas.");
     }
 
     if (selectedVisitors.some((item) => item.betada)) {
@@ -296,7 +429,7 @@ export async function createPassAction(
       .single();
 
     if (insertError || !insertedPass) {
-      return failure("No se pudo crear el pase.");
+      return failure(insertError?.message || "No se pudo crear el pase.");
     }
 
     const orderedVisitors = [...selectedVisitors].sort((a, b) => (b.edad ?? 0) - (a.edad ?? 0));
@@ -309,15 +442,17 @@ export async function createPassAction(
 
     const { error: relationInsertError } = await supabase.from("listado_visitas").insert(payload);
     if (relationInsertError) {
-      return failure("El pase se creó pero no se pudieron guardar sus visitas.");
+      return failure(
+        relationInsertError.message || "El pase se creo, pero no se pudieron guardar sus visitas."
+      );
     }
 
     revalidatePath("/sistema");
     revalidatePath("/sistema/internos");
     revalidatePath("/sistema/listado");
-    return success("Pase creado correctamente.");
-  } catch {
-    return failure("Ocurrió un problema al generar el pase.");
+    return success("Pase creado.");
+  } catch (error) {
+    return failure(error instanceof Error ? error.message : "No se pudo crear el pase.");
   }
 }
 
