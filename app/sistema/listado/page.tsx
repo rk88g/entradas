@@ -1,43 +1,54 @@
 import { PassListing } from "@/components/pass-listing";
-import { getListado } from "@/lib/supabase/queries";
+import { PassOperations } from "@/components/pass-operations";
+import { getCurrentUserProfile, getListingBuilderData, getListado } from "@/lib/supabase/queries";
 import { getStatsFromListings } from "@/lib/utils";
 
 export default async function ListadoPage() {
-  const listado = await getListado();
+  const profile = await getCurrentUserProfile();
+  const builderData = await getListingBuilderData();
+  const selectedDate = builderData.operatingDate?.fechaCompleta ?? builderData.todayDate?.fechaCompleta ?? "";
+  const listado = await getListado(selectedDate ? { fechaVisita: selectedDate } : undefined);
   const stats = getStatsFromListings(listado);
 
   return (
     <>
       <section className="quick-grid hide-print">
         <article className="quick-card">
-          <h3>Pases por apartado</h3>
+          <h3>Fecha en operación</h3>
           <div className="mini-list">
             <div className="mini-row">
-              <span>618</span>
-              <strong>{stats.areas["618"] ?? 0}</strong>
+              <span>Fecha</span>
+              <strong>{builderData.operatingDate?.fechaCompleta ?? "Sin fecha abierta"}</strong>
             </div>
             <div className="mini-row">
-              <span>INTIMA</span>
-              <strong>{stats.areas.INTIMA ?? 0}</strong>
+              <span>Pases en listado</span>
+              <strong>{stats.totalPasses}</strong>
             </div>
           </div>
         </article>
         <article className="quick-card">
-          <h3>Origen</h3>
+          <h3>Operación diaria</h3>
           <p className="muted" style={{ color: "var(--muted)" }}>
-            Datos armados desde listado, listado_visitas, internos y visitas.
+            El sistema ya indica duplicados para la fecha abierta y muestra las visitas del día
+            actual para aclaraciones rápidas.
           </p>
         </article>
         <article className="quick-card">
-          <h3>Historial consultable</h3>
+          <h3>Reglas activas</h3>
           <p className="muted" style={{ color: "var(--muted)" }}>
-            La impresion y el historial ya salen de tu base con agrupacion por interno.
+            Menciones solo para control y super-admin. El capturador genera únicamente pases 618.
           </p>
         </article>
       </section>
 
-      <PassListing listings={listado} />
+      <PassOperations
+        operatingDate={builderData.operatingDate}
+        profiles={builderData.internalProfiles}
+        todaysPasses={builderData.todaysPasses}
+        roleKey={profile?.roleKey ?? "capturador"}
+      />
+
+      <PassListing listings={listado} initialDate={selectedDate} />
     </>
   );
 }
-

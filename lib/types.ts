@@ -1,9 +1,9 @@
 export type RoleKey = "super-admin" | "control" | "supervisor" | "capturador";
 
 export type AccessArea = "618" | "INTIMA";
-
 export type AccessStatus = "abierto" | "proximo" | "cerrado";
 export type PassStatus = "capturado" | "autorizado" | "impreso" | "cancelado";
+export type VisitorSex = "hombre" | "mujer" | "sin-definir";
 
 export interface UserProfile {
   id: string;
@@ -32,6 +32,21 @@ export interface InternalRecord {
   observaciones?: string;
 }
 
+export interface InternalVisitorLink {
+  id: string;
+  internoId: string;
+  visitaId: string;
+  parentesco: string;
+  titular: boolean;
+  visitor: VisitorRecord;
+}
+
+export interface InternalProfile extends InternalRecord {
+  visitors: InternalVisitorLink[];
+  currentDatePass?: ListingRecord | null;
+  recentPasses: ListingRecord[];
+}
+
 export interface VisitorRecord {
   id: string;
   fullName: string;
@@ -41,6 +56,7 @@ export interface VisitorRecord {
   fechaNacimiento: string;
   edad: number;
   menor: boolean;
+  sexo: VisitorSex;
   parentesco: string;
   betada: boolean;
   historialInterno: string[];
@@ -58,6 +74,8 @@ export interface DateRecord {
   fechaCompleta: string;
   cierre: boolean;
   estado: AccessStatus;
+  createdAt?: string;
+  updatedAt?: string;
 }
 
 export interface PassVisitor {
@@ -66,6 +84,7 @@ export interface PassVisitor {
   parentesco: string;
   edad: number;
   menor: boolean;
+  sexo: VisitorSex;
   betada: boolean;
 }
 
@@ -73,11 +92,16 @@ export interface ListingRecord {
   id: string;
   internoId: string;
   internoNombre: string;
+  internoUbicacion: number;
+  fechaId?: string;
   fechaVisita: string;
   area: AccessArea;
   createdByRole: RoleKey;
   status: PassStatus;
+  numeroPase?: number | null;
   menciones?: string;
+  cierreAplicado?: boolean;
+  createdAt: string;
   visitantes: PassVisitor[];
 }
 
@@ -97,4 +121,16 @@ export interface DashboardStat {
   label: string;
   value: string;
   hint: string;
+}
+
+export interface ListingBuilderData {
+  operatingDate: DateRecord | null;
+  todayDate: DateRecord | null;
+  internalProfiles: InternalProfile[];
+  todaysPasses: ListingRecord[];
+}
+
+export interface MutationState {
+  success: string | null;
+  error: string | null;
 }

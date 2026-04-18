@@ -62,6 +62,7 @@ create table if not exists public.visitas (
   fecha_nacimiento date not null,
   edad integer not null default 0,
   menor boolean not null default false,
+  sexo text not null default 'sin-definir' check (sexo in ('hombre', 'mujer', 'sin-definir')),
   parentesco text not null,
   betada boolean not null default false,
   telefono text,
@@ -70,6 +71,15 @@ create table if not exists public.visitas (
   created_at timestamptz not null default timezone('utc', now()),
   updated_at timestamptz not null default timezone('utc', now())
 );
+
+alter table public.visitas
+  add column if not exists sexo text not null default 'sin-definir';
+
+alter table public.visitas
+  drop constraint if exists visitas_sexo_check;
+
+alter table public.visitas
+  add constraint visitas_sexo_check check (sexo in ('hombre', 'mujer', 'sin-definir'));
 
 create or replace function public.set_visita_derived_fields()
 returns trigger
@@ -116,10 +126,30 @@ create table if not exists public.listado (
   fecha_visita date not null,
   apartado text not null check (apartado in ('618', 'INTIMA')),
   status text not null default 'capturado' check (status in ('capturado', 'autorizado', 'impreso', 'cancelado')),
+  numero_pase integer,
+  cierre_aplicado boolean not null default false,
   menciones text,
   created_by uuid references public.user_profiles (id),
   created_at timestamptz not null default timezone('utc', now()),
   updated_at timestamptz not null default timezone('utc', now())
+);
+
+alter table public.listado
+  add column if not exists numero_pase integer;
+
+alter table public.listado
+  add column if not exists cierre_aplicado boolean not null default false;
+
+create table if not exists public.interno_visitas (
+  id uuid primary key default gen_random_uuid(),
+  interno_id uuid not null references public.internos (id) on delete cascade,
+  visita_id uuid not null references public.visitas (id) on delete cascade,
+  parentesco text,
+  titular boolean not null default false,
+  created_by uuid references public.user_profiles (id),
+  created_at timestamptz not null default timezone('utc', now()),
+  updated_at timestamptz not null default timezone('utc', now()),
+  unique (interno_id, visita_id)
 );
 
 create table if not exists public.listado_visitas (
@@ -136,6 +166,8 @@ create index if not exists idx_internos_apartado on public.internos (apartado);
 create index if not exists idx_visitas_betada on public.visitas (betada);
 create index if not exists idx_fechas_fecha_completa on public.fechas (fecha_completa);
 create index if not exists idx_listado_fecha_visita on public.listado (fecha_visita, apartado);
+create index if not exists idx_listado_numero_pase on public.listado (fecha_visita, numero_pase);
+create index if not exists idx_interno_visitas_interno on public.interno_visitas (interno_id);
 
 create or replace view public.historial_ingresos as
 select
@@ -220,6 +252,12 @@ before update on public.listado
 for each row
 execute function public.set_updated_at();
 
+drop trigger if exists interno_visitas_set_updated_at on public.interno_visitas;
+create trigger interno_visitas_set_updated_at
+before update on public.interno_visitas
+for each row
+execute function public.set_updated_at();
+
 alter table public.roles enable row level security;
 alter table public.user_profiles enable row level security;
 alter table public.internos enable row level security;
@@ -228,6 +266,7 @@ alter table public.betadas enable row level security;
 alter table public.fechas enable row level security;
 alter table public.listado enable row level security;
 alter table public.listado_visitas enable row level security;
+alter table public.interno_visitas enable row level security;
 
 create or replace function public.current_role_key()
 returns text
@@ -289,6 +328,13 @@ for select
 to authenticated
 using (true);
 
+drop policy if exists "read access interno_visitas" on public.interno_visitas;
+create policy "read access interno_visitas"
+on public.interno_visitas
+for select
+to authenticated
+using (true);
+
 drop policy if exists "read access betadas" on public.betadas;
 create policy "read access betadas"
 on public.betadas
@@ -331,6 +377,14 @@ with check (public.current_role_key() in ('super-admin', 'control', 'supervisor'
 drop policy if exists "manage pass visitors by control roles" on public.listado_visitas;
 create policy "manage pass visitors by control roles"
 on public.listado_visitas
+for all
+to authenticated
+using (public.current_role_key() in ('super-admin', 'control', 'supervisor', 'capturador'))
+with check (public.current_role_key() in ('super-admin', 'control', 'supervisor', 'capturador'));
+
+drop policy if exists "manage internal visitors by control roles" on public.interno_visitas;
+create policy "manage internal visitors by control roles"
+on public.interno_visitas
 for all
 to authenticated
 using (public.current_role_key() in ('super-admin', 'control', 'supervisor', 'capturador'))

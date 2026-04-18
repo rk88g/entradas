@@ -1,4 +1,4 @@
-import { ListingRecord, PassVisitor, VisitorRecord } from "@/lib/types";
+import { ListingRecord, PassVisitor, RoleKey, VisitorRecord } from "@/lib/types";
 
 export function formatLongDate(input: string) {
   return new Intl.DateTimeFormat("es-MX", {
@@ -17,6 +17,10 @@ export function formatShortDate(input: string) {
   }).format(new Date(input));
 }
 
+export function formatDateInput(input: Date) {
+  return input.toISOString().slice(0, 10);
+}
+
 export function fullNameFromParts(...parts: Array<string | null | undefined>) {
   return parts
     .map((part) => part?.trim())
@@ -28,17 +32,21 @@ export function sortVisitorsByAge<T extends PassVisitor | VisitorRecord>(visitor
   return [...visitors].sort((a, b) => b.edad - a.edad);
 }
 
+export function getTodayDate() {
+  return formatDateInput(new Date());
+}
+
 export function getTomorrowDate() {
   const date = new Date();
   date.setDate(date.getDate() + 1);
-  return date.toISOString().slice(0, 10);
+  return formatDateInput(date);
 }
 
 export function getNextTwoDays() {
   return [0, 1, 2].map((offset) => {
     const date = new Date();
     date.setDate(date.getDate() + offset);
-    return date.toISOString().slice(0, 10);
+    return formatDateInput(date);
   });
 }
 
@@ -58,5 +66,53 @@ export function getStatsFromListings(listings: ListingRecord[]) {
     totalVisitors,
     minors,
     areas
+  };
+}
+
+export function canManageMentions(role: RoleKey) {
+  return role === "super-admin" || role === "control";
+}
+
+export function canChoosePassType(role: RoleKey) {
+  return role === "super-admin" || role === "control";
+}
+
+export function nextPassNumber(seed: number) {
+  if (seed >= 9999) {
+    return 1;
+  }
+
+  return seed + 1;
+}
+
+export function sortListingsForPrint(listings: ListingRecord[]) {
+  const sueltos = listings
+    .filter((item) => item.area === "INTIMA")
+    .sort((a, b) => a.internoUbicacion - b.internoUbicacion || a.createdAt.localeCompare(b.createdAt));
+
+  const byLocation = listings
+    .filter((item) => item.area === "618")
+    .sort((a, b) => {
+      const numberA = a.numeroPase ?? Number.MAX_SAFE_INTEGER;
+      const numberB = b.numeroPase ?? Number.MAX_SAFE_INTEGER;
+
+      if (numberA !== numberB) {
+        return numberA - numberB;
+      }
+
+      if (a.cierreAplicado && b.cierreAplicado) {
+        return a.internoUbicacion - b.internoUbicacion;
+      }
+
+      if (a.cierreAplicado !== b.cierreAplicado) {
+        return a.cierreAplicado ? -1 : 1;
+      }
+
+      return a.createdAt.localeCompare(b.createdAt);
+    });
+
+  return {
+    byLocation,
+    sueltos
   };
 }

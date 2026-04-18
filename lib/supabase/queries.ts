@@ -1,16 +1,28 @@
 import "server-only";
 
+import { SupabaseClient } from "@supabase/supabase-js";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import {
   BetadaRecord,
   DateRecord,
+  InternalProfile,
   InternalRecord,
+  InternalVisitorLink,
+  ListingBuilderData,
   ListingRecord,
+  PassVisitor,
   RoleKey,
   UserProfile,
-  VisitorRecord
+  VisitorRecord,
+  VisitorSex
 } from "@/lib/types";
-import { fullNameFromParts, getStatsFromListings, sortVisitorsByAge } from "@/lib/utils";
+import {
+  fullNameFromParts,
+  getStatsFromListings,
+  getTodayDate,
+  getTomorrowDate,
+  sortVisitorsByAge
+} from "@/lib/utils";
 
 function ensureRoleKey(value?: string | null): RoleKey {
   if (value === "super-admin" || value === "control" || value === "supervisor") {
@@ -18,6 +30,240 @@ function ensureRoleKey(value?: string | null): RoleKey {
   }
 
   return "capturador";
+}
+
+function ensureSex(value?: string | null): VisitorSex {
+  if (value === "hombre" || value === "mujer") {
+    return value;
+  }
+
+  return "sin-definir";
+}
+
+function mapInternalRecord(item: {
+  id: string;
+  expediente: string;
+  nombres: string;
+  apellido_pat: string;
+  apellido_mat: string | null;
+  nacimiento: string;
+  llego: string;
+  libre: string | null;
+  ubicacion: number;
+  ubi_filiacion: string;
+  apartado: "618" | "INTIMA";
+  observaciones: string | null;
+  created_at: string;
+  updated_at: string;
+}): InternalRecord {
+  return {
+    id: item.id,
+    fullName: fullNameFromParts(item.nombres, item.apellido_pat, item.apellido_mat),
+    nombres: item.nombres,
+    apellidoPat: item.apellido_pat,
+    apellidoMat: item.apellido_mat ?? "",
+    nacimiento: item.nacimiento,
+    llego: item.llego,
+    libre: item.libre ?? "",
+    ubicacion: item.ubicacion,
+    ubiFiliacion: item.ubi_filiacion,
+    clasificacion: item.apartado,
+    createdAt: item.created_at,
+    updatedAt: item.updated_at,
+    expediente: item.expediente,
+    observaciones: item.observaciones ?? undefined
+  };
+}
+
+function mapVisitorRecord(
+  item: {
+    id: string;
+    nombres: string;
+    apellido_pat: string;
+    apellido_mat: string | null;
+    fecha_nacimiento: string;
+    edad: number | null;
+    menor: boolean | null;
+    sexo: string | null;
+    parentesco: string;
+    betada: boolean | null;
+    telefono: string | null;
+    created_at: string;
+    updated_at: string;
+  },
+  historialInterno: string[] = []
+): VisitorRecord {
+  return {
+    id: item.id,
+    fullName: fullNameFromParts(item.nombres, item.apellido_pat, item.apellido_mat),
+    nombres: item.nombres,
+    apellidoPat: item.apellido_pat,
+    apellidoMat: item.apellido_mat ?? "",
+    fechaNacimiento: item.fecha_nacimiento,
+    edad: item.edad ?? 0,
+    menor: Boolean(item.menor),
+    sexo: ensureSex(item.sexo),
+    parentesco: item.parentesco,
+    betada: Boolean(item.betada),
+    historialInterno,
+    telefono: item.telefono ?? undefined,
+    createdAt: item.created_at,
+    updatedAt: item.updated_at
+  };
+}
+
+async function getVisitorHistoryMap(supabase: SupabaseClient) {
+  const { data } = await supabase.from("historial_ingresos").select("visita_id, interno_nombre");
+  const historyMap = new Map<string, string[]>();
+
+  (data ?? []).forEach((item) => {
+    if (!item.visita_id || !item.interno_nombre) {
+      return;
+    }
+
+    const current = historyMap.get(item.visita_id) ?? [];
+    if (!current.includes(item.interno_nombre)) {
+      current.push(item.interno_nombre);
+      historyMap.set(item.visita_id, current);
+    }
+  });
+
+  return historyMap;
+}
+
+async function getInternosMap(
+  supabase: SupabaseClient,
+  internalIds: string[]
+): Promise<Map<string, InternalRecord>> {
+  if (internalIds.length === 0) {
+    return new Map();
+  }
+
+  const { data, error } = await supabase
+    .from("internos")
+    .select(
+      "id, expediente, nombres, apellido_pat, apellido_mat, nacimiento, llego, libre, ubicacion, ubi_filiacion, apartado, observaciones, created_at, updated_at"
+    )
+    .in("id", internalIds);
+
+  if (error || !data) {
+    return new Map();
+  }
+
+  return new Map(data.map((item) => [item.id, mapInternalRecord(item)]));
+}
+
+async function getVisitorsMap(
+  supabase: SupabaseClient,
+  visitorIds: string[]
+): Promise<Map<string, VisitorRecord>> {
+  if (visitorIds.length === 0) {
+    return new Map();
+  }
+
+  const [historyMap, { data, error }] = await Promise.all([
+    getVisitorHistoryMap(supabase),
+    supabase
+      .from("visitas")
+      .select(
+        "id, nombres, apellido_pat, apellido_mat, fecha_nacimiento, edad, menor, sexo, parentesco, betada, telefono, created_at, updated_at"
+      )
+      .in("id", visitorIds)
+  ]);
+
+  if (error || !data) {
+    return new Map();
+  }
+
+  return new Map(data.map((item) => [item.id, mapVisitorRecord(item, historyMap.get(item.id) ?? [])]));
+}
+
+async function buildListingsForRows(
+  supabase: SupabaseClient,
+  listadoRows: Array<{
+    id: string;
+    interno_id: string;
+    fecha_id: string;
+    fecha_visita: string;
+    apartado: "618" | "INTIMA";
+    status: "capturado" | "autorizado" | "impreso" | "cancelado";
+    numero_pase: number | null;
+    cierre_aplicado: boolean | null;
+    menciones: string | null;
+    created_at: string;
+  }>
+): Promise<ListingRecord[]> {
+  if (listadoRows.length === 0) {
+    return [];
+  }
+
+  const internalIds = [...new Set(listadoRows.map((item) => item.interno_id))];
+  const [internosMap, { data: listadoVisitasRows, error: listadoVisitasError }] = await Promise.all([
+    getInternosMap(supabase, internalIds),
+    supabase
+      .from("listado_visitas")
+      .select("listado_id, visita_id, orden")
+      .in(
+        "listado_id",
+        listadoRows.map((item) => item.id)
+      )
+  ]);
+
+  if (listadoVisitasError) {
+    return [];
+  }
+
+  const visitorIds = [...new Set((listadoVisitasRows ?? []).map((item) => item.visita_id))];
+  const visitorsMap = await getVisitorsMap(supabase, visitorIds);
+  const relationMap = new Map<string, typeof listadoVisitasRows>();
+
+  (listadoVisitasRows ?? []).forEach((item) => {
+    const current = relationMap.get(item.listado_id) ?? [];
+    current.push(item);
+    relationMap.set(item.listado_id, current);
+  });
+
+  return listadoRows.map((item) => {
+    const interno = internosMap.get(item.interno_id);
+    const visitantes: PassVisitor[] = sortVisitorsByAge(
+      (relationMap.get(item.id) ?? [])
+        .sort((a, b) => a.orden - b.orden)
+        .map((relation) => {
+          const visitor = visitorsMap.get(relation.visita_id);
+          if (!visitor) {
+            return null;
+          }
+
+          return {
+            visitorId: visitor.id,
+            nombre: visitor.fullName,
+            parentesco: visitor.parentesco,
+            edad: visitor.edad,
+            menor: visitor.menor,
+            sexo: visitor.sexo,
+            betada: visitor.betada
+          };
+        })
+        .filter((visitor): visitor is PassVisitor => visitor !== null)
+    );
+
+    return {
+      id: item.id,
+      internoId: item.interno_id,
+      internoNombre: interno?.fullName ?? "Interno sin nombre",
+      internoUbicacion: interno?.ubicacion ?? 0,
+      fechaId: item.fecha_id,
+      fechaVisita: item.fecha_visita,
+      area: item.apartado,
+      createdByRole: "capturador",
+      status: item.status,
+      numeroPase: item.numero_pase,
+      cierreAplicado: Boolean(item.cierre_aplicado),
+      menciones: item.menciones ?? undefined,
+      createdAt: item.created_at,
+      visitantes
+    };
+  });
 }
 
 export async function getCurrentUserProfile(): Promise<UserProfile | null> {
@@ -65,22 +311,24 @@ export async function getInternos(): Promise<InternalRecord[]> {
   const { data, error } = await supabase
     .from("internos")
     .select(
-      `
-        id,
-        expediente,
-        nombres,
-        apellido_pat,
-        apellido_mat,
-        nacimiento,
-        llego,
-        libre,
-        ubicacion,
-        ubi_filiacion,
-        apartado,
-        observaciones,
-        created_at,
-        updated_at
-      `
+      "id, expediente, nombres, apellido_pat, apellido_mat, nacimiento, llego, libre, ubicacion, ubi_filiacion, apartado, observaciones, created_at, updated_at"
+    )
+    .order("ubicacion", { ascending: true });
+
+  if (error || !data) {
+    return [];
+  }
+
+  return data.map(mapInternalRecord);
+}
+
+export async function getVisitas(): Promise<VisitorRecord[]> {
+  const supabase = await createServerSupabaseClient();
+  const historyMap = await getVisitorHistoryMap(supabase);
+  const { data, error } = await supabase
+    .from("visitas")
+    .select(
+      "id, nombres, apellido_pat, apellido_mat, fecha_nacimiento, edad, menor, sexo, parentesco, betada, telefono, created_at, updated_at"
     )
     .order("updated_at", { ascending: false });
 
@@ -88,88 +336,8 @@ export async function getInternos(): Promise<InternalRecord[]> {
     return [];
   }
 
-  return data.map((item) => ({
-    id: item.id,
-    fullName: fullNameFromParts(item.nombres, item.apellido_pat, item.apellido_mat),
-    nombres: item.nombres,
-    apellidoPat: item.apellido_pat,
-    apellidoMat: item.apellido_mat ?? "",
-    nacimiento: item.nacimiento,
-    llego: item.llego,
-    libre: item.libre ?? "",
-    ubicacion: item.ubicacion,
-    ubiFiliacion: item.ubi_filiacion,
-    clasificacion: item.apartado,
-    createdAt: item.created_at,
-    updatedAt: item.updated_at,
-    expediente: item.expediente,
-    observaciones: item.observaciones ?? undefined
-  }));
-}
-
-export async function getVisitas(): Promise<VisitorRecord[]> {
-  const supabase = await createServerSupabaseClient();
-
-  const [{ data: visitas, error: visitasError }, { data: historial }] = await Promise.all([
-    supabase
-      .from("visitas")
-      .select(
-        `
-          id,
-          nombres,
-          apellido_pat,
-          apellido_mat,
-          fecha_nacimiento,
-          edad,
-          menor,
-          parentesco,
-          betada,
-          telefono,
-          created_at,
-          updated_at
-        `
-      )
-      .order("updated_at", { ascending: false }),
-    supabase
-      .from("historial_ingresos")
-      .select("visita_id, interno_nombre")
-  ]);
-
-  if (visitasError || !visitas) {
-    return [];
-  }
-
-  const historyMap = new Map<string, string[]>();
-
-  (historial ?? []).forEach((item) => {
-    if (!item.visita_id || !item.interno_nombre) {
-      return;
-    }
-
-    const current = historyMap.get(item.visita_id) ?? [];
-    if (!current.includes(item.interno_nombre)) {
-      current.push(item.interno_nombre);
-      historyMap.set(item.visita_id, current);
-    }
-  });
-
   return sortVisitorsByAge(
-    visitas.map((item) => ({
-      id: item.id,
-      fullName: fullNameFromParts(item.nombres, item.apellido_pat, item.apellido_mat),
-      nombres: item.nombres,
-      apellidoPat: item.apellido_pat,
-      apellidoMat: item.apellido_mat ?? "",
-      fechaNacimiento: item.fecha_nacimiento,
-      edad: item.edad ?? 0,
-      menor: Boolean(item.menor),
-      parentesco: item.parentesco,
-      betada: Boolean(item.betada),
-      historialInterno: historyMap.get(item.id) ?? [],
-      telefono: item.telefono ?? undefined,
-      createdAt: item.created_at,
-      updatedAt: item.updated_at
-    }))
+    data.map((item) => mapVisitorRecord(item, historyMap.get(item.id) ?? []))
   );
 }
 
@@ -178,16 +346,7 @@ export async function getBetadas(): Promise<BetadaRecord[]> {
   const { data, error } = await supabase
     .from("betadas")
     .select(
-      `
-        id,
-        nombres,
-        apellido_pat,
-        apellido_mat,
-        fecha_nacimiento,
-        motivo,
-        activo,
-        created_at
-      `
+      "id, nombres, apellido_pat, apellido_mat, fecha_nacimiento, motivo, activo, created_at"
     )
     .order("created_at", { ascending: false });
 
@@ -212,8 +371,8 @@ export async function getFechas(): Promise<DateRecord[]> {
   const supabase = await createServerSupabaseClient();
   const { data, error } = await supabase
     .from("fechas")
-    .select("id, dia, mes, anio, fecha_completa, cierre, estado")
-    .order("fecha_completa", { ascending: true });
+    .select("id, dia, mes, anio, fecha_completa, cierre, estado, created_at, updated_at")
+    .order("fecha_completa", { ascending: false });
 
   if (error || !data) {
     return [];
@@ -226,113 +385,159 @@ export async function getFechas(): Promise<DateRecord[]> {
     anio: item.anio,
     fechaCompleta: item.fecha_completa,
     cierre: Boolean(item.cierre),
-    estado: item.estado
+    estado: item.estado,
+    createdAt: item.created_at,
+    updatedAt: item.updated_at
   }));
 }
 
-export async function getListado(): Promise<ListingRecord[]> {
+export async function getOperatingDate(): Promise<DateRecord | null> {
+  const fechas = await getFechas();
+  return fechas.find((item) => item.estado === "abierto") ?? fechas[0] ?? null;
+}
+
+export async function getDateByValue(dateValue: string): Promise<DateRecord | null> {
   const supabase = await createServerSupabaseClient();
-  const { data: listadoRows, error: listadoError } = await supabase
+  const { data, error } = await supabase
+    .from("fechas")
+    .select("id, dia, mes, anio, fecha_completa, cierre, estado, created_at, updated_at")
+    .eq("fecha_completa", dateValue)
+    .maybeSingle();
+
+  if (error || !data) {
+    return null;
+  }
+
+  return {
+    id: data.id,
+    dia: data.dia,
+    mes: data.mes,
+    anio: data.anio,
+    fechaCompleta: data.fecha_completa,
+    cierre: Boolean(data.cierre),
+    estado: data.estado,
+    createdAt: data.created_at,
+    updatedAt: data.updated_at
+  };
+}
+
+export async function getListado(filters?: {
+  fechaVisita?: string;
+  area?: "618" | "INTIMA";
+}): Promise<ListingRecord[]> {
+  const supabase = await createServerSupabaseClient();
+  let query = supabase
     .from("listado")
-    .select("id, interno_id, fecha_visita, apartado, status, menciones")
-    .order("fecha_visita", { ascending: true });
+    .select(
+      "id, interno_id, fecha_id, fecha_visita, apartado, status, numero_pase, cierre_aplicado, menciones, created_at"
+    )
+    .order("fecha_visita", { ascending: true })
+    .order("created_at", { ascending: true });
 
-  if (listadoError || !listadoRows) {
+  if (filters?.fechaVisita) {
+    query = query.eq("fecha_visita", filters.fechaVisita);
+  }
+
+  if (filters?.area) {
+    query = query.eq("apartado", filters.area);
+  }
+
+  const { data, error } = await query;
+
+  if (error || !data) {
     return [];
   }
 
-  const internoIds = [...new Set(listadoRows.map((item) => item.interno_id))];
+  return buildListingsForRows(supabase, data);
+}
 
-  const [
-    { data: internosRows, error: internosError },
-    { data: listadoVisitasRows, error: listadoVisitasError }
-  ] = await Promise.all([
-    internoIds.length
-      ? supabase
-          .from("internos")
-          .select("id, nombres, apellido_pat, apellido_mat")
-          .in("id", internoIds)
-      : Promise.resolve({ data: [], error: null }),
-    supabase
-      .from("listado_visitas")
-      .select("listado_id, visita_id, orden")
-      .in(
-        "listado_id",
-        listadoRows.map((item) => item.id)
-      )
-  ]);
+export async function getInternalProfiles(dateValue?: string): Promise<InternalProfile[]> {
+  const supabase = await createServerSupabaseClient();
+  const [internos, operatingDate] = await Promise.all([getInternos(), dateValue ? getDateByValue(dateValue) : getOperatingDate()]);
 
-  if (internosError || listadoVisitasError) {
-    return [];
+  const internalIds = internos.map((item) => item.id);
+  const [{ data: relationRows, error: relationError }, currentDatePasses, allListingsForRecent] =
+    await Promise.all([
+      internalIds.length
+        ? supabase
+            .from("interno_visitas")
+            .select("id, interno_id, visita_id, parentesco, titular")
+            .in("interno_id", internalIds)
+        : Promise.resolve({ data: [], error: null }),
+      operatingDate ? getListado({ fechaVisita: operatingDate.fechaCompleta }) : Promise.resolve([]),
+      getListado()
+    ]);
+
+  if (relationError) {
+    return internos.map((interno) => ({
+      ...interno,
+      visitors: [],
+      currentDatePass: null,
+      recentPasses: []
+    }));
   }
 
-  const visitaIds = [...new Set((listadoVisitasRows ?? []).map((item) => item.visita_id))];
+  const visitorIds = [...new Set((relationRows ?? []).map((item) => item.visita_id))];
+  const visitorsMap = await getVisitorsMap(supabase, visitorIds);
+  const relationMap = new Map<string, InternalVisitorLink[]>();
 
-  const { data: visitasRows, error: visitasError } = visitaIds.length
-    ? await supabase
-        .from("visitas")
-        .select("id, nombres, apellido_pat, apellido_mat, parentesco, edad, menor, betada")
-        .in("id", visitaIds)
-    : { data: [], error: null };
+  (relationRows ?? []).forEach((item) => {
+    const visitor = visitorsMap.get(item.visita_id);
+    if (!visitor) {
+      return;
+    }
 
-  if (visitasError) {
-    return [];
-  }
-
-  const internosMap = new Map(
-    (internosRows ?? []).map((item) => [
-      item.id,
-      fullNameFromParts(item.nombres, item.apellido_pat, item.apellido_mat)
-    ])
-  );
-
-  const visitasMap = new Map((visitasRows ?? []).map((item) => [item.id, item]));
-  const listadoVisitasMap = new Map<string, typeof listadoVisitasRows>();
-
-  (listadoVisitasRows ?? []).forEach((item) => {
-    const current = listadoVisitasMap.get(item.listado_id) ?? [];
-    current.push(item);
-    listadoVisitasMap.set(item.listado_id, current);
-  });
-
-  return listadoRows.map((item) => {
-    const visitors = (listadoVisitasMap.get(item.id) ?? [])
-      .sort((a, b) => a.orden - b.orden)
-      .map((relation) => {
-        const visitor = visitasMap.get(relation.visita_id);
-        if (!visitor) {
-          return null;
-        }
-
-        return {
-          visitorId: visitor.id,
-          nombre: fullNameFromParts(visitor.nombres, visitor.apellido_pat, visitor.apellido_mat),
-          parentesco: visitor.parentesco,
-          edad: visitor.edad ?? 0,
-          menor: Boolean(visitor.menor),
-          betada: Boolean(visitor.betada)
-        };
-      })
-      .filter((visitor): visitor is NonNullable<typeof visitor> => visitor !== null);
-
-    return {
+    const current = relationMap.get(item.interno_id) ?? [];
+    current.push({
       id: item.id,
       internoId: item.interno_id,
-      internoNombre: internosMap.get(item.interno_id) ?? "Interno sin nombre",
-      fechaVisita: item.fecha_visita,
-      area: item.apartado,
-      createdByRole: "capturador",
-      status: item.status,
-      menciones: item.menciones ?? undefined,
-      visitantes: sortVisitorsByAge(visitors)
-    };
+      visitaId: item.visita_id,
+      parentesco: item.parentesco ?? visitor.parentesco,
+      titular: Boolean(item.titular),
+      visitor
+    });
+    relationMap.set(item.interno_id, current);
   });
+
+  const currentPassMap = new Map(currentDatePasses.map((item) => [item.internoId, item]));
+  const recentPassMap = new Map<string, ListingRecord[]>();
+
+  allListingsForRecent.forEach((item) => {
+    const current = recentPassMap.get(item.internoId) ?? [];
+    if (current.length < 5) {
+      current.push(item);
+      recentPassMap.set(item.internoId, current);
+    }
+  });
+
+  return internos.map((interno) => ({
+    ...interno,
+    visitors: [...(relationMap.get(interno.id) ?? [])].sort(
+      (a, b) => b.visitor.edad - a.visitor.edad
+    ) as InternalVisitorLink[],
+    currentDatePass: currentPassMap.get(interno.id) ?? null,
+    recentPasses: recentPassMap.get(interno.id) ?? []
+  }));
+}
+
+export async function getListingBuilderData(): Promise<ListingBuilderData> {
+  const operatingDate = await getOperatingDate();
+  const todayDate = await getDateByValue(getTodayDate());
+  const [internalProfiles, todaysPasses] = await Promise.all([
+    getInternalProfiles(operatingDate?.fechaCompleta),
+    getListado({ fechaVisita: getTodayDate() })
+  ]);
+
+  return {
+    operatingDate,
+    todayDate,
+    internalProfiles,
+    todaysPasses
+  };
 }
 
 export async function getDashboardSummary() {
-  const tomorrow = new Date();
-  tomorrow.setDate(tomorrow.getDate() + 1);
-  const tomorrowDate = tomorrow.toISOString().slice(0, 10);
+  const tomorrowDate = getTomorrowDate();
 
   const [listado, visitas, betadas, fechas] = await Promise.all([
     getListado(),
