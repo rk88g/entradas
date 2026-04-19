@@ -1,6 +1,7 @@
 import { redirect } from "next/navigation";
 import { VisitorManager } from "@/components/visitor-manager";
 import { getCurrentUserProfile, getInternos, getVisitas } from "@/lib/supabase/queries";
+import { canAccessCoreSystem } from "@/lib/utils";
 
 export default async function VisitasPage() {
   const [profile, visitors] = await Promise.all([
@@ -11,6 +12,10 @@ export default async function VisitasPage() {
 
   if (profile?.moduleOnly && profile.accessibleModules.length > 0) {
     redirect(`/sistema/${profile.accessibleModules[0].moduleKey}`);
+  }
+
+  if (profile && !canAccessCoreSystem(profile.roleKey, profile.moduleOnly)) {
+    redirect("/sistema/escaleras");
   }
 
   return (

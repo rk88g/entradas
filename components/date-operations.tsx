@@ -1,27 +1,15 @@
 "use client";
 
-import { useActionState, useState } from "react";
+import { useActionState, useMemo, useState } from "react";
 import { closeDateAction, createDateAction, updateClosePasswordAction } from "@/app/sistema/actions";
 import { MutationBanner } from "@/components/mutation-banner";
 import { DateRecord, MutationState, RoleKey } from "@/lib/types";
-import { formatLongDate, getDateOffset, getStatusDisplayLabel } from "@/lib/utils";
+import { canCloseMexicoCityDate, formatLongDate, getDateOffset } from "@/lib/utils";
 
 const mutationInitialState: MutationState = {
   success: null,
   error: null
 };
-
-function getVisibleDateLabel(date: DateRecord) {
-  if (date.fechaCompleta === getDateOffset(1)) {
-    return "PROXIMOS";
-  }
-
-  if (date.fechaCompleta === getDateOffset(2)) {
-    return "EN ESPERA";
-  }
-
-  return getStatusDisplayLabel(date.estado);
-}
 
 export function DateOperations({
   dates,
@@ -46,7 +34,15 @@ export function DateOperations({
     updateClosePasswordAction,
     mutationInitialState
   );
-  const activeDates = dates.filter((date) => date.estado === "abierto" || date.estado === "proximo");
+  const tomorrowValue = getDateOffset(1);
+  const waitingValue = getDateOffset(2);
+  const canCloseNow = canCloseMexicoCityDate();
+  const registeredDates = useMemo(
+    () => [...dates].sort((a, b) => b.fechaCompleta.localeCompare(a.fechaCompleta)),
+    [dates]
+  );
+  const tomorrowDate = registeredDates.find((item) => item.fechaCompleta === tomorrowValue) ?? null;
+  const waitingDate = registeredDates.find((item) => item.fechaCompleta === waitingValue) ?? null;
 
   return (
     <section className="module-grid">
@@ -58,25 +54,71 @@ export function DateOperations({
           <strong className="section-title">Fechas</strong>
         </div>
 
-        <div className="stack" style={{ marginTop: "1rem", gap: "1rem" }}>
-          <div className="data-card" style={{ padding: "1.15rem", border: "2px solid var(--line-strong)" }}>
-            <strong className="section-title">Fechas registradas</strong>
-            <p className="muted" style={{ marginTop: "0.4rem" }}>
-              PROXIMOS corresponde a manana y EN ESPERA a dos dias adelante.
-            </p>
+        <div className="stack" style={{ marginTop: "1rem", gap: "1.25rem" }}>
+          <div
+            className="data-card"
+            style={{
+              padding: "1.15rem",
+              border: "2px solid var(--line-strong)",
+              background: "color-mix(in srgb, var(--panel) 88%, var(--brand-2) 12%)"
+            }}
+          >
+            <strong className="section-title">Fechas operativas</strong>
           </div>
           <div className="calendar-grid">
-          {activeDates.map((date) => (
-            <article key={date.id} className="calendar-card">
+            {[
+              { label: "MAÑANA", dateValue: tomorrowValue, record: tomorrowDate },
+              { label: "EN ESPERA", dateValue: waitingValue, record: waitingDate }
+            ].map((slot) => (
+            <article key={slot.dateValue} className="calendar-card">
               <div className="record-title">
-                <strong>{formatLongDate(date.fechaCompleta)}</strong>
+                <strong>{formatLongDate(slot.dateValue)}</strong>
               </div>
               <div className="chips-row">
-                <span className="chip">{getVisibleDateLabel(date)}</span>
-                <span className="chip">{date.cierre ? "Cerrada" : "Disponible"}</span>
+                <span className="chip">{slot.label}</span>
+                <span className="chip">
+                  {slot.record ? (slot.record.cierre ? "Cerrada" : "Registrada") : "Sin registrar"}
+                </span>
               </div>
             </article>
           ))}
+          </div>
+
+          <div
+            className="data-card"
+            style={{
+              padding: "1.15rem",
+              border: "2px solid var(--line-strong)",
+              background: "color-mix(in srgb, var(--panel) 92%, var(--brand) 8%)"
+            }}
+          >
+            <strong className="section-title">Fechas registradas</strong>
+            <div className="table-wrap" style={{ marginTop: "1rem" }}>
+              <table>
+                <thead>
+                  <tr>
+                    <th>Fecha</th>
+                    <th>Apartado</th>
+                    <th>Estatus</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {registeredDates.length === 0 ? (
+                    <tr>
+                      <td colSpan={3}>Sin fechas registradas.</td>
+                    </tr>
+                  ) : (
+                    registeredDates.map((date) => (
+                      <tr key={date.id}>
+                        <td>{formatLongDate(date.fechaCompleta)}</td>
+                        <td>{date.fechaCompleta === tomorrowValue ? "MAÑANA" : date.fechaCompleta === waitingValue ? "EN ESPERA" : "Registrada"}</td>
+                        <td>{date.cierre ? "Cerrada" : "Disponible"}</td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
         </div>
       </article>
@@ -110,7 +152,7 @@ export function DateOperations({
                 value={selectedStatus}
                 onChange={(event) => setSelectedStatus(event.target.value as "abierto" | "proximo")}
               >
-                <option value="abierto">PROXIMOS</option>
+                <option value="abierto">MAÑANA</option>
                 <option value="proximo">EN ESPERA</option>
               </select>
             </div>
@@ -132,6 +174,11 @@ export function DateOperations({
                   ? `Estas por cerrar la fecha de ${formatLongDate(openDate.fechaCompleta)}.`
                   : "No hay fecha activa en PROXIMOS para cerrar."}
               </p>
+              {!canCloseNow ? (
+                <p className="muted" style={{ marginTop: "0.45rem" }}>
+                  Solo puedes cerrar la fecha despues de las 18:00 horas de Mexico.
+                </p>
+              ) : null}
               <MutationBanner state={closeState} />
               {!openDate ? (
                 <MutationBanner
@@ -159,9 +206,9 @@ export function DateOperations({
                   <button
                     className="button-secondary"
                     type="submit"
-                    disabled={closePending || !openDate}
+                    disabled={closePending || !openDate || !canCloseNow}
                   >
-                    Cerrar {openDate ? formatLongDate(openDate.fechaCompleta) : "PROXIMOS"}
+                    Cerrar {openDate ? formatLongDate(openDate.fechaCompleta) : "MAÑANA"}
                   </button>
                 </div>
               </form>

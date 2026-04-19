@@ -17,7 +17,8 @@ const coreNavItems = [
 
 const moduleNavItems = [
   { href: "/sistema/visual", icon: "VI", label: "Visual", moduleKey: "visual" as const },
-  { href: "/sistema/comunicacion", icon: "CO", label: "Comunicacion", moduleKey: "comunicacion" as const }
+  { href: "/sistema/comunicacion", icon: "CO", label: "Comunicacion", moduleKey: "comunicacion" as const },
+  { href: "/sistema/escaleras", icon: "ES", label: "Escaleras", moduleKey: "escaleras" as const }
 ];
 
 export function AppShell({

@@ -6,6 +6,9 @@ import {
   AccessStatus,
   BetadaRecord,
   DateRecord,
+  EscaleraAuthorizedDevice,
+  EscaleraManualItem,
+  EscaleraRecord,
   InternalProfile,
   InternalRecord,
   InternalDeviceRecord,
@@ -31,6 +34,7 @@ import {
   compareInternalLocations,
   fullNameFromParts,
   getAgeFromDate,
+  getAllowedModuleDeviceNames,
   getModuleDisplayName,
   getStatsFromListings,
   getTodayDate,
@@ -45,7 +49,8 @@ function ensureRoleKey(value?: string | null): RoleKey {
     value === "control" ||
     value === "supervisor" ||
     value === "visual" ||
-    value === "comunicacion"
+    value === "comunicacion" ||
+    value === "escaleras"
   ) {
     return value;
   }
@@ -62,7 +67,7 @@ function ensureSex(value?: string | null): VisitorSex {
 }
 
 function ensureModuleKey(value?: string | null): ModuleKey {
-  if (value === "visual" || value === "comunicacion") {
+  if (value === "visual" || value === "comunicacion" || value === "escaleras") {
     return value;
   }
 
@@ -448,6 +453,22 @@ export async function getCurrentUserProfile(): Promise<UserProfile | null> {
       .filter((permission) => permission.worker_id === worker.id)
       .map((permission) => permission.function_key) as UserProfile["accessibleModules"][number]["functions"]
   }));
+
+  const directRoleModuleKey =
+    role.key === "visual" || role.key === "comunicacion" || role.key === "escaleras"
+      ? ensureModuleKey(role.key)
+      : null;
+
+  if (
+    directRoleModuleKey &&
+    !accessibleModules.some((item) => item.moduleKey === directRoleModuleKey)
+  ) {
+    accessibleModules.push({
+      moduleKey: directRoleModuleKey,
+      moduleName: getModuleDisplayName(directRoleModuleKey),
+      functions: ["encargado", "altas", "cobranza"]
+    });
+  }
 
   return {
     id: profile.id,
@@ -883,6 +904,11 @@ export async function getModulePanelData(moduleKey: ModuleKey, includeInactiveIn
     requiresChip: Boolean(item.requires_chip),
     allowCamerasFlag: Boolean(item.allow_cameras_flag)
   }));
+  const allowedDeviceNames = getAllowedModuleDeviceNames(moduleKey);
+  const visibleDeviceTypes = allowedDeviceNames
+    ? deviceTypes.filter((item) => allowedDeviceNames.has(item.name))
+    : deviceTypes;
+  const visibleDeviceTypeIds = new Set(visibleDeviceTypes.map((item) => item.id));
 
   const zones: ModuleZone[] = (zonesResponse.data ?? []).map((item) => ({
     id: item.id,
@@ -911,34 +937,36 @@ export async function getModulePanelData(moduleKey: ModuleKey, includeInactiveIn
       .map((item) => [item.internal_device_id, item])
   );
 
-  const devices: InternalDeviceRecord[] = (devicesResponse.data ?? []).map((item) => {
-    const internal = internalMap.get(item.internal_id);
-    const zone = item.zone_id ? zoneMap.get(item.zone_id) : undefined;
-    return {
-      id: item.id,
-      internalId: item.internal_id,
-      internalName: internal?.fullName ?? "Interno sin nombre",
-      internalLocation: internal?.ubicacion ?? "",
-      moduleKey: ensureModuleKey(item.module_key),
-      deviceTypeId: item.device_type_id,
-      deviceTypeName: item.module_device_types?.[0]?.name ?? "Aparato",
-      zoneId: item.zone_id ?? undefined,
-      zoneName: zone?.name ?? item.module_zones?.[0]?.name ?? undefined,
-      brand: item.brand ?? undefined,
-      model: item.model ?? undefined,
-      characteristics: item.characteristics ?? undefined,
-      imei: item.imei ?? undefined,
-      chipNumber: item.chip_number ?? undefined,
-      camerasAllowed: Boolean(item.cameras_allowed),
-      quantity: item.quantity ?? 1,
-      status: item.status,
-      paidThrough: item.paid_through ?? undefined,
-      weeklyPriceOverride: item.weekly_price_override ?? undefined,
-      discountOverride: item.discount_override ?? undefined,
-      assignedManually: Boolean(item.assigned_manually),
-      notes: item.notes ?? undefined
-    };
-  });
+  const devices: InternalDeviceRecord[] = (devicesResponse.data ?? [])
+    .map((item) => {
+      const internal = internalMap.get(item.internal_id);
+      const zone = item.zone_id ? zoneMap.get(item.zone_id) : undefined;
+      return {
+        id: item.id,
+        internalId: item.internal_id,
+        internalName: internal?.fullName ?? "Interno sin nombre",
+        internalLocation: internal?.ubicacion ?? "",
+        moduleKey: ensureModuleKey(item.module_key),
+        deviceTypeId: item.device_type_id,
+        deviceTypeName: item.module_device_types?.[0]?.name ?? "Aparato",
+        zoneId: item.zone_id ?? undefined,
+        zoneName: zone?.name ?? item.module_zones?.[0]?.name ?? undefined,
+        brand: item.brand ?? undefined,
+        model: item.model ?? undefined,
+        characteristics: item.characteristics ?? undefined,
+        imei: item.imei ?? undefined,
+        chipNumber: item.chip_number ?? undefined,
+        camerasAllowed: Boolean(item.cameras_allowed),
+        quantity: item.quantity ?? 1,
+        status: item.status,
+        paidThrough: item.paid_through ?? undefined,
+        weeklyPriceOverride: item.weekly_price_override ?? undefined,
+        discountOverride: item.discount_override ?? undefined,
+        assignedManually: Boolean(item.assigned_manually),
+        notes: item.notes ?? undefined
+      };
+    })
+    .filter((item) => visibleDeviceTypeIds.has(item.deviceTypeId));
 
   const userMap = new Map(
     (userProfilesResponse.data ?? []).map((item) => [item.id, item.full_name ?? "Usuario"])
@@ -1005,7 +1033,7 @@ export async function getModulePanelData(moduleKey: ModuleKey, includeInactiveIn
   return {
     moduleKey,
     moduleName,
-    deviceTypes,
+    deviceTypes: visibleDeviceTypes,
     zones,
     prices,
     devices,
@@ -1026,6 +1054,114 @@ export async function getModulePanelData(moduleKey: ModuleKey, includeInactiveIn
       })),
     staffAssignments
   };
+}
+
+export async function getEscalerasPanelData(includeInactiveInternals = false): Promise<EscaleraRecord[]> {
+  const supabase = await createServerSupabaseClient();
+  const today = getTodayDate();
+  const [internals, passes] = await Promise.all([
+    getInternos(includeInactiveInternals),
+    getListado({ fechaVisita: today })
+  ]);
+
+  const relevantPasses = passes.filter(
+    (item) => item.menciones?.trim() || item.especiales?.trim() || item.deviceItems.length > 0
+  );
+
+  if (relevantPasses.length === 0) {
+    return [];
+  }
+
+  const internalMap = new Map(internals.map((item) => [item.id, item]));
+  const passIds = relevantPasses.map((item) => item.id);
+  const internalIds = [...new Set(relevantPasses.map((item) => item.internoId))];
+
+  const [{ data: entryRows }, { data: authorizedDeviceRows }] = await Promise.all([
+    supabase
+      .from("escalera_entries")
+      .select("id, listado_id, internal_id, fecha_visita, off8_aplica, off8_type, off8_value, ticket_amount, status, comentarios, retenciones")
+      .in("listado_id", passIds),
+    supabase
+      .from("internal_devices")
+      .select("id, internal_id, quantity, brand, model, module_key, module_device_types!inner(name)")
+      .in("internal_id", internalIds)
+      .in("module_key", ["visual", "comunicacion"])
+      .neq("status", "baja")
+  ]);
+  const escaleraEntryIds = (entryRows ?? []).map((item) => item.id);
+  const itemRows = escaleraEntryIds.length
+    ? (
+        await supabase
+          .from("escalera_entry_items")
+          .select("id, escalera_entry_id, description, quantity, unit_label, weight_kg, liters, notes")
+          .in("escalera_entry_id", escaleraEntryIds)
+      ).data ?? []
+    : [];
+
+  const entryMap = new Map((entryRows ?? []).map((item) => [item.listado_id, item]));
+  const manualItemsMap = new Map<string, EscaleraManualItem[]>();
+  (itemRows ?? []).forEach((item) => {
+    const current = manualItemsMap.get(item.escalera_entry_id) ?? [];
+    current.push({
+      id: item.id,
+      escaleraEntryId: item.escalera_entry_id,
+      description: item.description,
+      quantity: item.quantity ?? 1,
+      unitLabel: item.unit_label ?? undefined,
+      weightKg: item.weight_kg ?? undefined,
+      liters: item.liters ?? undefined,
+      notes: item.notes ?? undefined
+    });
+    manualItemsMap.set(item.escalera_entry_id, current);
+  });
+
+  const authorizedDevicesMap = new Map<string, EscaleraAuthorizedDevice[]>();
+  (authorizedDeviceRows ?? []).forEach((item) => {
+    const current = authorizedDevicesMap.get(item.internal_id) ?? [];
+    current.push({
+      id: item.id,
+      name: item.module_device_types?.[0]?.name ?? "Aparato",
+      quantity: item.quantity ?? 1,
+      moduleKey: ensureModuleKey(item.module_key),
+      brand: item.brand ?? undefined,
+      model: item.model ?? undefined
+    });
+    authorizedDevicesMap.set(item.internal_id, current);
+  });
+
+  const records = relevantPasses
+    .map((pass): EscaleraRecord | null => {
+      const internal = internalMap.get(pass.internoId);
+      if (!internal) {
+        return null;
+      }
+
+      const entry = entryMap.get(pass.id);
+      return {
+        id: entry?.id ?? `pending-${pass.id}`,
+        listadoId: pass.id,
+        internalId: pass.internoId,
+        internalName: pass.internoNombre,
+        internalLocation: pass.internoUbicacion,
+        laborando: internal.laborando,
+        fechaVisita: pass.fechaVisita,
+        off8Aplica: Boolean(entry?.off8_aplica),
+        off8Type: (entry?.off8_type as EscaleraRecord["off8Type"]) ?? null,
+        off8Value: entry?.off8_value ?? null,
+        ticketAmount: entry?.ticket_amount ?? null,
+        status: (entry?.status as EscaleraRecord["status"]) ?? "pendiente",
+        comments: entry?.comentarios ?? undefined,
+        retentions: entry?.retenciones ?? undefined,
+        basicRequest: pass.menciones ?? undefined,
+        specialRequest: pass.especiales ?? undefined,
+        passDeviceItems: pass.deviceItems,
+        authorizedDevices: authorizedDevicesMap.get(pass.internoId) ?? [],
+        manualItems: entry ? manualItemsMap.get(entry.id) ?? [] : []
+      };
+    })
+    .filter((item): item is EscaleraRecord => item !== null);
+
+  return records.sort((a, b) => compareInternalLocations(a.internalLocation, b.internalLocation));
 }
 
 export async function getDashboardSummary() {
@@ -1065,7 +1201,7 @@ export async function getIntegratedModuleCounts() {
   const supabase = await createServerSupabaseClient();
   const { data, error } = await supabase
     .from("internal_devices")
-    .select("module_key")
+    .select("module_key, module_device_types!inner(name)")
     .neq("status", "baja");
 
   if (error || !data) {
@@ -1078,7 +1214,12 @@ export async function getIntegratedModuleCounts() {
   return data.reduce(
     (acc, item) => {
       const moduleKey = ensureModuleKey(item.module_key);
-      if (moduleKey === "visual" || moduleKey === "comunicacion") {
+      const allowedNames = getAllowedModuleDeviceNames(moduleKey);
+      const typeName = item.module_device_types?.[0]?.name;
+      if (
+        (moduleKey === "visual" || moduleKey === "comunicacion") &&
+        (!allowedNames || (typeName ? allowedNames.has(typeName) : false))
+      ) {
         acc[moduleKey] += 1;
       }
       return acc;

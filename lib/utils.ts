@@ -1,5 +1,6 @@
 import {
   AccessStatus,
+  EscaleraEntryStatus,
   ListingRecord,
   ModuleAccess,
   ModuleKey,
@@ -8,6 +9,15 @@ import {
   RoleKey,
   VisitorRecord
 } from "@/lib/types";
+
+const MEXICO_CITY_TIMEZONE = "America/Mexico_City";
+
+function formatPartsToIso(parts: Intl.DateTimeFormatPart[]) {
+  const year = parts.find((part) => part.type === "year")?.value ?? "0000";
+  const month = parts.find((part) => part.type === "month")?.value ?? "01";
+  const day = parts.find((part) => part.type === "day")?.value ?? "01";
+  return `${year}-${month}-${day}`;
+}
 
 function parseLocalDate(input: string) {
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(input);
@@ -71,7 +81,7 @@ export function formatShortDate(input: string) {
 
 export function getStatusDisplayLabel(status: AccessStatus) {
   if (status === "abierto") {
-    return "PROXIMOS";
+    return "MANANA";
   }
 
   if (status === "proximo") {
@@ -88,6 +98,10 @@ export function getModuleDisplayName(moduleKey: ModuleKey) {
 
   if (moduleKey === "comunicacion") {
     return "Comunicacion";
+  }
+
+  if (moduleKey === "escaleras") {
+    return "Escaleras";
   }
 
   return "Rentas";
@@ -111,7 +125,14 @@ export function maskValue(value: string | number, visible = false) {
 }
 
 export function formatDateInput(input: Date) {
-  return input.toISOString().slice(0, 10);
+  return formatPartsToIso(
+    new Intl.DateTimeFormat("en-CA", {
+      timeZone: MEXICO_CITY_TIMEZONE,
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit"
+    }).formatToParts(input)
+  );
 }
 
 export function fullNameFromParts(...parts: Array<string | null | undefined>) {
@@ -149,6 +170,36 @@ export function getNextTwoDays() {
   });
 }
 
+export function getMexicoCityHour(reference = new Date()) {
+  return Number(
+    new Intl.DateTimeFormat("en-US", {
+      timeZone: MEXICO_CITY_TIMEZONE,
+      hour: "2-digit",
+      hour12: false
+    }).format(reference)
+  );
+}
+
+export function canCloseMexicoCityDate(reference = new Date()) {
+  return getMexicoCityHour(reference) >= 18;
+}
+
+export function getEscaleraStatusLabel(status: EscaleraEntryStatus) {
+  if (status === "entregado") {
+    return "Entregado";
+  }
+
+  if (status === "retenido") {
+    return "Retenido";
+  }
+
+  if (status === "rechazado") {
+    return "No entregado";
+  }
+
+  return "Pendiente";
+}
+
 export function getStatsFromListings(listings: ListingRecord[]) {
   const totalVisitors = listings.reduce((sum, item) => sum + item.visitantes.length, 0);
   const minors = listings.reduce(
@@ -181,6 +232,10 @@ export function canAccessCoreSystem(role: RoleKey, moduleOnly: boolean) {
     return true;
   }
 
+  if (role === "escaleras") {
+    return false;
+  }
+
   return !moduleOnly;
 }
 
@@ -190,6 +245,10 @@ export function canAccessModule(
   moduleKey: ModuleKey
 ) {
   if (role === "super-admin" || role === "control") {
+    return true;
+  }
+
+  if (role === "escaleras" && moduleKey === "escaleras") {
     return true;
   }
 
@@ -209,6 +268,18 @@ export function canManageModuleFunction(
   return accesses.some(
     (item) => item.moduleKey === moduleKey && (item.functions.includes("encargado") || item.functions.includes(fn))
   );
+}
+
+export function getAllowedModuleDeviceNames(moduleKey: ModuleKey) {
+  if (moduleKey === "visual") {
+    return new Set(["Pantalla", "Consola", "Sonido"]);
+  }
+
+  if (moduleKey === "comunicacion") {
+    return new Set(["Banda ancha", "Celular", "Internet", "Laptop", "Satelital", "Tablet"]);
+  }
+
+  return null;
 }
 
 export function getWeekRange(reference = new Date()) {

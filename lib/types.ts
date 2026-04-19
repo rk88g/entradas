@@ -4,8 +4,9 @@ export type RoleKey =
   | "supervisor"
   | "capturador"
   | "visual"
-  | "comunicacion";
-export type ModuleKey = "visual" | "comunicacion" | "rentas";
+  | "comunicacion"
+  | "escaleras";
+export type ModuleKey = "visual" | "comunicacion" | "escaleras" | "rentas";
 export type ModuleWorkerFunctionKey =
   | "altas"
   | "cobranza"
@@ -285,4 +286,49 @@ export interface ModuleStaffAssignment {
   userId: string;
   userName: string;
   positionKey: ModuleWorkerFunctionKey;
+}
+
+export type EscaleraEntryStatus = "pendiente" | "entregado" | "retenido" | "rechazado";
+export type EscaleraOff8Type = "fijo" | "porcentual";
+
+export interface EscaleraManualItem {
+  id: string;
+  escaleraEntryId: string;
+  description: string;
+  quantity: number;
+  unitLabel?: string;
+  weightKg?: number | null;
+  liters?: number | null;
+  notes?: string;
+}
+
+export interface EscaleraAuthorizedDevice {
+  id: string;
+  name: string;
+  quantity: number;
+  moduleKey: ModuleKey;
+  brand?: string;
+  model?: string;
+}
+
+export interface EscaleraRecord {
+  id: string;
+  listadoId: string;
+  internalId: string;
+  internalName: string;
+  internalLocation: string;
+  laborando: boolean;
+  fechaVisita: string;
+  off8Aplica: boolean;
+  off8Type?: EscaleraOff8Type | null;
+  off8Value?: number | null;
+  ticketAmount?: number | null;
+  status: EscaleraEntryStatus;
+  comments?: string;
+  retentions?: string;
+  basicRequest?: string;
+  specialRequest?: string;
+  passDeviceItems: PassDeviceItem[];
+  authorizedDevices: EscaleraAuthorizedDevice[];
+  manualItems: EscaleraManualItem[];
 }

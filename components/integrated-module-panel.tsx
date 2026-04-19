@@ -48,18 +48,6 @@ const weekdayOptions = [
   { value: "0", label: "Domingo" }
 ];
 
-function getAllowedDeviceNames(moduleKey: ModulePanelData["moduleKey"]) {
-  if (moduleKey === "visual") {
-    return new Set(["Pantalla", "Consola", "Sonido"]);
-  }
-
-  if (moduleKey === "comunicacion") {
-    return new Set(["Celular", "Tablet", "Laptop", "Banda ancha", "Satelital", "Internet"]);
-  }
-
-  return null;
-}
-
 function getZonePrefix(zoneName?: string) {
   const match = /m(\d+)/i.exec(zoneName ?? "");
   return match?.[1] ?? null;
@@ -108,10 +96,7 @@ export function IntegratedModulePanel({
   const [settingsState, settingsAction, settingsPending] = useActionState(saveModuleSettingsAction, mutationInitialState);
   const [closeState, closeAction, closePending] = useActionState(closeModuleWeekAction, mutationInitialState);
 
-  const allowedDeviceNames = getAllowedDeviceNames(data.moduleKey);
-  const visibleDeviceTypes = allowedDeviceNames
-    ? data.deviceTypes.filter((item) => allowedDeviceNames.has(item.name))
-    : data.deviceTypes;
+  const visibleDeviceTypes = data.deviceTypes;
 
   const priceMap = useMemo(
     () =>
@@ -181,10 +166,7 @@ export function IntegratedModulePanel({
   const selectedInternal = groupedInternals.find((item) => item.internalId === selectedInternalId) ?? null;
   const selectedChargeInternal =
     filteredInternalsForZone.find((item) => item.internalId === selectedChargeInternalId) ?? null;
-  const visibleModalDevices =
-    selectedInternal?.devices.filter((device) =>
-      visibleDeviceTypes.some((deviceType) => deviceType.id === device.deviceTypeId)
-    ) ?? [];
+  const visibleModalDevices = selectedInternal?.devices ?? [];
 
   const canManageConfig = roleKey === "super-admin";
   const canManageCharges = canManageModuleFunction(roleKey, accesses, data.moduleKey, "cobranza");

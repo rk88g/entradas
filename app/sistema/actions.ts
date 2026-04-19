@@ -12,6 +12,8 @@ import {
 } from "@/lib/supabase/queries";
 import { MutationState } from "@/lib/types";
 import {
+  canCloseMexicoCityDate,
+  getAllowedModuleDeviceNames,
   canManageMentions,
   compareInternalLocations,
   getDateOffset,
@@ -131,7 +133,7 @@ export async function createDateAction(
     }
 
     if (status === "abierto" && activeOpenDate) {
-      return failure("Ya existe una fecha activa para PROXIMOS.");
+      return failure("Ya existe una fecha activa para MAÑANA.");
     }
 
     if (status === "proximo" && waitingDate) {
@@ -174,7 +176,11 @@ export async function closeDateAction(
     const openDate = await getOpenDate();
     const dateValue = String(formData.get("fecha_completa") ?? "").trim() || openDate?.fechaCompleta || "";
     if (!dateValue) {
-      return failure("No se encontro la fecha activa de PROXIMOS.");
+      return failure("No se encontro la fecha activa de MAÑANA.");
+    }
+
+    if (!canCloseMexicoCityDate()) {
+      return failure("Solo puedes cerrar la fecha despues de las 18:00 horas de Mexico.");
     }
 
     const supabase = await createServerSupabaseClient();
@@ -196,6 +202,10 @@ export async function closeDateAction(
     const selectedDate = await getDateByValue(dateValue);
     if (!selectedDate) {
       return failure("La fecha ya no existe.");
+    }
+
+    if (selectedDate.estado !== "abierto") {
+      return failure("Solo se puede cerrar la fecha de MAÑANA.");
     }
 
     const passes = await getListado({ fechaVisita: dateValue });
@@ -1030,6 +1040,22 @@ export async function assignModuleDeviceAction(
       return failure("Debes elegir el interno y el tipo de aparato.");
     }
 
+    const allowedDeviceNames = getAllowedModuleDeviceNames(moduleKey as "visual" | "comunicacion" | "escaleras" | "rentas");
+    const { data: selectedType, error: typeError } = await supabase
+      .from("module_device_types")
+      .select("name")
+      .eq("id", deviceTypeId)
+      .eq("module_key", moduleKey)
+      .maybeSingle();
+
+    if (typeError || !selectedType) {
+      return failure(typeError?.message || "No se encontro el tipo de aparato.");
+    }
+
+    if (allowedDeviceNames && !allowedDeviceNames.has(selectedType.name)) {
+      return failure(`Ese aparato no corresponde al bloque ${moduleKey}.`);
+    }
+
     const { error } = await supabase.from("internal_devices").insert({
       internal_id: internalId,
       module_key: moduleKey,
@@ -1105,22 +1131,37 @@ export async function registerModulePaymentAction(
       return failure("La semana ya esta cerrada y no admite cambios.");
     }
 
+    const allowedDeviceNames = getAllowedModuleDeviceNames(moduleKey as "visual" | "comunicacion" | "escaleras" | "rentas");
     const targetDevices = internalId
       ? await supabase
           .from("internal_devices")
-          .select("id, internal_id")
+          .select("id, internal_id, module_device_types!inner(name)")
           .eq("module_key", moduleKey)
           .eq("internal_id", internalId)
           .neq("status", "baja")
-      : { data: [{ id: internalDeviceId, internal_id: internalId || "" }], error: null };
+      : await supabase
+          .from("internal_devices")
+          .select("id, internal_id, module_device_types!inner(name)")
+          .eq("id", internalDeviceId)
+          .eq("module_key", moduleKey)
+          .neq("status", "baja");
 
     if (targetDevices.error || !targetDevices.data || targetDevices.data.length === 0) {
       return failure(targetDevices.error?.message || "No se encontraron aparatos para cobrar.");
     }
 
+    const filteredTargetDevices = (targetDevices.data ?? []).filter((device) => {
+      const typeName = device.module_device_types?.[0]?.name;
+      return !allowedDeviceNames || (typeName ? allowedDeviceNames.has(typeName) : false);
+    });
+
+    if (filteredTargetDevices.length === 0) {
+      return failure("No se encontraron aparatos validos para este bloque.");
+    }
+
     const perDeviceAmount =
-      amount && targetDevices.data.length > 0 ? amount / targetDevices.data.length : amount;
-    const paymentsPayload = targetDevices.data.map((device) => ({
+      amount && filteredTargetDevices.length > 0 ? amount / filteredTargetDevices.length : amount;
+    const paymentsPayload = filteredTargetDevices.map((device) => ({
       internal_device_id: device.id,
       module_key: moduleKey,
       zone_id: zoneId,
@@ -1197,13 +1238,23 @@ export async function closeModuleWeekAction(
       return failure("No se encontro la semana activa.");
     }
 
+    const allowedDeviceNames = getAllowedModuleDeviceNames(moduleKey as "visual" | "comunicacion" | "escaleras" | "rentas");
     const { data: devices } = await supabase
       .from("internal_devices")
-      .select("id, zone_id, status")
+      .select("id, zone_id, status, module_device_types!inner(name)")
       .eq("module_key", moduleKey)
       .neq("status", "baja");
 
-    const activeDeviceIds = (devices ?? []).filter((item) => item.status === "activo").map((item) => item.id);
+    const activeDeviceIds = (devices ?? [])
+      .filter((item) => {
+        const typeName = item.module_device_types?.[0]?.name;
+        if (allowedDeviceNames && (!typeName || !allowedDeviceNames.has(typeName))) {
+          return false;
+        }
+
+        return item.status === "activo";
+      })
+      .map((item) => item.id);
     if (activeDeviceIds.length > 0) {
       const { data: paidItems } = await supabase
         .from("device_payments")
@@ -1236,6 +1287,147 @@ export async function closeModuleWeekAction(
     return success("Semana cerrada.");
   } catch (error) {
     return failure(error instanceof Error ? error.message : "No se pudo cerrar la semana.");
+  }
+}
+
+export async function saveEscaleraEntryAction(
+  _prevState: MutationState,
+  formData: FormData
+): Promise<MutationState> {
+  try {
+    const profile = await requireProfile();
+    if (!["super-admin", "escaleras"].includes(profile.roleKey)) {
+      return failure("Tu rol no puede operar Escaleras.");
+    }
+
+    const supabase = await createServerSupabaseClient();
+    const listadoId = String(formData.get("listado_id") ?? "").trim();
+    const internalId = String(formData.get("internal_id") ?? "").trim();
+    const fechaVisita = String(formData.get("fecha_visita") ?? "").trim();
+    const off8Aplica = String(formData.get("off8_aplica") ?? "") === "on";
+    const off8Type = String(formData.get("off8_type") ?? "").trim() || null;
+    const off8Value = Number(formData.get("off8_value") ?? 0);
+    const ticketAmount = Number(formData.get("ticket_amount") ?? 0);
+    const status = String(formData.get("status") ?? "pendiente").trim();
+    const comentarios = String(formData.get("comentarios") ?? "").trim() || null;
+    const retenciones = String(formData.get("retenciones") ?? "").trim() || null;
+
+    if (!listadoId || !internalId || !fechaVisita) {
+      return failure("Faltan datos del registro de Escaleras.");
+    }
+
+    const { error } = await supabase.from("escalera_entries").upsert(
+      {
+        listado_id: listadoId,
+        internal_id: internalId,
+        fecha_visita: fechaVisita,
+        off8_aplica: off8Aplica,
+        off8_type: off8Aplica ? off8Type : null,
+        off8_value: off8Aplica && Number.isFinite(off8Value) ? off8Value : null,
+        ticket_amount: off8Aplica && Number.isFinite(ticketAmount) ? ticketAmount : null,
+        status,
+        comentarios,
+        retenciones,
+        created_by: profile.id
+      },
+      { onConflict: "listado_id" }
+    );
+
+    if (error) {
+      return failure(error.message || "No se pudo guardar el registro de Escaleras.");
+    }
+
+    const logLines = [
+      off8Aplica ? `Off8: ${off8Type === "porcentual" ? "Porcentual" : "Fijo"} ${Number.isFinite(off8Value) ? off8Value : 0}` : null,
+      Number.isFinite(ticketAmount) && ticketAmount > 0 ? `Ticket: $${ticketAmount.toFixed(2)}` : null,
+      retenciones ? `Retenciones: ${retenciones}` : null,
+      comentarios ? `Comentarios: ${comentarios}` : null,
+      `Estatus: ${status}`
+    ].filter(Boolean);
+
+    if (logLines.length > 0) {
+      await supabase.from("internal_log_notes").upsert(
+        {
+          internal_id: internalId,
+          source_module: "escaleras",
+          source_ref_id: listadoId,
+          title: "Registro Escaleras",
+          notes: logLines.join("\n"),
+          created_by: profile.id
+        },
+        { onConflict: "source_module,source_ref_id" }
+      );
+    }
+
+    revalidatePath("/sistema/escaleras");
+    return success("Registro de Escaleras guardado.");
+  } catch (error) {
+    return failure(error instanceof Error ? error.message : "No se pudo guardar Escaleras.");
+  }
+}
+
+export async function addEscaleraItemAction(
+  _prevState: MutationState,
+  formData: FormData
+): Promise<MutationState> {
+  try {
+    const profile = await requireProfile();
+    if (!["super-admin", "escaleras"].includes(profile.roleKey)) {
+      return failure("Tu rol no puede agregar articulos en Escaleras.");
+    }
+
+    const supabase = await createServerSupabaseClient();
+    const listadoId = String(formData.get("listado_id") ?? "").trim();
+    const internalId = String(formData.get("internal_id") ?? "").trim();
+    const fechaVisita = String(formData.get("fecha_visita") ?? "").trim();
+    const description = String(formData.get("description") ?? "").trim();
+    const quantity = Number(formData.get("quantity") ?? 1);
+    const unitLabel = String(formData.get("unit_label") ?? "").trim() || null;
+    const weightKg = Number(formData.get("weight_kg") ?? 0);
+    const liters = Number(formData.get("liters") ?? 0);
+    const notes = String(formData.get("notes") ?? "").trim() || null;
+
+    if (!listadoId || !internalId || !fechaVisita || !description) {
+      return failure("Completa la descripcion del articulo.");
+    }
+
+    const { data: entry, error: entryError } = await supabase
+      .from("escalera_entries")
+      .upsert(
+        {
+          listado_id: listadoId,
+          internal_id: internalId,
+          fecha_visita: fechaVisita,
+          created_by: profile.id
+        },
+        { onConflict: "listado_id" }
+      )
+      .select("id")
+      .single();
+
+    if (entryError || !entry) {
+      return failure(entryError?.message || "No se pudo preparar el registro de Escaleras.");
+    }
+
+    const { error } = await supabase.from("escalera_entry_items").insert({
+      escalera_entry_id: entry.id,
+      description,
+      quantity: Number.isFinite(quantity) && quantity > 0 ? quantity : 1,
+      unit_label: unitLabel,
+      weight_kg: Number.isFinite(weightKg) && weightKg > 0 ? weightKg : null,
+      liters: Number.isFinite(liters) && liters > 0 ? liters : null,
+      notes,
+      created_by: profile.id
+    });
+
+    if (error) {
+      return failure(error.message || "No se pudo guardar el articulo.");
+    }
+
+    revalidatePath("/sistema/escaleras");
+    return success("Articulo agregado.");
+  } catch (error) {
+    return failure(error instanceof Error ? error.message : "No se pudo guardar el articulo.");
   }
 }
 

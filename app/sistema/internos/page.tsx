@@ -4,6 +4,7 @@ import {
   getCurrentUserProfile,
   getListingBuilderData
 } from "@/lib/supabase/queries";
+import { canAccessCoreSystem } from "@/lib/utils";
 
 export default async function InternosPage() {
   const [profile] = await Promise.all([getCurrentUserProfile()]);
@@ -11,6 +12,10 @@ export default async function InternosPage() {
 
   if (profile?.moduleOnly && profile.accessibleModules.length > 0) {
     redirect(`/sistema/${profile.accessibleModules[0].moduleKey}`);
+  }
+
+  if (profile && !canAccessCoreSystem(profile.roleKey, profile.moduleOnly)) {
+    redirect("/sistema/escaleras");
   }
 
   return (

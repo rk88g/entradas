@@ -25,7 +25,8 @@ values
   ('supervisor', 'Supervisor', 'Revisa, autoriza y supervisa la operación'),
   ('capturador', 'Capturador', 'Registra internos, fechas y pases'),
   ('visual', 'Visual', 'Opera el bloque visual'),
-  ('comunicacion', 'Comunicacion', 'Opera el bloque de comunicacion')
+  ('comunicacion', 'Comunicacion', 'Opera el bloque de comunicacion'),
+  ('escaleras', 'Escaleras', 'Opera el bloque de escaleras')
 on conflict (key) do nothing;
 
 create table if not exists public.user_profiles (
@@ -77,11 +78,37 @@ begin
 end $$;
 
 alter table public.internos
-  alter column laborando type boolean
-  using case
-    when laborando::text in ('true', 't', '1') then true
-    else false
-  end;
+  drop constraint if exists internos_apartado_check;
+
+alter table public.internos
+  drop constraint if exists internos_laborando_check;
+
+do $$
+declare
+  laborando_type text;
+begin
+  select data_type
+  into laborando_type
+  from information_schema.columns
+  where table_schema = 'public'
+    and table_name = 'internos'
+    and column_name = 'laborando';
+
+  if laborando_type is null then
+    alter table public.internos
+      add column laborando boolean not null default false;
+  elsif laborando_type <> 'boolean' then
+    execute $sql$
+      alter table public.internos
+      alter column laborando type boolean
+      using case
+        when nullif(trim(laborando::text), '') is null then false
+        when lower(trim(laborando::text)) in ('true', 't', '1', 'si', 'activo', '618', 'intima') then true
+        else false
+      end
+    $sql$;
+  end if;
+end $$;
 
 alter table public.internos
   alter column laborando set default false;
@@ -227,6 +254,7 @@ insert into public.block_modules (key, name, description)
 values
   ('visual', 'Visual', 'Control de aparatos visuales'),
   ('comunicacion', 'Comunicacion', 'Control de aparatos de comunicacion'),
+  ('escaleras', 'Escaleras', 'Control de ingreso de mercancia y menciones'),
   ('rentas', 'Rentas', 'Control de rentas')
 on conflict (key) do nothing;
 
@@ -302,19 +330,15 @@ create table if not exists public.module_device_types (
 
 insert into public.module_device_types (module_key, key, name, sort_order, requires_imei, requires_chip, allow_cameras_flag)
 values
-  ('visual', 'aire', 'Aire', 1, false, false, false),
   ('comunicacion', 'banda-ancha', 'Banda ancha', 1, false, false, false),
   ('visual', 'consola', 'Consola', 2, false, false, false),
   ('comunicacion', 'celular', 'Celular', 2, true, true, true),
   ('comunicacion', 'internet', 'Internet', 3, false, false, false),
   ('comunicacion', 'laptop', 'Laptop', 4, false, false, true),
   ('visual', 'pantalla', 'Pantalla', 5, false, false, false),
-  ('visual', 'parrilla', 'Parrilla', 6, false, false, false),
-  ('visual', 'regadera', 'Regadera', 7, false, false, false),
   ('comunicacion', 'satelital', 'Satelital', 8, false, false, false),
   ('visual', 'sonido', 'Sonido', 9, false, false, false),
-  ('comunicacion', 'tablet', 'Tablet', 10, false, false, true),
-  ('visual', 'ventilador', 'Ventilador', 11, false, false, false)
+  ('comunicacion', 'tablet', 'Tablet', 10, false, false, true)
 on conflict (key) do update
 set
   module_key = excluded.module_key,
@@ -323,6 +347,11 @@ set
   requires_imei = excluded.requires_imei,
   requires_chip = excluded.requires_chip,
   allow_cameras_flag = excluded.allow_cameras_flag;
+
+update public.module_device_types
+set active = false
+where (module_key = 'visual' and name not in ('Pantalla', 'Consola', 'Sonido'))
+   or (module_key = 'comunicacion' and name not in ('Banda ancha', 'Celular', 'Internet', 'Laptop', 'Satelital', 'Tablet'));
 
 create table if not exists public.module_prices (
   id uuid primary key default gen_random_uuid(),
@@ -412,6 +441,50 @@ create table if not exists public.module_internal_staff (
   unique (module_key, internal_id, user_profile_id)
 );
 
+create table if not exists public.escalera_entries (
+  id uuid primary key default gen_random_uuid(),
+  listado_id uuid not null unique references public.listado (id) on delete cascade,
+  internal_id uuid not null references public.internos (id) on delete cascade,
+  fecha_visita date not null,
+  off8_aplica boolean not null default false,
+  off8_type text check (off8_type in ('fijo', 'porcentual')),
+  off8_value numeric(10,2),
+  ticket_amount numeric(10,2),
+  status text not null default 'pendiente' check (status in ('pendiente', 'entregado', 'retenido', 'rechazado')),
+  comentarios text,
+  retenciones text,
+  created_by uuid references public.user_profiles (id),
+  created_at timestamptz not null default timezone('utc', now()),
+  updated_at timestamptz not null default timezone('utc', now())
+);
+
+create table if not exists public.escalera_entry_items (
+  id uuid primary key default gen_random_uuid(),
+  escalera_entry_id uuid not null references public.escalera_entries (id) on delete cascade,
+  description text not null,
+  quantity integer not null default 1,
+  unit_label text,
+  weight_kg numeric(10,2),
+  liters numeric(10,2),
+  notes text,
+  created_by uuid references public.user_profiles (id),
+  created_at timestamptz not null default timezone('utc', now()),
+  updated_at timestamptz not null default timezone('utc', now())
+);
+
+create table if not exists public.internal_log_notes (
+  id uuid primary key default gen_random_uuid(),
+  internal_id uuid not null references public.internos (id) on delete cascade,
+  source_module text not null,
+  source_ref_id uuid,
+  title text not null,
+  notes text not null,
+  created_by uuid references public.user_profiles (id),
+  created_at timestamptz not null default timezone('utc', now()),
+  updated_at timestamptz not null default timezone('utc', now()),
+  unique (source_module, source_ref_id)
+);
+
 drop index if exists public.idx_internos_apartado;
 create index if not exists idx_internos_laborando on public.internos (laborando);
 create index if not exists idx_visitas_betada on public.visitas (betada);
@@ -423,6 +496,8 @@ create index if not exists idx_visita_interno_historial_visita on public.visita_
 create index if not exists idx_internal_devices_module on public.internal_devices (module_key, internal_id);
 create index if not exists idx_device_payments_cycle on public.device_payments (module_key, cycle_id);
 create index if not exists idx_module_internal_staff_module on public.module_internal_staff (module_key, internal_id);
+create index if not exists idx_escalera_entries_fecha on public.escalera_entries (fecha_visita, status);
+create index if not exists idx_internal_log_notes_internal on public.internal_log_notes (internal_id, created_at desc);
 
 create or replace view public.historial_ingresos as
 select
@@ -561,6 +636,24 @@ before update on public.module_internal_staff
 for each row
 execute function public.set_updated_at();
 
+drop trigger if exists escalera_entries_set_updated_at on public.escalera_entries;
+create trigger escalera_entries_set_updated_at
+before update on public.escalera_entries
+for each row
+execute function public.set_updated_at();
+
+drop trigger if exists escalera_entry_items_set_updated_at on public.escalera_entry_items;
+create trigger escalera_entry_items_set_updated_at
+before update on public.escalera_entry_items
+for each row
+execute function public.set_updated_at();
+
+drop trigger if exists internal_log_notes_set_updated_at on public.internal_log_notes;
+create trigger internal_log_notes_set_updated_at
+before update on public.internal_log_notes
+for each row
+execute function public.set_updated_at();
+
 alter table public.roles enable row level security;
 alter table public.user_profiles enable row level security;
 alter table public.internos enable row level security;
@@ -584,6 +677,9 @@ alter table public.listing_device_items enable row level security;
 alter table public.device_payment_cycles enable row level security;
 alter table public.device_payments enable row level security;
 alter table public.module_internal_staff enable row level security;
+alter table public.escalera_entries enable row level security;
+alter table public.escalera_entry_items enable row level security;
+alter table public.internal_log_notes enable row level security;
 
 grant usage on schema public to anon, authenticated, service_role;
 grant select on all tables in schema public to anon;
@@ -846,6 +942,27 @@ for select
 to authenticated
 using (true);
 
+drop policy if exists "read access escalera entries" on public.escalera_entries;
+create policy "read access escalera entries"
+on public.escalera_entries
+for select
+to authenticated
+using (true);
+
+drop policy if exists "read access escalera entry items" on public.escalera_entry_items;
+create policy "read access escalera entry items"
+on public.escalera_entry_items
+for select
+to authenticated
+using (true);
+
+drop policy if exists "read access internal log notes" on public.internal_log_notes;
+create policy "read access internal log notes"
+on public.internal_log_notes
+for select
+to authenticated
+using (true);
+
 drop policy if exists "manage modules by authenticated users" on public.module_workers;
 create policy "manage modules by authenticated users"
 on public.module_workers
@@ -921,6 +1038,30 @@ with check (true);
 drop policy if exists "manage module internal staff by authenticated users" on public.module_internal_staff;
 create policy "manage module internal staff by authenticated users"
 on public.module_internal_staff
+for all
+to authenticated
+using (true)
+with check (true);
+
+drop policy if exists "manage escalera entries by authenticated users" on public.escalera_entries;
+create policy "manage escalera entries by authenticated users"
+on public.escalera_entries
+for all
+to authenticated
+using (true)
+with check (true);
+
+drop policy if exists "manage escalera entry items by authenticated users" on public.escalera_entry_items;
+create policy "manage escalera entry items by authenticated users"
+on public.escalera_entry_items
+for all
+to authenticated
+using (true)
+with check (true);
+
+drop policy if exists "manage internal log notes by authenticated users" on public.internal_log_notes;
+create policy "manage internal log notes by authenticated users"
+on public.internal_log_notes
 for all
 to authenticated
 using (true)
