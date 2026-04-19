@@ -1,4 +1,13 @@
-import { AccessStatus, ListingRecord, PassVisitor, RoleKey, VisitorRecord } from "@/lib/types";
+import {
+  AccessStatus,
+  ListingRecord,
+  ModuleAccess,
+  ModuleKey,
+  ModuleWorkerFunctionKey,
+  PassVisitor,
+  RoleKey,
+  VisitorRecord
+} from "@/lib/types";
 
 function parseLocalDate(input: string) {
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(input);
@@ -72,6 +81,18 @@ export function getStatusDisplayLabel(status: AccessStatus) {
   return "CERRADA";
 }
 
+export function getModuleDisplayName(moduleKey: ModuleKey) {
+  if (moduleKey === "visual") {
+    return "Visual";
+  }
+
+  if (moduleKey === "comunicacion") {
+    return "Comunicacion";
+  }
+
+  return "Rentas";
+}
+
 export function formatDateInput(input: Date) {
   return input.toISOString().slice(0, 10);
 }
@@ -136,6 +157,56 @@ export function canManageMentions(role: RoleKey) {
 
 export function getDefaultDateStatusForRole(role: RoleKey): AccessStatus {
   return role === "capturador" ? "proximo" : "abierto";
+}
+
+export function canAccessCoreSystem(role: RoleKey, moduleOnly: boolean) {
+  if (role === "super-admin" || role === "control") {
+    return true;
+  }
+
+  return !moduleOnly;
+}
+
+export function canAccessModule(
+  role: RoleKey,
+  accesses: ModuleAccess[],
+  moduleKey: ModuleKey
+) {
+  if (role === "super-admin" || role === "control") {
+    return true;
+  }
+
+  return accesses.some((item) => item.moduleKey === moduleKey);
+}
+
+export function canManageModuleFunction(
+  role: RoleKey,
+  accesses: ModuleAccess[],
+  moduleKey: ModuleKey,
+  fn: ModuleWorkerFunctionKey
+) {
+  if (role === "super-admin" || role === "control") {
+    return true;
+  }
+
+  return accesses.some(
+    (item) => item.moduleKey === moduleKey && (item.functions.includes("encargado") || item.functions.includes(fn))
+  );
+}
+
+export function getWeekRange(reference = new Date()) {
+  const value = new Date(reference);
+  const day = value.getDay();
+  const diffToMonday = day === 0 ? -6 : 1 - day;
+  const start = new Date(value);
+  start.setDate(value.getDate() + diffToMonday);
+  const end = new Date(start);
+  end.setDate(start.getDate() + 6);
+
+  return {
+    start: formatDateInput(start),
+    end: formatDateInput(end)
+  };
 }
 
 export function nextPassNumber(seed: number) {

@@ -1,9 +1,17 @@
 export type RoleKey = "super-admin" | "control" | "supervisor" | "capturador";
+export type ModuleKey = "visual" | "comunicacion" | "rentas";
+export type ModuleWorkerFunctionKey =
+  | "altas"
+  | "cobranza"
+  | "encargado"
+  | "consulta"
+  | "configuracion";
 
 export type AccessArea = "618" | "INTIMA";
 export type AccessStatus = "abierto" | "proximo" | "cerrado";
 export type PassStatus = "capturado" | "autorizado" | "impreso" | "cancelado";
 export type VisitorSex = "hombre" | "mujer" | "sin-definir";
+export type DeviceStatus = "activo" | "retenido" | "reparacion" | "baja";
 
 export interface UserProfile {
   id: string;
@@ -12,6 +20,14 @@ export interface UserProfile {
   roleKey: RoleKey;
   roleName: string;
   active: boolean;
+  moduleOnly: boolean;
+  accessibleModules: ModuleAccess[];
+}
+
+export interface ModuleAccess {
+  moduleKey: ModuleKey;
+  moduleName: string;
+  functions: ModuleWorkerFunctionKey[];
 }
 
 export interface InternalRecord {
@@ -113,9 +129,19 @@ export interface ListingRecord {
   status: PassStatus;
   numeroPase?: number | null;
   menciones?: string;
+  especiales?: string;
   cierreAplicado?: boolean;
   createdAt: string;
   visitantes: PassVisitor[];
+  deviceItems: PassDeviceItem[];
+}
+
+export interface PassDeviceItem {
+  id: string;
+  deviceTypeId: string;
+  moduleKey: ModuleKey;
+  name: string;
+  quantity: number;
 }
 
 export interface BetadaRecord {
@@ -143,9 +169,100 @@ export interface ListingBuilderData {
   internalProfiles: InternalProfile[];
   todaysPasses: ListingRecord[];
   closePasswordConfigured: boolean;
+  passArticles: ModuleDeviceType[];
 }
 
 export interface MutationState {
   success: string | null;
   error: string | null;
+}
+
+export interface ModuleDeviceType {
+  id: string;
+  moduleKey: ModuleKey;
+  key: string;
+  name: string;
+  sortOrder: number;
+  requiresImei: boolean;
+  requiresChip: boolean;
+  allowCamerasFlag: boolean;
+}
+
+export interface ModuleZone {
+  id: string;
+  moduleKey: ModuleKey;
+  name: string;
+  chargeWeekday: number;
+  active: boolean;
+}
+
+export interface ModulePriceRecord {
+  id: string;
+  moduleKey: ModuleKey;
+  deviceTypeId: string;
+  deviceTypeName: string;
+  weeklyPrice: number;
+  discountAmount: number;
+  active: boolean;
+}
+
+export interface InternalDeviceRecord {
+  id: string;
+  internalId: string;
+  internalName: string;
+  internalLocation: number;
+  moduleKey: ModuleKey;
+  deviceTypeId: string;
+  deviceTypeName: string;
+  zoneId?: string;
+  zoneName?: string;
+  brand?: string;
+  model?: string;
+  characteristics?: string;
+  imei?: string;
+  chipNumber?: string;
+  camerasAllowed: boolean;
+  quantity: number;
+  status: DeviceStatus;
+  paidThrough?: string | null;
+  weeklyPriceOverride?: number | null;
+  discountOverride?: number | null;
+  assignedManually: boolean;
+  notes?: string;
+}
+
+export interface ModuleWorkerRecord {
+  id: string;
+  userId: string;
+  fullName: string;
+  email: string;
+  moduleKey: ModuleKey;
+  functions: ModuleWorkerFunctionKey[];
+  active: boolean;
+}
+
+export interface ModuleFinanceSummary {
+  zoneId: string | null;
+  zoneName: string;
+  totalPaid: number;
+  paidCount: number;
+  pendingCount: number;
+}
+
+export interface ModulePanelData {
+  moduleKey: ModuleKey;
+  moduleName: string;
+  deviceTypes: ModuleDeviceType[];
+  zones: ModuleZone[];
+  prices: ModulePriceRecord[];
+  devices: InternalDeviceRecord[];
+  workers: ModuleWorkerRecord[];
+  unpaidDevices: InternalDeviceRecord[];
+  paidDevices: InternalDeviceRecord[];
+  totalsByZone: ModuleFinanceSummary[];
+  totalIncome: number;
+  currentWeekLabel: string;
+  weekClosed: boolean;
+  currentCycleId?: string;
+  assignableUsers: Array<{ id: string; fullName: string }>;
 }

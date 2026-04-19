@@ -1,27 +1,26 @@
+import { redirect } from "next/navigation";
 import { InternalBrowser } from "@/components/internal-browser";
 import {
   getCurrentUserProfile,
-  getInternalProfiles,
-  getNextDate,
-  getOpenDate
+  getListingBuilderData
 } from "@/lib/supabase/queries";
 
 export default async function InternosPage() {
-  const [profile, nextDate, openDate] = await Promise.all([
+  const [profile, builderData] = await Promise.all([
     getCurrentUserProfile(),
-    getNextDate(),
-    getOpenDate()
+    getListingBuilderData()
   ]);
-  const profiles = await getInternalProfiles({
-    nextDateValue: nextDate?.fechaCompleta,
-    openDateValue: openDate?.fechaCompleta
-  });
+
+  if (profile?.moduleOnly && profile.accessibleModules.length > 0) {
+    redirect(`/sistema/${profile.accessibleModules[0].moduleKey}`);
+  }
 
   return (
     <InternalBrowser
-      profiles={profiles}
-      nextDate={nextDate}
-      openDate={openDate}
+      profiles={builderData.internalProfiles}
+      nextDate={builderData.nextDate}
+      openDate={builderData.openDate}
+      passArticles={builderData.passArticles}
       roleKey={profile?.roleKey ?? "capturador"}
     />
   );

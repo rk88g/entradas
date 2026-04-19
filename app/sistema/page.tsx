@@ -1,11 +1,17 @@
-import { getDashboardSummary, getInternos, getVisitas } from "@/lib/supabase/queries";
+import { redirect } from "next/navigation";
+import { getCurrentUserProfile, getDashboardSummary, getInternos, getVisitas } from "@/lib/supabase/queries";
 
 export default async function SistemaPage() {
-  const [summary, internos, visitas] = await Promise.all([
+  const [profile, summary, internos, visitas] = await Promise.all([
+    getCurrentUserProfile(),
     getDashboardSummary(),
     getInternos(),
     getVisitas()
   ]);
+
+  if (profile?.moduleOnly && profile.accessibleModules.length > 0) {
+    redirect(`/sistema/${profile.accessibleModules[0].moduleKey}`);
+  }
 
   return (
     <section className="stats-grid">

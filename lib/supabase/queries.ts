@@ -8,9 +8,17 @@ import {
   DateRecord,
   InternalProfile,
   InternalRecord,
+  InternalDeviceRecord,
   InternalVisitorLink,
   ListingBuilderData,
   ListingRecord,
+  ModuleDeviceType,
+  ModuleFinanceSummary,
+  ModuleKey,
+  ModulePanelData,
+  ModulePriceRecord,
+  ModuleZone,
+  ModuleWorkerRecord,
   PassVisitor,
   RoleKey,
   UserProfile,
@@ -21,9 +29,10 @@ import {
 import {
   fullNameFromParts,
   getAgeFromDate,
+  getModuleDisplayName,
   getStatsFromListings,
   getTodayDate,
-  getTomorrowDate,
+  getWeekRange,
   sortVisitorsByAge
 } from "@/lib/utils";
 
@@ -41,6 +50,14 @@ function ensureSex(value?: string | null): VisitorSex {
   }
 
   return "sin-definir";
+}
+
+function ensureModuleKey(value?: string | null): ModuleKey {
+  if (value === "visual" || value === "comunicacion") {
+    return value;
+  }
+
+  return "rentas";
 }
 
 function mapInternalRecord(item: {
@@ -256,6 +273,7 @@ async function buildListingsForRows(
     numero_pase: number | null;
     cierre_aplicado: boolean | null;
     menciones: string | null;
+    especiales: string | null;
     created_at: string;
   }>
 ): Promise<ListingRecord[]> {
@@ -264,11 +282,18 @@ async function buildListingsForRows(
   }
 
   const internalIds = [...new Set(listadoRows.map((item) => item.interno_id))];
-  const [internosMap, { data: listadoVisitasRows, error: listadoVisitasError }] = await Promise.all([
+  const [internosMap, { data: listadoVisitasRows, error: listadoVisitasError }, { data: deviceItemRows }] = await Promise.all([
     getInternosMap(supabase, internalIds),
     supabase
       .from("listado_visitas")
       .select("listado_id, visita_id, orden")
+      .in(
+        "listado_id",
+        listadoRows.map((item) => item.id)
+      ),
+    supabase
+      .from("listing_device_items")
+      .select("id, listado_id, quantity, device_type_id, module_device_types!inner(id, module_key, name)")
       .in(
         "listado_id",
         listadoRows.map((item) => item.id)
@@ -282,11 +307,23 @@ async function buildListingsForRows(
   const visitorIds = [...new Set((listadoVisitasRows ?? []).map((item) => item.visita_id))];
   const visitorsMap = await getVisitorsMap(supabase, visitorIds);
   const relationMap = new Map<string, typeof listadoVisitasRows>();
+  const deviceMap = new Map<string, Array<{
+    id: string;
+    quantity: number;
+    device_type_id: string;
+    module_device_types: Array<{ id: string; module_key: string; name: string }>;
+  }>>();
 
   (listadoVisitasRows ?? []).forEach((item) => {
     const current = relationMap.get(item.listado_id) ?? [];
     current.push(item);
     relationMap.set(item.listado_id, current);
+  });
+
+  (deviceItemRows ?? []).forEach((item) => {
+    const current = deviceMap.get(item.listado_id) ?? [];
+    current.push(item);
+    deviceMap.set(item.listado_id, current);
   });
 
   return listadoRows.map((item) => {
@@ -326,8 +363,25 @@ async function buildListingsForRows(
       numeroPase: item.numero_pase,
       cierreAplicado: Boolean(item.cierre_aplicado),
       menciones: item.menciones ?? undefined,
+      especiales: item.especiales ?? undefined,
       createdAt: item.created_at,
-      visitantes
+      visitantes,
+      deviceItems: (deviceMap.get(item.id) ?? [])
+        .map((device) => {
+          const deviceType = device.module_device_types?.[0];
+          if (!deviceType) {
+            return null;
+          }
+
+          return {
+            id: device.id,
+            deviceTypeId: device.device_type_id,
+            moduleKey: ensureModuleKey(deviceType.module_key),
+            name: deviceType.name,
+            quantity: device.quantity
+          };
+        })
+        .filter((item): item is ListingRecord["deviceItems"][number] => item !== null)
     };
   });
 }
@@ -344,7 +398,7 @@ export async function getCurrentUserProfile(): Promise<UserProfile | null> {
 
   const { data: profile, error: profileError } = await supabase
     .from("user_profiles")
-    .select("id, full_name, role_id, active")
+    .select("id, full_name, role_id, active, module_only")
     .eq("id", user.id)
     .maybeSingle();
 
@@ -362,13 +416,37 @@ export async function getCurrentUserProfile(): Promise<UserProfile | null> {
     return null;
   }
 
+  const { data: workers } = await supabase
+    .from("module_workers")
+    .select("id, module_key, active")
+    .eq("user_profile_id", profile.id)
+    .eq("active", true);
+
+  const workerIds = (workers ?? []).map((item) => item.id);
+  const { data: permissions } = workerIds.length
+    ? await supabase
+        .from("module_worker_permissions")
+        .select("worker_id, function_key")
+        .in("worker_id", workerIds)
+    : { data: [] as Array<{ worker_id: string; function_key: string }> };
+
+  const accessibleModules = (workers ?? []).map((worker) => ({
+    moduleKey: ensureModuleKey(worker.module_key),
+    moduleName: getModuleDisplayName(ensureModuleKey(worker.module_key)),
+    functions: (permissions ?? [])
+      .filter((permission) => permission.worker_id === worker.id)
+      .map((permission) => permission.function_key) as UserProfile["accessibleModules"][number]["functions"]
+  }));
+
   return {
     id: profile.id,
     email: user.email ?? "",
     fullName: profile.full_name ?? user.email ?? "Usuario",
     roleKey: ensureRoleKey(role.key),
     roleName: role.name,
-    active: Boolean(profile.active)
+    active: Boolean(profile.active),
+    moduleOnly: Boolean(profile.module_only),
+    accessibleModules
   };
 }
 
@@ -537,7 +615,7 @@ export async function getListado(filters?: {
   let query = supabase
     .from("listado")
     .select(
-      "id, interno_id, fecha_id, fecha_visita, apartado, status, numero_pase, cierre_aplicado, menciones, created_at"
+      "id, interno_id, fecha_id, fecha_visita, apartado, status, numero_pase, cierre_aplicado, menciones, especiales, created_at"
     )
     .order("fecha_visita", { ascending: true })
     .order("created_at", { ascending: true });
@@ -644,13 +722,14 @@ export async function getInternalProfiles(options?: {
 
 export async function getListingBuilderData(): Promise<ListingBuilderData> {
   const [openDate, nextDate] = await Promise.all([getOpenDate(), getNextDate()]);
-  const [closePasswordConfigured, internalProfiles, todaysPasses] = await Promise.all([
+  const [closePasswordConfigured, internalProfiles, todaysPasses, passArticles] = await Promise.all([
     getClosePasswordConfigured(),
     getInternalProfiles({
       nextDateValue: nextDate?.fechaCompleta,
       openDateValue: openDate?.fechaCompleta
     }),
-    getListado({ fechaVisita: getTodayDate() })
+    getListado({ fechaVisita: getTodayDate() }),
+    getPassDeviceTypes()
   ]);
 
   return {
@@ -659,7 +738,8 @@ export async function getListingBuilderData(): Promise<ListingBuilderData> {
     printDate: openDate,
     internalProfiles,
     todaysPasses,
-    closePasswordConfigured
+    closePasswordConfigured,
+    passArticles
   };
 }
 
@@ -672,6 +752,245 @@ export async function getClosePasswordConfigured() {
     .maybeSingle();
 
   return Boolean(data);
+}
+
+export async function getPassDeviceTypes(): Promise<ModuleDeviceType[]> {
+  const supabase = await createServerSupabaseClient();
+  const { data, error } = await supabase
+    .from("module_device_types")
+    .select("id, module_key, key, name, sort_order, requires_imei, requires_chip, allow_cameras_flag")
+    .in("key", [
+      "aire",
+      "celular",
+      "consola",
+      "pantalla",
+      "sonido",
+      "ventilador",
+      "parrilla",
+      "regadera",
+      "laptop",
+      "tablet"
+    ])
+    .order("name", { ascending: true });
+
+  if (error || !data) {
+    return [];
+  }
+
+  return data.map((item) => ({
+    id: item.id,
+    moduleKey: ensureModuleKey(item.module_key),
+    key: item.key,
+    name: item.name,
+    sortOrder: item.sort_order,
+    requiresImei: Boolean(item.requires_imei),
+    requiresChip: Boolean(item.requires_chip),
+    allowCamerasFlag: Boolean(item.allow_cameras_flag)
+  }));
+}
+
+export async function getModulePanelData(moduleKey: ModuleKey): Promise<ModulePanelData> {
+  const supabase = await createServerSupabaseClient();
+  const { start, end } = getWeekRange();
+  const moduleName = getModuleDisplayName(moduleKey);
+
+  const [
+    internals,
+    deviceTypesResponse,
+    zonesResponse,
+    pricesResponse,
+    devicesResponse,
+    workersResponse,
+    permissionsResponse,
+    cyclesResponse,
+    paymentsResponse,
+    userProfilesResponse
+  ] = await Promise.all([
+    getInternos(),
+    supabase
+      .from("module_device_types")
+      .select("id, module_key, key, name, sort_order, requires_imei, requires_chip, allow_cameras_flag")
+      .eq("module_key", moduleKey)
+      .eq("active", true)
+      .order("sort_order", { ascending: true }),
+    supabase
+      .from("module_zones")
+      .select("id, module_key, name, charge_weekday, active")
+      .eq("module_key", moduleKey)
+      .order("name", { ascending: true }),
+    supabase
+      .from("module_prices")
+      .select("id, module_key, device_type_id, weekly_price, discount_amount, active, module_device_types!inner(name)")
+      .eq("module_key", moduleKey),
+    supabase
+      .from("internal_devices")
+      .select(
+        "id, internal_id, module_key, device_type_id, zone_id, brand, model, characteristics, imei, chip_number, cameras_allowed, quantity, status, paid_through, weekly_price_override, discount_override, assigned_manually, notes, module_device_types!inner(name), module_zones(name)"
+      )
+      .eq("module_key", moduleKey)
+      .neq("status", "baja")
+      .order("created_at", { ascending: false }),
+    supabase
+      .from("module_workers")
+      .select("id, user_profile_id, module_key, active")
+      .eq("module_key", moduleKey),
+    supabase
+      .from("module_worker_permissions")
+      .select("worker_id, function_key"),
+    supabase
+      .from("device_payment_cycles")
+      .select("id, closed, week_start, week_end")
+      .eq("module_key", moduleKey)
+      .eq("week_start", start)
+      .eq("week_end", end)
+      .maybeSingle(),
+    supabase
+      .from("device_payments")
+      .select("id, internal_device_id, zone_id, amount, status, cycle_id")
+      .eq("module_key", moduleKey),
+    supabase.from("user_profiles").select("id, full_name").eq("active", true)
+  ]);
+
+  const deviceTypes: ModuleDeviceType[] = (deviceTypesResponse.data ?? []).map((item) => ({
+    id: item.id,
+    moduleKey: ensureModuleKey(item.module_key),
+    key: item.key,
+    name: item.name,
+    sortOrder: item.sort_order,
+    requiresImei: Boolean(item.requires_imei),
+    requiresChip: Boolean(item.requires_chip),
+    allowCamerasFlag: Boolean(item.allow_cameras_flag)
+  }));
+
+  const zones: ModuleZone[] = (zonesResponse.data ?? []).map((item) => ({
+    id: item.id,
+    moduleKey: ensureModuleKey(item.module_key),
+    name: item.name,
+    chargeWeekday: item.charge_weekday,
+    active: Boolean(item.active)
+  }));
+
+  const prices: ModulePriceRecord[] = (pricesResponse.data ?? []).map((item) => ({
+    id: item.id,
+    moduleKey: ensureModuleKey(item.module_key),
+    deviceTypeId: item.device_type_id,
+    deviceTypeName: item.module_device_types?.[0]?.name ?? "Aparato",
+    weeklyPrice: Number(item.weekly_price ?? 0),
+    discountAmount: Number(item.discount_amount ?? 0),
+    active: Boolean(item.active)
+  }));
+
+  const internalMap = new Map(internals.map((item) => [item.id, item]));
+  const zoneMap = new Map(zones.map((item) => [item.id, item]));
+  const cycleId = cyclesResponse.data?.id ?? null;
+  const paymentMap = new Map(
+    (paymentsResponse.data ?? [])
+      .filter((item) => !cycleId || item.cycle_id === cycleId)
+      .map((item) => [item.internal_device_id, item])
+  );
+
+  const devices: InternalDeviceRecord[] = (devicesResponse.data ?? []).map((item) => {
+    const internal = internalMap.get(item.internal_id);
+    const zone = item.zone_id ? zoneMap.get(item.zone_id) : undefined;
+    return {
+      id: item.id,
+      internalId: item.internal_id,
+      internalName: internal?.fullName ?? "Interno sin nombre",
+      internalLocation: internal?.ubicacion ?? 0,
+      moduleKey: ensureModuleKey(item.module_key),
+      deviceTypeId: item.device_type_id,
+      deviceTypeName: item.module_device_types?.[0]?.name ?? "Aparato",
+      zoneId: item.zone_id ?? undefined,
+      zoneName: zone?.name ?? item.module_zones?.[0]?.name ?? undefined,
+      brand: item.brand ?? undefined,
+      model: item.model ?? undefined,
+      characteristics: item.characteristics ?? undefined,
+      imei: item.imei ?? undefined,
+      chipNumber: item.chip_number ?? undefined,
+      camerasAllowed: Boolean(item.cameras_allowed),
+      quantity: item.quantity ?? 1,
+      status: item.status,
+      paidThrough: item.paid_through ?? undefined,
+      weeklyPriceOverride: item.weekly_price_override ?? undefined,
+      discountOverride: item.discount_override ?? undefined,
+      assignedManually: Boolean(item.assigned_manually),
+      notes: item.notes ?? undefined
+    };
+  });
+
+  const userMap = new Map(
+    (userProfilesResponse.data ?? []).map((item) => [item.id, item.full_name ?? "Usuario"])
+  );
+
+  const workers: ModuleWorkerRecord[] = (workersResponse.data ?? []).map((item) => ({
+    id: item.id,
+    userId: item.user_profile_id,
+    fullName: userMap.get(item.user_profile_id) ?? "Usuario",
+    email: "",
+    moduleKey: ensureModuleKey(item.module_key),
+    functions: (permissionsResponse.data ?? [])
+      .filter((permission) => permission.worker_id === item.id)
+      .map((permission) => permission.function_key) as ModuleWorkerRecord["functions"],
+    active: Boolean(item.active)
+  }));
+
+  const unpaidDevices = devices.filter((device) => {
+    const payment = paymentMap.get(device.id);
+    if (device.status !== "activo") {
+      return false;
+    }
+
+    return !payment || payment.status !== "pagado";
+  });
+
+  const paidDevices = devices.filter((device) => {
+    const payment = paymentMap.get(device.id);
+    return Boolean(payment && payment.status === "pagado");
+  });
+
+  const totalsByZoneMap = new Map<string, ModuleFinanceSummary>();
+  devices.forEach((device) => {
+    const zoneId = device.zoneId ?? "sin-zona";
+    const zoneName = device.zoneName ?? "Sin zona";
+    const payment = paymentMap.get(device.id);
+    const current = totalsByZoneMap.get(zoneId) ?? {
+      zoneId: zoneId === "sin-zona" ? null : zoneId,
+      zoneName,
+      totalPaid: 0,
+      paidCount: 0,
+      pendingCount: 0
+    };
+
+    if (payment && payment.status === "pagado") {
+      current.totalPaid += Number(payment.amount ?? 0);
+      current.paidCount += 1;
+    } else {
+      current.pendingCount += 1;
+    }
+
+    totalsByZoneMap.set(zoneId, current);
+  });
+
+  return {
+    moduleKey,
+    moduleName,
+    deviceTypes,
+    zones,
+    prices,
+    devices,
+    workers,
+    unpaidDevices,
+    paidDevices,
+    totalsByZone: [...totalsByZoneMap.values()].sort((a, b) => a.zoneName.localeCompare(b.zoneName)),
+    totalIncome: [...totalsByZoneMap.values()].reduce((sum, item) => sum + item.totalPaid, 0),
+    currentWeekLabel: `${start} al ${end}`,
+    weekClosed: Boolean(cyclesResponse.data?.closed),
+    currentCycleId: cyclesResponse.data?.id,
+    assignableUsers: (userProfilesResponse.data ?? []).map((item) => ({
+      id: item.id,
+      fullName: item.full_name ?? "Usuario"
+    }))
+  };
 }
 
 export async function getDashboardSummary() {

@@ -5,13 +5,19 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { LogoutButton } from "@/components/logout-button";
 import { UserProfile } from "@/lib/types";
+import { canAccessCoreSystem, canAccessModule } from "@/lib/utils";
 
-const navItems = [
+const coreNavItems = [
   { href: "/sistema", icon: "IN", label: "Inicio" },
   { href: "/sistema/internos", icon: "IT", label: "Internos" },
   { href: "/sistema/visitas", icon: "VS", label: "Visitas" },
   { href: "/sistema/listado", icon: "LS", label: "Listado" },
   { href: "/sistema/fechas", icon: "FC", label: "Fechas" }
+];
+
+const moduleNavItems = [
+  { href: "/sistema/visual", icon: "VI", label: "Visual", moduleKey: "visual" as const },
+  { href: "/sistema/comunicacion", icon: "CO", label: "Comunicacion", moduleKey: "comunicacion" as const }
 ];
 
 export function AppShell({
@@ -25,6 +31,10 @@ export function AppShell({
 }) {
   const pathname = usePathname();
   const [open, setOpen] = useState(false);
+  const visibleNavItems = [
+    ...(canAccessCoreSystem(user.roleKey, user.moduleOnly) ? coreNavItems : []),
+    ...moduleNavItems.filter((item) => canAccessModule(user.roleKey, user.accessibleModules, item.moduleKey))
+  ];
 
   return (
     <div className="page-bg">
@@ -45,7 +55,7 @@ export function AppShell({
 
             <div className={`sidebar-card ${open ? "open" : ""}`}>
               <nav className="nav-list">
-                {navItems.map((item) => {
+                {visibleNavItems.map((item) => {
                   const active = pathname === item.href;
                   return (
                     <Link

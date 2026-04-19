@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import { DateOperations } from "@/components/date-operations";
 import {
   getClosePasswordConfigured,
@@ -15,6 +16,10 @@ export default async function FechasPage() {
     getOpenDate(),
     getClosePasswordConfigured()
   ]);
+
+  if (profile?.moduleOnly && profile.accessibleModules.length > 0) {
+    redirect(`/sistema/${profile.accessibleModules[0].moduleKey}`);
+  }
 
   return (
     <DateOperations

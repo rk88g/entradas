@@ -182,6 +182,183 @@ create table if not exists public.listado_visitas (
   unique (listado_id, visita_id)
 );
 
+alter table public.user_profiles
+  add column if not exists module_only boolean not null default false;
+
+alter table public.listado
+  add column if not exists especiales text;
+
+create table if not exists public.block_modules (
+  key text primary key,
+  name text not null,
+  description text,
+  created_at timestamptz not null default timezone('utc', now())
+);
+
+insert into public.block_modules (key, name, description)
+values
+  ('visual', 'Visual', 'Control de aparatos visuales'),
+  ('comunicacion', 'Comunicacion', 'Control de aparatos de comunicacion'),
+  ('rentas', 'Rentas', 'Control de rentas')
+on conflict (key) do nothing;
+
+create table if not exists public.module_worker_functions (
+  key text primary key,
+  name text not null
+);
+
+insert into public.module_worker_functions (key, name)
+values
+  ('altas', 'Altas'),
+  ('cobranza', 'Cobranza'),
+  ('encargado', 'Encargado'),
+  ('consulta', 'Consulta'),
+  ('configuracion', 'Configuracion')
+on conflict (key) do nothing;
+
+create table if not exists public.module_workers (
+  id uuid primary key default gen_random_uuid(),
+  module_key text not null references public.block_modules (key) on delete cascade,
+  user_profile_id uuid not null references public.user_profiles (id) on delete cascade,
+  active boolean not null default true,
+  created_by uuid references public.user_profiles (id),
+  created_at timestamptz not null default timezone('utc', now()),
+  updated_at timestamptz not null default timezone('utc', now()),
+  unique (module_key, user_profile_id)
+);
+
+create table if not exists public.module_worker_permissions (
+  id uuid primary key default gen_random_uuid(),
+  worker_id uuid not null references public.module_workers (id) on delete cascade,
+  function_key text not null references public.module_worker_functions (key) on delete cascade,
+  created_at timestamptz not null default timezone('utc', now()),
+  unique (worker_id, function_key)
+);
+
+create table if not exists public.module_zones (
+  id uuid primary key default gen_random_uuid(),
+  module_key text not null references public.block_modules (key) on delete cascade,
+  name text not null,
+  charge_weekday smallint not null check (charge_weekday between 0 and 6),
+  active boolean not null default true,
+  created_by uuid references public.user_profiles (id),
+  created_at timestamptz not null default timezone('utc', now()),
+  updated_at timestamptz not null default timezone('utc', now()),
+  unique (module_key, name)
+);
+
+create table if not exists public.module_device_types (
+  id uuid primary key default gen_random_uuid(),
+  module_key text not null references public.block_modules (key) on delete cascade,
+  key text unique not null,
+  name text not null,
+  sort_order smallint not null default 0,
+  requires_imei boolean not null default false,
+  requires_chip boolean not null default false,
+  allow_cameras_flag boolean not null default false,
+  active boolean not null default true,
+  created_at timestamptz not null default timezone('utc', now())
+);
+
+insert into public.module_device_types (module_key, key, name, sort_order, requires_imei, requires_chip, allow_cameras_flag)
+values
+  ('visual', 'aire', 'Aire', 1, false, false, false),
+  ('comunicacion', 'banda-ancha', 'Banda ancha', 1, false, false, false),
+  ('visual', 'consola', 'Consola', 2, false, false, false),
+  ('comunicacion', 'celular', 'Celular', 2, true, true, true),
+  ('comunicacion', 'internet', 'Internet', 3, false, false, false),
+  ('comunicacion', 'laptop', 'Laptop', 4, false, false, true),
+  ('visual', 'pantalla', 'Pantalla', 5, false, false, false),
+  ('visual', 'parrilla', 'Parrilla', 6, false, false, false),
+  ('visual', 'regadera', 'Regadera', 7, false, false, false),
+  ('comunicacion', 'satelital', 'Satelital', 8, false, false, false),
+  ('visual', 'sonido', 'Sonido', 9, false, false, false),
+  ('comunicacion', 'tablet', 'Tablet', 10, false, false, true),
+  ('visual', 'ventilador', 'Ventilador', 11, false, false, false)
+on conflict (key) do update
+set
+  module_key = excluded.module_key,
+  name = excluded.name,
+  sort_order = excluded.sort_order,
+  requires_imei = excluded.requires_imei,
+  requires_chip = excluded.requires_chip,
+  allow_cameras_flag = excluded.allow_cameras_flag;
+
+create table if not exists public.module_prices (
+  id uuid primary key default gen_random_uuid(),
+  module_key text not null references public.block_modules (key) on delete cascade,
+  device_type_id uuid not null references public.module_device_types (id) on delete cascade,
+  weekly_price numeric(10,2) not null default 0,
+  discount_amount numeric(10,2) not null default 0,
+  active boolean not null default true,
+  created_by uuid references public.user_profiles (id),
+  created_at timestamptz not null default timezone('utc', now()),
+  updated_at timestamptz not null default timezone('utc', now()),
+  unique (module_key, device_type_id)
+);
+
+create table if not exists public.internal_devices (
+  id uuid primary key default gen_random_uuid(),
+  internal_id uuid not null references public.internos (id) on delete cascade,
+  module_key text not null references public.block_modules (key) on delete cascade,
+  device_type_id uuid not null references public.module_device_types (id) on delete restrict,
+  source_listing_id uuid references public.listado (id) on delete set null,
+  zone_id uuid references public.module_zones (id) on delete set null,
+  brand text,
+  model text,
+  characteristics text,
+  imei text,
+  chip_number text,
+  serial_number text,
+  cameras_allowed boolean not null default false,
+  quantity integer not null default 1,
+  status text not null default 'activo' check (status in ('activo', 'retenido', 'reparacion', 'baja')),
+  paid_through date,
+  weekly_price_override numeric(10,2),
+  discount_override numeric(10,2),
+  assigned_manually boolean not null default false,
+  notes text,
+  created_by uuid references public.user_profiles (id),
+  created_at timestamptz not null default timezone('utc', now()),
+  updated_at timestamptz not null default timezone('utc', now())
+);
+
+create table if not exists public.listing_device_items (
+  id uuid primary key default gen_random_uuid(),
+  listado_id uuid not null references public.listado (id) on delete cascade,
+  device_type_id uuid not null references public.module_device_types (id) on delete restrict,
+  quantity integer not null default 1,
+  created_at timestamptz not null default timezone('utc', now())
+);
+
+create table if not exists public.device_payment_cycles (
+  id uuid primary key default gen_random_uuid(),
+  module_key text not null references public.block_modules (key) on delete cascade,
+  week_start date not null,
+  week_end date not null,
+  closed boolean not null default false,
+  closed_by uuid references public.user_profiles (id),
+  created_at timestamptz not null default timezone('utc', now()),
+  updated_at timestamptz not null default timezone('utc', now()),
+  unique (module_key, week_start, week_end)
+);
+
+create table if not exists public.device_payments (
+  id uuid primary key default gen_random_uuid(),
+  internal_device_id uuid not null references public.internal_devices (id) on delete cascade,
+  module_key text not null references public.block_modules (key) on delete cascade,
+  zone_id uuid references public.module_zones (id) on delete set null,
+  cycle_id uuid not null references public.device_payment_cycles (id) on delete cascade,
+  amount numeric(10,2) not null default 0,
+  status text not null default 'pagado' check (status in ('pendiente', 'pagado', 'descuento', 'condonado')),
+  paid_at timestamptz,
+  paid_by uuid references public.user_profiles (id),
+  notes text,
+  created_at timestamptz not null default timezone('utc', now()),
+  updated_at timestamptz not null default timezone('utc', now()),
+  unique (internal_device_id, cycle_id)
+);
+
 create index if not exists idx_internos_apartado on public.internos (apartado);
 create index if not exists idx_visitas_betada on public.visitas (betada);
 create index if not exists idx_fechas_fecha_completa on public.fechas (fecha_completa);
@@ -189,6 +366,8 @@ create index if not exists idx_listado_fecha_visita on public.listado (fecha_vis
 create index if not exists idx_listado_numero_pase on public.listado (fecha_visita, numero_pase);
 create index if not exists idx_interno_visitas_interno on public.interno_visitas (interno_id);
 create index if not exists idx_visita_interno_historial_visita on public.visita_interno_historial (visita_id);
+create index if not exists idx_internal_devices_module on public.internal_devices (module_key, internal_id);
+create index if not exists idx_device_payments_cycle on public.device_payments (module_key, cycle_id);
 
 create or replace view public.historial_ingresos as
 select
@@ -279,6 +458,42 @@ before update on public.interno_visitas
 for each row
 execute function public.set_updated_at();
 
+drop trigger if exists module_workers_set_updated_at on public.module_workers;
+create trigger module_workers_set_updated_at
+before update on public.module_workers
+for each row
+execute function public.set_updated_at();
+
+drop trigger if exists module_zones_set_updated_at on public.module_zones;
+create trigger module_zones_set_updated_at
+before update on public.module_zones
+for each row
+execute function public.set_updated_at();
+
+drop trigger if exists module_prices_set_updated_at on public.module_prices;
+create trigger module_prices_set_updated_at
+before update on public.module_prices
+for each row
+execute function public.set_updated_at();
+
+drop trigger if exists internal_devices_set_updated_at on public.internal_devices;
+create trigger internal_devices_set_updated_at
+before update on public.internal_devices
+for each row
+execute function public.set_updated_at();
+
+drop trigger if exists device_payment_cycles_set_updated_at on public.device_payment_cycles;
+create trigger device_payment_cycles_set_updated_at
+before update on public.device_payment_cycles
+for each row
+execute function public.set_updated_at();
+
+drop trigger if exists device_payments_set_updated_at on public.device_payments;
+create trigger device_payments_set_updated_at
+before update on public.device_payments
+for each row
+execute function public.set_updated_at();
+
 alter table public.roles enable row level security;
 alter table public.user_profiles enable row level security;
 alter table public.internos enable row level security;
@@ -290,6 +505,16 @@ alter table public.listado_visitas enable row level security;
 alter table public.interno_visitas enable row level security;
 alter table public.visita_interno_historial enable row level security;
 alter table public.app_settings enable row level security;
+alter table public.block_modules enable row level security;
+alter table public.module_workers enable row level security;
+alter table public.module_worker_permissions enable row level security;
+alter table public.module_zones enable row level security;
+alter table public.module_device_types enable row level security;
+alter table public.module_prices enable row level security;
+alter table public.internal_devices enable row level security;
+alter table public.listing_device_items enable row level security;
+alter table public.device_payment_cycles enable row level security;
+alter table public.device_payments enable row level security;
 
 grant usage on schema public to anon, authenticated, service_role;
 grant select on all tables in schema public to anon;
@@ -467,3 +692,137 @@ for all
 to authenticated
 using (public.current_role_key() in ('super-admin', 'control', 'supervisor'))
 with check (public.current_role_key() in ('super-admin', 'control', 'supervisor'));
+
+drop policy if exists "read access block_modules" on public.block_modules;
+create policy "read access block_modules"
+on public.block_modules
+for select
+to authenticated
+using (true);
+
+drop policy if exists "read access module workers" on public.module_workers;
+create policy "read access module workers"
+on public.module_workers
+for select
+to authenticated
+using (true);
+
+drop policy if exists "read access module worker permissions" on public.module_worker_permissions;
+create policy "read access module worker permissions"
+on public.module_worker_permissions
+for select
+to authenticated
+using (true);
+
+drop policy if exists "read access module zones" on public.module_zones;
+create policy "read access module zones"
+on public.module_zones
+for select
+to authenticated
+using (true);
+
+drop policy if exists "read access module device types" on public.module_device_types;
+create policy "read access module device types"
+on public.module_device_types
+for select
+to authenticated
+using (true);
+
+drop policy if exists "read access module prices" on public.module_prices;
+create policy "read access module prices"
+on public.module_prices
+for select
+to authenticated
+using (true);
+
+drop policy if exists "read access internal devices" on public.internal_devices;
+create policy "read access internal devices"
+on public.internal_devices
+for select
+to authenticated
+using (true);
+
+drop policy if exists "read access listing device items" on public.listing_device_items;
+create policy "read access listing device items"
+on public.listing_device_items
+for select
+to authenticated
+using (true);
+
+drop policy if exists "read access payment cycles" on public.device_payment_cycles;
+create policy "read access payment cycles"
+on public.device_payment_cycles
+for select
+to authenticated
+using (true);
+
+drop policy if exists "read access device payments" on public.device_payments;
+create policy "read access device payments"
+on public.device_payments
+for select
+to authenticated
+using (true);
+
+drop policy if exists "manage modules by authenticated users" on public.module_workers;
+create policy "manage modules by authenticated users"
+on public.module_workers
+for all
+to authenticated
+using (true)
+with check (true);
+
+drop policy if exists "manage module worker permissions by authenticated users" on public.module_worker_permissions;
+create policy "manage module worker permissions by authenticated users"
+on public.module_worker_permissions
+for all
+to authenticated
+using (true)
+with check (true);
+
+drop policy if exists "manage module zones by authenticated users" on public.module_zones;
+create policy "manage module zones by authenticated users"
+on public.module_zones
+for all
+to authenticated
+using (true)
+with check (true);
+
+drop policy if exists "manage module prices by authenticated users" on public.module_prices;
+create policy "manage module prices by authenticated users"
+on public.module_prices
+for all
+to authenticated
+using (true)
+with check (true);
+
+drop policy if exists "manage internal devices by authenticated users" on public.internal_devices;
+create policy "manage internal devices by authenticated users"
+on public.internal_devices
+for all
+to authenticated
+using (true)
+with check (true);
+
+drop policy if exists "manage listing device items by authenticated users" on public.listing_device_items;
+create policy "manage listing device items by authenticated users"
+on public.listing_device_items
+for all
+to authenticated
+using (true)
+with check (true);
+
+drop policy if exists "manage payment cycles by authenticated users" on public.device_payment_cycles;
+create policy "manage payment cycles by authenticated users"
+on public.device_payment_cycles
+for all
+to authenticated
+using (true)
+with check (true);
+
+drop policy if exists "manage device payments by authenticated users" on public.device_payments;
+create policy "manage device payments by authenticated users"
+on public.device_payments
+for all
+to authenticated
+using (true)
+with check (true);

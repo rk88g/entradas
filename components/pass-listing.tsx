@@ -50,9 +50,15 @@ function splitMentions(menciones?: string) {
   return { basic, special };
 }
 
+function formatDeviceItems(pass: ListingRecord) {
+  return pass.deviceItems.map((item) => `${item.quantity} ${item.name}`);
+}
+
 function renderMainPass(pass: ListingRecord) {
   const { listedVisitors, hiddenVisitorsCount, underTwelveCount } = getCompactVisibleVisitors(pass);
   const { basic, special } = splitMentions(pass.menciones);
+  const specialLines = [...formatDeviceItems(pass), ...(pass.especiales ? splitMentions(pass.especiales).basic : [])];
+  const explicitSpecialLines = splitMentions(pass.especiales).special;
 
   return (
     <article key={pass.id} className="pass-card apoyo-pass-card">
@@ -123,10 +129,23 @@ function renderMainPass(pass: ListingRecord) {
         </div>
       ) : null}
 
-      <div className="apoyo-pass-footer">
-        <div>#70-TODO LO NO AGREGADO EN LA PETICION DE SU PASE NO TENDRA AUTORIZACION PARA ENTRAR.</div>
-        <div>#70-TODO LO QUE VENGA EN PETICION ESPECIAL / ENTREGAR A ADUANA PARA SU REVISION.</div>
-      </div>
+      {specialLines.length > 0 ? (
+        <div className="apoyo-pass-section">
+          <strong>Peticion especial:</strong>
+          <div className="apoyo-pass-list">
+            {specialLines.map((item, index) => (
+              <div key={`${pass.id}-special-articles-${index}`} className="apoyo-pass-line minor">
+                {item}
+              </div>
+            ))}
+            {explicitSpecialLines.map((item, index) => (
+              <div key={`${pass.id}-special-extra-${index}`} className="apoyo-pass-line minor">
+                {item}
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
     </article>
   );
 }
@@ -182,6 +201,8 @@ function renderSeparatedPasses(pass: ListingRecord) {
 
 function renderMentionPass(pass: ListingRecord) {
   const { basic, special } = splitMentions(pass.menciones);
+  const deviceLines = formatDeviceItems(pass);
+  const specialLines = splitMentions(pass.especiales);
   return (
     <article key={pass.id} className="pass-card apoyo-pass-card mention-pass-card">
       <div className="apoyo-pass-header">
@@ -220,6 +241,21 @@ function renderMentionPass(pass: ListingRecord) {
           <div className="apoyo-pass-list support-note-list">
             {special.map((item, index) => (
               <div key={`${pass.id}-mention-special-${index}`} className="apoyo-pass-line minor">
+                {item}
+              </div>
+            ))}
+            {deviceLines.map((item, index) => (
+              <div key={`${pass.id}-mention-device-${index}`} className="apoyo-pass-line minor">
+                {item}
+              </div>
+            ))}
+            {specialLines.basic.map((item, index) => (
+              <div key={`${pass.id}-mention-basic-special-${index}`} className="apoyo-pass-line minor">
+                {item}
+              </div>
+            ))}
+            {specialLines.special.map((item, index) => (
+              <div key={`${pass.id}-mention-explicit-special-${index}`} className="apoyo-pass-line minor">
                 {item}
               </div>
             ))}
@@ -315,7 +351,7 @@ export function PassListing({
             <div className="numbers-print-list">
               {filtered.map((pass) => (
                 <div key={pass.id} className="numbers-print-row">
-                  <span>{pass.numeroPase ?? "-"}</span>
+                  <span className="numbers-print-value">{pass.numeroPase ?? "-"}</span>
                   <span>{pass.internoUbicacion}</span>
                   <span>{pass.internoNombre}</span>
                 </div>
@@ -324,6 +360,13 @@ export function PassListing({
           </article>
         )}
       </div>
+
+      {printMode === "listado" ? (
+        <div className="print-sheet-footer">
+          <div>#70-TODO LO NO AGREGADO EN LA PETICION DE SU PASE NO TENDRA AUTORIZACION PARA ENTRAR.</div>
+          <div>#70-TODO LO QUE VENGA EN PETICION ESPECIAL / ENTREGAR A ADUANA PARA SU REVISION.</div>
+        </div>
+      ) : null}
     </section>
   );
 }

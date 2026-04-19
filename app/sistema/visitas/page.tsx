@@ -1,3 +1,4 @@
+import { redirect } from "next/navigation";
 import { VisitorManager } from "@/components/visitor-manager";
 import {
   getCurrentUserProfile,
@@ -15,6 +16,10 @@ export default async function VisitasPage() {
     getNextDate(),
     getOpenDate()
   ]);
+
+  if (profile?.moduleOnly && profile.accessibleModules.length > 0) {
+    redirect(`/sistema/${profile.accessibleModules[0].moduleKey}`);
+  }
 
   return (
     <VisitorManager

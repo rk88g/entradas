@@ -1,10 +1,19 @@
+import { redirect } from "next/navigation";
 import { PassListing } from "@/components/pass-listing";
-import { getListingBuilderData, getListado } from "@/lib/supabase/queries";
+import { getCurrentUserProfile, getListingBuilderData, getListado } from "@/lib/supabase/queries";
 import { formatLongDate, getStatusDisplayLabel } from "@/lib/utils";
 
 export default async function ListadoPage() {
-  const builderData = await getListingBuilderData();
-  const listado = await getListado();
+  const [profile, builderData, listado] = await Promise.all([
+    getCurrentUserProfile(),
+    getListingBuilderData(),
+    getListado()
+  ]);
+
+  if (profile?.moduleOnly && profile.accessibleModules.length > 0) {
+    redirect(`/sistema/${profile.accessibleModules[0].moduleKey}`);
+  }
+
   const printDate = builderData.printDate?.fechaCompleta ?? "";
   const waitingDate = builderData.nextDate?.fechaCompleta ?? "";
   const currentPrintListings = listado.filter((item) => item.fechaVisita === printDate);

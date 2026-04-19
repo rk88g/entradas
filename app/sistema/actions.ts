@@ -49,6 +49,18 @@ function buildInternalExpediente() {
   return `INT-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
 }
 
+async function getPassArticlePayload(formData: FormData) {
+  const articlePairs = [...formData.entries()]
+    .filter(([key]) => key.startsWith("article_qty_"))
+    .map(([key, value]) => ({
+      deviceTypeId: key.replace("article_qty_", ""),
+      quantity: Number(value ?? 0)
+    }))
+    .filter((item) => Number.isFinite(item.quantity) && item.quantity > 0);
+
+  return articlePairs;
+}
+
 async function requireProfile() {
   const profile = await getCurrentUserProfile();
   if (!profile?.active) {
@@ -134,7 +146,7 @@ export async function closeDateAction(
 ): Promise<MutationState> {
   try {
     const profile = await requireProfile();
-    if (!["super-admin", "control"].includes(profile.roleKey)) {
+    if (profile.roleKey !== "super-admin") {
       return failure("Tu rol no puede cerrar la fecha.");
     }
 
@@ -581,6 +593,8 @@ export async function createPassAction(
     const visitorIds = formData.getAll("visitor_ids").map((item) => String(item));
     const targetDateValue = String(formData.get("fecha_visita") ?? "").trim();
     const mentions = String(formData.get("menciones") ?? "").trim();
+    const specials = String(formData.get("especiales") ?? "").trim();
+    const articlePayload = await getPassArticlePayload(formData);
     const targetDate = await getDateByValue(targetDateValue);
 
     if (!internoId) {
@@ -607,6 +621,10 @@ export async function createPassAction(
 
     if (mentions && !canManageMentions(profile.roleKey)) {
       return failure("Tu rol no puede capturar menciones.");
+    }
+
+    if (specials && !canManageMentions(profile.roleKey)) {
+      return failure("Tu rol no puede capturar peticiones especiales.");
     }
 
     const { data: existingPass } = await supabase
@@ -688,6 +706,7 @@ export async function createPassAction(
         numero_pase: nextNumber,
         cierre_aplicado: false,
         menciones: canManageMentions(profile.roleKey) && mentions ? mentions : null,
+        especiales: canManageMentions(profile.roleKey) && specials ? specials : null,
         created_by: profile.id
       })
       .select("id")
@@ -714,11 +733,380 @@ export async function createPassAction(
       );
     }
 
+    if (articlePayload.length > 0) {
+      const { data: articleTypes, error: articleTypeError } = await supabase
+        .from("module_device_types")
+        .select("id, module_key")
+        .in(
+          "id",
+          articlePayload.map((item) => item.deviceTypeId)
+        );
+
+      if (articleTypeError || !articleTypes) {
+        return failure(articleTypeError?.message || "No se pudieron validar los articulos del pase.");
+      }
+
+      const articleTypeMap = new Map(articleTypes.map((item) => [item.id, item]));
+      const listingItemsPayload = articlePayload
+        .map((item) => ({
+          listado_id: passId,
+          device_type_id: item.deviceTypeId,
+          quantity: item.quantity
+        }))
+        .filter((item) => articleTypeMap.has(item.device_type_id));
+
+      if (listingItemsPayload.length > 0) {
+        const { error: listingItemsError } = await supabase
+          .from("listing_device_items")
+          .insert(listingItemsPayload);
+
+        if (listingItemsError) {
+          return failure(
+            listingItemsError.message || "El pase se creo, pero no se pudieron guardar los articulos."
+          );
+        }
+
+        const internalDevicePayload = articlePayload
+          .map((item) => {
+            const articleType = articleTypeMap.get(item.deviceTypeId);
+            if (!articleType) {
+              return null;
+            }
+
+            return {
+              internal_id: internoId,
+              module_key: articleType.module_key,
+              device_type_id: item.deviceTypeId,
+              source_listing_id: passId,
+              quantity: item.quantity,
+              assigned_manually: false,
+              status: "activo",
+              created_by: profile.id
+            };
+          })
+          .filter(Boolean);
+
+        if (internalDevicePayload.length > 0) {
+          const { error: devicesError } = await supabase
+            .from("internal_devices")
+            .insert(internalDevicePayload);
+
+          if (devicesError) {
+            return failure(
+              devicesError.message || "El pase se creo, pero no se pudieron registrar los articulos del interno."
+            );
+          }
+        }
+      }
+    }
+
     revalidatePath("/sistema");
     revalidatePath("/sistema/internos");
     revalidatePath("/sistema/listado");
+    revalidatePath("/sistema/visual");
+    revalidatePath("/sistema/comunicacion");
     return success("Pase creado.");
   } catch (error) {
     return failure(error instanceof Error ? error.message : "No se pudo crear el pase.");
+  }
+}
+
+export async function createModuleZoneAction(
+  _prevState: MutationState,
+  formData: FormData
+): Promise<MutationState> {
+  try {
+    const profile = await requireProfile();
+    const supabase = await createServerSupabaseClient();
+    const moduleKey = String(formData.get("module_key") ?? "").trim();
+    const name = String(formData.get("name") ?? "").trim();
+    const chargeWeekday = Number(formData.get("charge_weekday") ?? 0);
+
+    if (!name) {
+      return failure("Debes escribir el nombre de la zona.");
+    }
+
+    const { error } = await supabase.from("module_zones").insert({
+      module_key: moduleKey,
+      name,
+      charge_weekday: chargeWeekday,
+      created_by: profile.id
+    });
+
+    if (error) {
+      return failure(error.message || "No se pudo guardar la zona.");
+    }
+
+    revalidatePath(`/sistema/${moduleKey}`);
+    return success("Zona guardada.");
+  } catch (error) {
+    return failure(error instanceof Error ? error.message : "No se pudo guardar la zona.");
+  }
+}
+
+export async function saveModulePriceAction(
+  _prevState: MutationState,
+  formData: FormData
+): Promise<MutationState> {
+  try {
+    const profile = await requireProfile();
+    const supabase = await createServerSupabaseClient();
+    const moduleKey = String(formData.get("module_key") ?? "").trim();
+    const deviceTypeId = String(formData.get("device_type_id") ?? "").trim();
+    const weeklyPrice = Number(formData.get("weekly_price") ?? 0);
+    const discountAmount = Number(formData.get("discount_amount") ?? 0);
+
+    if (!deviceTypeId) {
+      return failure("Debes elegir un tipo de aparato.");
+    }
+
+    const { error } = await supabase.from("module_prices").upsert(
+      {
+        module_key: moduleKey,
+        device_type_id: deviceTypeId,
+        weekly_price: weeklyPrice,
+        discount_amount: discountAmount,
+        created_by: profile.id
+      },
+      { onConflict: "module_key,device_type_id" }
+    );
+
+    if (error) {
+      return failure(error.message || "No se pudo guardar el precio.");
+    }
+
+    revalidatePath(`/sistema/${moduleKey}`);
+    return success("Precio guardado.");
+  } catch (error) {
+    return failure(error instanceof Error ? error.message : "No se pudo guardar el precio.");
+  }
+}
+
+export async function assignModuleDeviceAction(
+  _prevState: MutationState,
+  formData: FormData
+): Promise<MutationState> {
+  try {
+    const profile = await requireProfile();
+    const supabase = await createServerSupabaseClient();
+    const moduleKey = String(formData.get("module_key") ?? "").trim();
+    const internalId = String(formData.get("internal_id") ?? "").trim();
+    const deviceTypeId = String(formData.get("device_type_id") ?? "").trim();
+    const zoneId = String(formData.get("zone_id") ?? "").trim() || null;
+    const brand = String(formData.get("brand") ?? "").trim() || null;
+    const model = String(formData.get("model") ?? "").trim() || null;
+    const characteristics = String(formData.get("characteristics") ?? "").trim() || null;
+    const imei = String(formData.get("imei") ?? "").trim() || null;
+    const chipNumber = String(formData.get("chip_number") ?? "").trim() || null;
+    const quantity = Number(formData.get("quantity") ?? 1);
+    const camerasAllowed = String(formData.get("cameras_allowed") ?? "") === "on";
+    const notes = String(formData.get("notes") ?? "").trim() || null;
+
+    if (!internalId || !deviceTypeId) {
+      return failure("Debes elegir el interno y el tipo de aparato.");
+    }
+
+    const { error } = await supabase.from("internal_devices").insert({
+      internal_id: internalId,
+      module_key: moduleKey,
+      device_type_id: deviceTypeId,
+      zone_id: zoneId,
+      brand,
+      model,
+      characteristics,
+      imei,
+      chip_number: chipNumber,
+      quantity: Number.isFinite(quantity) && quantity > 0 ? quantity : 1,
+      cameras_allowed: camerasAllowed,
+      assigned_manually: true,
+      status: "activo",
+      notes,
+      created_by: profile.id
+    });
+
+    if (error) {
+      return failure(error.message || "No se pudo asignar el aparato.");
+    }
+
+    revalidatePath(`/sistema/${moduleKey}`);
+    return success("Aparato asignado.");
+  } catch (error) {
+    return failure(error instanceof Error ? error.message : "No se pudo asignar el aparato.");
+  }
+}
+
+export async function registerModulePaymentAction(
+  _prevState: MutationState,
+  formData: FormData
+): Promise<MutationState> {
+  try {
+    const profile = await requireProfile();
+    const supabase = await createServerSupabaseClient();
+    const moduleKey = String(formData.get("module_key") ?? "").trim();
+    const internalDeviceId = String(formData.get("internal_device_id") ?? "").trim();
+    const zoneId = String(formData.get("zone_id") ?? "").trim() || null;
+    const amount = Number(formData.get("amount") ?? 0);
+    const notes = String(formData.get("notes") ?? "").trim() || null;
+
+    if (!internalDeviceId) {
+      return failure("Debes elegir un aparato.");
+    }
+
+    const today = new Date();
+    const day = today.getDay();
+    const diffToMonday = day === 0 ? -6 : 1 - day;
+    const weekStartDate = new Date(today);
+    weekStartDate.setDate(today.getDate() + diffToMonday);
+    const weekEndDate = new Date(weekStartDate);
+    weekEndDate.setDate(weekStartDate.getDate() + 6);
+    const weekStart = weekStartDate.toISOString().slice(0, 10);
+    const weekEnd = weekEndDate.toISOString().slice(0, 10);
+
+    const { data: cycle, error: cycleError } = await supabase
+      .from("device_payment_cycles")
+      .upsert(
+        {
+          module_key: moduleKey,
+          week_start: weekStart,
+          week_end: weekEnd
+        },
+        { onConflict: "module_key,week_start,week_end" }
+      )
+      .select("id, closed")
+      .single();
+
+    if (cycleError || !cycle) {
+      return failure(cycleError?.message || "No se pudo preparar la semana de cobro.");
+    }
+
+    if (cycle.closed) {
+      return failure("La semana ya esta cerrada y no admite cambios.");
+    }
+
+    const { error } = await supabase.from("device_payments").upsert(
+      {
+        internal_device_id: internalDeviceId,
+        module_key: moduleKey,
+        zone_id: zoneId,
+        cycle_id: cycle.id,
+        amount,
+        status: "pagado",
+        paid_at: new Date().toISOString(),
+        paid_by: profile.id,
+        notes
+      },
+      { onConflict: "internal_device_id,cycle_id" }
+    );
+
+    if (error) {
+      return failure(error.message || "No se pudo registrar el pago.");
+    }
+
+    revalidatePath(`/sistema/${moduleKey}`);
+    return success("Pago registrado.");
+  } catch (error) {
+    return failure(error instanceof Error ? error.message : "No se pudo registrar el pago.");
+  }
+}
+
+export async function closeModuleWeekAction(
+  _prevState: MutationState,
+  formData: FormData
+): Promise<MutationState> {
+  try {
+    const profile = await requireProfile();
+    if (!["super-admin", "control"].includes(profile.roleKey)) {
+      return failure("Tu rol no puede cerrar la semana.");
+    }
+
+    const supabase = await createServerSupabaseClient();
+    const moduleKey = String(formData.get("module_key") ?? "").trim();
+    const cycleId = String(formData.get("cycle_id") ?? "").trim();
+
+    if (!cycleId) {
+      return failure("No se encontro la semana activa.");
+    }
+
+    const { error } = await supabase
+      .from("device_payment_cycles")
+      .update({
+        closed: true,
+        closed_by: profile.id
+      })
+      .eq("id", cycleId);
+
+    if (error) {
+      return failure(error.message || "No se pudo cerrar la semana.");
+    }
+
+    revalidatePath(`/sistema/${moduleKey}`);
+    return success("Semana cerrada.");
+  } catch (error) {
+    return failure(error instanceof Error ? error.message : "No se pudo cerrar la semana.");
+  }
+}
+
+export async function assignModuleWorkerAction(
+  _prevState: MutationState,
+  formData: FormData
+): Promise<MutationState> {
+  try {
+    const profile = await requireProfile();
+    if (!["super-admin", "control"].includes(profile.roleKey)) {
+      return failure("Tu rol no puede asignar trabajadores.");
+    }
+
+    const supabase = await createServerSupabaseClient();
+    const moduleKey = String(formData.get("module_key") ?? "").trim();
+    const userId = String(formData.get("user_id") ?? "").trim();
+    const moduleOnly = String(formData.get("module_only") ?? "") === "on";
+    const functions = formData.getAll("functions").map((item) => String(item)).filter(Boolean);
+
+    if (!userId) {
+      return failure("Debes elegir un usuario.");
+    }
+
+    const { data: worker, error: workerError } = await supabase
+      .from("module_workers")
+      .upsert(
+        {
+          module_key: moduleKey,
+          user_profile_id: userId,
+          active: true,
+          created_by: profile.id
+        },
+        { onConflict: "module_key,user_profile_id" }
+      )
+      .select("id")
+      .single();
+
+    if (workerError || !worker) {
+      return failure(workerError?.message || "No se pudo guardar el trabajador.");
+    }
+
+    await supabase.from("module_worker_permissions").delete().eq("worker_id", worker.id);
+
+    if (functions.length > 0) {
+      const { error: permissionsError } = await supabase.from("module_worker_permissions").insert(
+        functions.map((fn) => ({
+          worker_id: worker.id,
+          function_key: fn
+        }))
+      );
+
+      if (permissionsError) {
+        return failure(permissionsError.message || "No se pudieron guardar las funciones.");
+      }
+    }
+
+    await supabase
+      .from("user_profiles")
+      .update({ module_only: moduleOnly })
+      .eq("id", userId);
+
+    revalidatePath(`/sistema/${moduleKey}`);
+    return success("Trabajador asignado.");
+  } catch (error) {
+    return failure(error instanceof Error ? error.message : "No se pudo asignar el trabajador.");
   }
 }

@@ -100,7 +100,7 @@ export function DateOperations({
           </div>
         </form>
 
-        {roleKey === "super-admin" || roleKey === "control" ? (
+        {roleKey === "super-admin" ? (
           <>
             <div style={{ height: "1rem" }} />
             <strong className="section-title">Cerrar fecha</strong>

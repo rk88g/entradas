@@ -9,7 +9,7 @@ import {
 } from "@/app/sistema/actions";
 import { MutationBanner } from "@/components/mutation-banner";
 import { StatusBadge } from "@/components/status-badge";
-import { DateRecord, InternalProfile, MutationState, RoleKey } from "@/lib/types";
+import { DateRecord, InternalProfile, ModuleDeviceType, MutationState, RoleKey } from "@/lib/types";
 import {
   canManageMentions,
   formatLongDate,
@@ -72,11 +72,13 @@ export function InternalBrowser({
   profiles,
   nextDate,
   openDate,
+  passArticles,
   roleKey
 }: {
   profiles: InternalProfile[];
   nextDate?: DateRecord | null;
   openDate?: DateRecord | null;
+  passArticles: ModuleDeviceType[];
   roleKey: RoleKey;
 }) {
   const pageSize = 20;
@@ -569,14 +571,42 @@ export function InternalBrowser({
                   </div>
 
                   {canManageMentions(roleKey) ? (
-                    <div className="field" style={{ gridColumn: "1 / -1" }}>
-                      <textarea
-                        name="menciones"
-                        placeholder="Menciones"
-                        defaultValue={selectedPass?.menciones ?? ""}
-                        autoComplete="off"
-                      />
-                    </div>
+                    <>
+                      <div className="field" style={{ gridColumn: "1 / -1" }}>
+                        <textarea
+                          name="menciones"
+                          placeholder="Peticiones basicas"
+                          defaultValue={selectedPass?.menciones ?? ""}
+                          autoComplete="off"
+                        />
+                      </div>
+                      <div className="field" style={{ gridColumn: "1 / -1" }}>
+                        <textarea
+                          name="especiales"
+                          placeholder="Peticiones especiales"
+                          defaultValue={selectedPass?.especiales ?? ""}
+                          autoComplete="off"
+                        />
+                      </div>
+                      <div className="field" style={{ gridColumn: "1 / -1" }}>
+                        <label>Articulos</label>
+                        <div className="article-grid">
+                          {passArticles.map((article) => (
+                            <div key={article.id} className="field">
+                              <label htmlFor={`article_${article.id}`}>{article.name}</label>
+                              <input
+                                id={`article_${article.id}`}
+                                type="number"
+                                min="0"
+                                name={`article_qty_${article.id}`}
+                                placeholder="0"
+                                autoComplete="off"
+                              />
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    </>
                   ) : null}
 
                   {!selectedPass ? (
