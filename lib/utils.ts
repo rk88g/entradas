@@ -93,6 +93,23 @@ export function getModuleDisplayName(moduleKey: ModuleKey) {
   return "Rentas";
 }
 
+export function getVisitorAvailabilityLabel(betada: boolean) {
+  return betada ? "No disponible" : "Activo";
+}
+
+export function maskValue(value: string | number, visible = false) {
+  if (visible) {
+    return String(value);
+  }
+
+  const text = String(value ?? "");
+  if (!text || text === "-") {
+    return "-";
+  }
+
+  return "*".repeat(Math.max(3, Math.min(text.length, 8)));
+}
+
 export function formatDateInput(input: Date) {
   return input.toISOString().slice(0, 10);
 }
@@ -200,6 +217,22 @@ export function getWeekRange(reference = new Date()) {
   const diffToMonday = day === 0 ? -6 : 1 - day;
   const start = new Date(value);
   start.setDate(value.getDate() + diffToMonday);
+  const end = new Date(start);
+  end.setDate(start.getDate() + 6);
+
+  return {
+    start: formatDateInput(start),
+    end: formatDateInput(end)
+  };
+}
+
+export function getWeekRangeFromCutoff(cutoffWeekday: number, reference = new Date()) {
+  const value = new Date(reference);
+  const currentDay = value.getDay();
+  const normalizedCutoff = Math.max(0, Math.min(6, cutoffWeekday));
+  const diff = (currentDay - normalizedCutoff + 7) % 7;
+  const start = new Date(value);
+  start.setDate(value.getDate() - diff);
   const end = new Date(start);
   end.setDate(start.getDate() + 6);
 

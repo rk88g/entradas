@@ -43,9 +43,9 @@ export function AppShell({
           <div className="glass-panel app-panel hide-print">
             <div className="mobile-topbar">
               <div className="brand-block">
-                <span className="brand-mark">EN</span>
+                <span className="brand-mark">RK</span>
                 <div>
-                  <strong>Entradas</strong>
+                  <strong>{user.fullName}</strong>
                 </div>
               </div>
               <button className="mobile-toggle" onClick={() => setOpen((value) => !value)}>
@@ -82,8 +82,7 @@ export function AppShell({
         <main className="app-main">
           <section className="app-panel hide-print">
             <div className="record-title">
-              <strong className="module-title">{title}</strong>
-              <span>{user.fullName}</span>
+              <strong className="module-title">Sistema Cumplido desde 2020</strong>
             </div>
           </section>
           {children}

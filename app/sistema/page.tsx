@@ -1,12 +1,19 @@
 import { redirect } from "next/navigation";
-import { getCurrentUserProfile, getDashboardSummary, getInternos, getVisitas } from "@/lib/supabase/queries";
+import {
+  getCurrentUserProfile,
+  getDashboardSummary,
+  getIntegratedModuleCounts,
+  getInternos,
+  getVisitas
+} from "@/lib/supabase/queries";
 
 export default async function SistemaPage() {
-  const [profile, summary, internos, visitas] = await Promise.all([
+  const [profile, summary, internos, visitas, moduleCounts] = await Promise.all([
     getCurrentUserProfile(),
     getDashboardSummary(),
     getInternos(),
-    getVisitas()
+    getVisitas(),
+    getIntegratedModuleCounts()
   ]);
 
   if (profile?.moduleOnly && profile.accessibleModules.length > 0) {
@@ -24,12 +31,20 @@ export default async function SistemaPage() {
         <strong>{visitas.length}</strong>
       </article>
       <article className="stat-card">
-        <small>Proximos</small>
+        <small>Mañana</small>
         <strong>{summary.openPassCount}</strong>
       </article>
       <article className="stat-card">
-        <small>En espera</small>
+        <small>618</small>
         <strong>{summary.waitingPassCount}</strong>
+      </article>
+      <article className="stat-card">
+        <small>Visual</small>
+        <strong>{moduleCounts.visual}</strong>
+      </article>
+      <article className="stat-card">
+        <small>Comunicacion</small>
+        <strong>{moduleCounts.comunicacion}</strong>
       </article>
     </section>
   );

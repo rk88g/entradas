@@ -46,7 +46,14 @@ export function DateOperations({
           <strong className="section-title">Fechas</strong>
         </div>
 
-        <div className="calendar-grid" style={{ marginTop: "1rem" }}>
+        <div className="stack" style={{ marginTop: "1rem", gap: "1rem" }}>
+          <div className="data-card" style={{ padding: "1rem" }}>
+            <strong className="section-title">Fechas registradas</strong>
+            <p className="muted" style={{ marginTop: "0.4rem" }}>
+              PROXIMOS corresponde a manana y EN ESPERA a dos dias adelante.
+            </p>
+          </div>
+          <div className="calendar-grid">
           {activeDates.map((date) => (
             <article key={date.id} className="calendar-card">
               <div className="record-title">
@@ -58,11 +65,12 @@ export function DateOperations({
               </div>
             </article>
           ))}
+          </div>
         </div>
       </article>
 
       <article className="form-card">
-        <strong className="section-title">Nueva fecha</strong>
+        <strong className="section-title">Crear fecha</strong>
         <MutationBanner state={createState} />
         <form
           action={createAction}
@@ -102,7 +110,7 @@ export function DateOperations({
 
         {roleKey === "super-admin" ? (
           <>
-            <div style={{ height: "1rem" }} />
+            <hr style={{ border: 0, borderTop: "1px solid var(--line)", margin: "1.5rem 0" }} />
             <strong className="section-title">Cerrar fecha</strong>
             <MutationBanner state={closeState} />
             {!openDate ? (
@@ -142,7 +150,7 @@ export function DateOperations({
 
         {roleKey === "super-admin" ? (
           <>
-            <div style={{ height: "1rem" }} />
+            <hr style={{ border: 0, borderTop: "1px solid var(--line)", margin: "1.5rem 0" }} />
             <strong className="section-title">Contrasena</strong>
             <MutationBanner state={passwordState} />
             <form

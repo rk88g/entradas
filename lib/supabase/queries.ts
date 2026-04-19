@@ -17,6 +17,7 @@ import {
   ModuleKey,
   ModulePanelData,
   ModulePriceRecord,
+  ModuleStaffAssignment,
   ModuleZone,
   ModuleWorkerRecord,
   PassVisitor,
@@ -33,11 +34,18 @@ import {
   getStatsFromListings,
   getTodayDate,
   getWeekRange,
+  getWeekRangeFromCutoff,
   sortVisitorsByAge
 } from "@/lib/utils";
 
 function ensureRoleKey(value?: string | null): RoleKey {
-  if (value === "super-admin" || value === "control" || value === "supervisor") {
+  if (
+    value === "super-admin" ||
+    value === "control" ||
+    value === "supervisor" ||
+    value === "visual" ||
+    value === "comunicacion"
+  ) {
     return value;
   }
 
@@ -73,6 +81,7 @@ function mapInternalRecord(item: {
   telefono: string | null;
   ubi_filiacion: string;
   apartado: "618" | "INTIMA";
+  estatus: string;
   observaciones: string | null;
   created_at: string;
   updated_at: string;
@@ -89,6 +98,7 @@ function mapInternalRecord(item: {
     libre: item.libre ?? "",
     ubicacion: item.ubicacion,
     telefono: item.telefono ?? "",
+    estatus: item.estatus ?? "activo",
     ubiFiliacion: item.ubi_filiacion,
     clasificacion: item.apartado,
     createdAt: item.created_at,
@@ -216,7 +226,7 @@ async function getInternosMap(
   const { data, error } = await supabase
     .from("internos")
     .select(
-      "id, expediente, nombres, apellido_pat, apellido_mat, nacimiento, llego, libre, ubicacion, telefono, ubi_filiacion, apartado, observaciones, created_at, updated_at"
+      "id, expediente, nombres, apellido_pat, apellido_mat, nacimiento, llego, libre, ubicacion, telefono, ubi_filiacion, apartado, estatus, observaciones, created_at, updated_at"
     )
     .in("id", internalIds);
 
@@ -455,8 +465,9 @@ export async function getInternos(): Promise<InternalRecord[]> {
   const { data, error } = await supabase
     .from("internos")
     .select(
-      "id, expediente, nombres, apellido_pat, apellido_mat, nacimiento, llego, libre, ubicacion, telefono, ubi_filiacion, apartado, observaciones, created_at, updated_at"
+      "id, expediente, nombres, apellido_pat, apellido_mat, nacimiento, llego, libre, ubicacion, telefono, ubi_filiacion, apartado, estatus, observaciones, created_at, updated_at"
     )
+    .neq("estatus", "150")
     .order("ubicacion", { ascending: true });
 
   if (error || !data) {
@@ -759,18 +770,7 @@ export async function getPassDeviceTypes(): Promise<ModuleDeviceType[]> {
   const { data, error } = await supabase
     .from("module_device_types")
     .select("id, module_key, key, name, sort_order, requires_imei, requires_chip, allow_cameras_flag")
-    .in("key", [
-      "aire",
-      "celular",
-      "consola",
-      "pantalla",
-      "sonido",
-      "ventilador",
-      "parrilla",
-      "regadera",
-      "laptop",
-      "tablet"
-    ])
+    .eq("active", true)
     .order("name", { ascending: true });
 
   if (error || !data) {
@@ -791,8 +791,14 @@ export async function getPassDeviceTypes(): Promise<ModuleDeviceType[]> {
 
 export async function getModulePanelData(moduleKey: ModuleKey): Promise<ModulePanelData> {
   const supabase = await createServerSupabaseClient();
-  const { start, end } = getWeekRange();
   const moduleName = getModuleDisplayName(moduleKey);
+  const { data: settingsSeed } = await supabase
+    .from("module_settings")
+    .select("cutoff_weekday")
+    .eq("module_key", moduleKey)
+    .maybeSingle();
+  const cutoffWeekday = settingsSeed?.cutoff_weekday ?? 1;
+  const { start, end } = getWeekRangeFromCutoff(cutoffWeekday);
 
   const [
     internals,
@@ -804,7 +810,8 @@ export async function getModulePanelData(moduleKey: ModuleKey): Promise<ModulePa
     permissionsResponse,
     cyclesResponse,
     paymentsResponse,
-    userProfilesResponse
+    userProfilesResponse,
+    staffAssignmentsResponse
   ] = await Promise.all([
     getInternos(),
     supabase
@@ -848,7 +855,14 @@ export async function getModulePanelData(moduleKey: ModuleKey): Promise<ModulePa
       .from("device_payments")
       .select("id, internal_device_id, zone_id, amount, status, cycle_id")
       .eq("module_key", moduleKey),
-    supabase.from("user_profiles").select("id, full_name").eq("active", true)
+    supabase
+      .from("user_profiles")
+      .select("id, full_name, roles!inner(key)")
+      .eq("active", true),
+    supabase
+      .from("module_internal_staff")
+      .select("id, module_key, internal_id, user_profile_id, position_key")
+      .eq("module_key", moduleKey)
   ]);
 
   const deviceTypes: ModuleDeviceType[] = (deviceTypesResponse.data ?? []).map((item) => ({
@@ -921,6 +935,15 @@ export async function getModulePanelData(moduleKey: ModuleKey): Promise<ModulePa
   const userMap = new Map(
     (userProfilesResponse.data ?? []).map((item) => [item.id, item.full_name ?? "Usuario"])
   );
+  const staffAssignments: ModuleStaffAssignment[] = (staffAssignmentsResponse.data ?? []).map((item) => ({
+    id: item.id,
+    moduleKey: ensureModuleKey(item.module_key),
+    internalId: item.internal_id,
+    internalName: internalMap.get(item.internal_id)?.fullName ?? "Interno",
+    userId: item.user_profile_id,
+    userName: userMap.get(item.user_profile_id) ?? "Usuario",
+    positionKey: item.position_key as ModuleStaffAssignment["positionKey"]
+  }));
 
   const workers: ModuleWorkerRecord[] = (workersResponse.data ?? []).map((item) => ({
     id: item.id,
@@ -986,10 +1009,14 @@ export async function getModulePanelData(moduleKey: ModuleKey): Promise<ModulePa
     currentWeekLabel: `${start} al ${end}`,
     weekClosed: Boolean(cyclesResponse.data?.closed),
     currentCycleId: cyclesResponse.data?.id,
-    assignableUsers: (userProfilesResponse.data ?? []).map((item) => ({
-      id: item.id,
-      fullName: item.full_name ?? "Usuario"
-    }))
+    cutoffWeekday,
+    assignableUsers: (userProfilesResponse.data ?? [])
+      .filter((item) => item.roles?.[0]?.key === moduleKey)
+      .map((item) => ({
+        id: item.id,
+        fullName: item.full_name ?? "Usuario"
+      })),
+    staffAssignments
   };
 }
 
@@ -1024,4 +1051,30 @@ export async function getDashboardSummary() {
     listingStats,
     activeVisitors: visitas.filter((item) => !item.betada).length
   };
+}
+
+export async function getIntegratedModuleCounts() {
+  const supabase = await createServerSupabaseClient();
+  const { data, error } = await supabase
+    .from("internal_devices")
+    .select("module_key")
+    .neq("status", "baja");
+
+  if (error || !data) {
+    return {
+      visual: 0,
+      comunicacion: 0
+    };
+  }
+
+  return data.reduce(
+    (acc, item) => {
+      const moduleKey = ensureModuleKey(item.module_key);
+      if (moduleKey === "visual" || moduleKey === "comunicacion") {
+        acc[moduleKey] += 1;
+      }
+      return acc;
+    },
+    { visual: 0, comunicacion: 0 }
+  );
 }

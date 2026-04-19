@@ -57,8 +57,8 @@ function formatDeviceItems(pass: ListingRecord) {
 function renderMainPass(pass: ListingRecord) {
   const { listedVisitors, hiddenVisitorsCount, underTwelveCount } = getCompactVisibleVisitors(pass);
   const { basic, special } = splitMentions(pass.menciones);
-  const specialLines = [...formatDeviceItems(pass), ...(pass.especiales ? splitMentions(pass.especiales).basic : [])];
-  const explicitSpecialLines = splitMentions(pass.especiales).special;
+  const extraSpecials = splitMentions(pass.especiales);
+  const specialLines = [...formatDeviceItems(pass), ...extraSpecials.basic, ...extraSpecials.special, ...special];
 
   return (
     <article key={pass.id} className="pass-card apoyo-pass-card">
@@ -85,18 +85,18 @@ function renderMainPass(pass: ListingRecord) {
           {listedVisitors.map((visitor) => (
             <div
               key={`${pass.id}-${visitor.visitorId}`}
-              className={`apoyo-pass-line ${visitor.edad < 18 ? "minor" : ""}`}
+              className={`apoyo-pass-line truncatable ${visitor.edad < 18 ? "minor" : ""}`}
             >
               {formatVisitorLine(visitor)}
             </div>
           ))}
           {underTwelveCount > 0 ? (
-            <div className="apoyo-pass-line minor">
+            <div className="apoyo-pass-line truncatable minor">
               + {underTwelveCount} {underTwelveCount === 1 ? "menor" : "menores"}
             </div>
           ) : null}
           {hiddenVisitorsCount > 0 ? (
-            <div className="apoyo-pass-line warning">
+            <div className="apoyo-pass-line truncatable warning">
               + {hiddenVisitorsCount} visitas en Hombres / Mujeres
             </div>
           ) : null}
@@ -108,20 +108,7 @@ function renderMainPass(pass: ListingRecord) {
           <strong>Peticion:</strong>
           <div className="apoyo-pass-list">
             {basic.map((item, index) => (
-              <div key={`${pass.id}-basic-${index}`} className="apoyo-pass-line warning">
-                {item}
-              </div>
-            ))}
-          </div>
-        </div>
-      ) : null}
-
-      {special.length > 0 ? (
-        <div className="apoyo-pass-section">
-          <strong>Peticion especial:</strong>
-          <div className="apoyo-pass-list">
-            {special.map((item, index) => (
-              <div key={`${pass.id}-special-${index}`} className="apoyo-pass-line minor">
+              <div key={`${pass.id}-basic-${index}`} className="apoyo-pass-line truncatable warning">
                 {item}
               </div>
             ))}
@@ -134,12 +121,7 @@ function renderMainPass(pass: ListingRecord) {
           <strong>Peticion especial:</strong>
           <div className="apoyo-pass-list">
             {specialLines.map((item, index) => (
-              <div key={`${pass.id}-special-articles-${index}`} className="apoyo-pass-line minor">
-                {item}
-              </div>
-            ))}
-            {explicitSpecialLines.map((item, index) => (
-              <div key={`${pass.id}-special-extra-${index}`} className="apoyo-pass-line minor">
+              <div key={`${pass.id}-special-${index}`} className="apoyo-pass-line truncatable minor">
                 {item}
               </div>
             ))}
@@ -183,13 +165,13 @@ function renderSeparatedPasses(pass: ListingRecord) {
           {section.visitors.map((visitor) => (
             <div
               key={`${pass.id}-${section.key}-${visitor.visitorId}`}
-              className={`apoyo-pass-line ${visitor.edad < 18 ? "minor" : ""}`}
+              className={`apoyo-pass-line truncatable ${visitor.edad < 18 ? "minor" : ""}`}
             >
               {formatVisitorLine(visitor)}
             </div>
           ))}
           {section.childrenCount > 0 ? (
-            <div className="apoyo-pass-line minor">
+            <div className="apoyo-pass-line truncatable minor">
               + {section.childrenCount} {section.childrenCount === 1 ? "menor" : "menores"}
             </div>
           ) : null}
@@ -201,8 +183,14 @@ function renderSeparatedPasses(pass: ListingRecord) {
 
 function renderMentionPass(pass: ListingRecord) {
   const { basic, special } = splitMentions(pass.menciones);
-  const deviceLines = formatDeviceItems(pass);
-  const specialLines = splitMentions(pass.especiales);
+  const extraSpecials = splitMentions(pass.especiales);
+  const mergedSpecialLines = [
+    ...special,
+    ...formatDeviceItems(pass),
+    ...extraSpecials.basic,
+    ...extraSpecials.special
+  ];
+
   return (
     <article key={pass.id} className="pass-card apoyo-pass-card mention-pass-card">
       <div className="apoyo-pass-header">
@@ -222,43 +210,25 @@ function renderMentionPass(pass: ListingRecord) {
         </div>
       </div>
 
-      {basic.length > 0 ? (
+      {basic.length > 0 || mergedSpecialLines.length > 0 ? (
         <div className="apoyo-pass-section">
           <strong>Mencion</strong>
           <div className="apoyo-pass-list support-note-list">
             {basic.map((item, index) => (
-              <div key={`${pass.id}-mention-basic-${index}`} className="apoyo-pass-line warning">
+              <div key={`${pass.id}-mention-basic-${index}`} className="apoyo-pass-line truncatable warning">
                 {item}
               </div>
             ))}
-          </div>
-        </div>
-      ) : null}
-
-      {special.length > 0 ? (
-        <div className="apoyo-pass-section">
-          <strong>Mencion especial</strong>
-          <div className="apoyo-pass-list support-note-list">
-            {special.map((item, index) => (
-              <div key={`${pass.id}-mention-special-${index}`} className="apoyo-pass-line minor">
-                {item}
+            {mergedSpecialLines.length > 0 ? (
+              <div className="support-note-block">
+                <strong>Mencion especial</strong>
+                {mergedSpecialLines.map((item, index) => (
+                  <div key={`${pass.id}-mention-special-${index}`} className="apoyo-pass-line truncatable minor">
+                    {item}
+                  </div>
+                ))}
               </div>
-            ))}
-            {deviceLines.map((item, index) => (
-              <div key={`${pass.id}-mention-device-${index}`} className="apoyo-pass-line minor">
-                {item}
-              </div>
-            ))}
-            {specialLines.basic.map((item, index) => (
-              <div key={`${pass.id}-mention-basic-special-${index}`} className="apoyo-pass-line minor">
-                {item}
-              </div>
-            ))}
-            {specialLines.special.map((item, index) => (
-              <div key={`${pass.id}-mention-explicit-special-${index}`} className="apoyo-pass-line minor">
-                {item}
-              </div>
-            ))}
+            ) : null}
           </div>
         </div>
       ) : null}
@@ -279,7 +249,12 @@ export function PassListing({
     const byDate = listings.filter((item) => item.fechaVisita === printDate);
     const sorted = sortListingsForPrint(byDate);
     if (printMode === "menciones") {
-      return sorted.filter((item) => item.menciones?.trim());
+      return sorted.filter(
+        (item) =>
+          item.menciones?.trim() ||
+          item.especiales?.trim() ||
+          item.deviceItems.length > 0
+      );
     }
 
     return sorted;
@@ -351,9 +326,9 @@ export function PassListing({
             <div className="numbers-print-list">
               {filtered.map((pass) => (
                 <div key={pass.id} className="numbers-print-row">
-                  <span className="numbers-print-value">{pass.numeroPase ?? "-"}</span>
                   <span>{pass.internoUbicacion}</span>
                   <span>{pass.internoNombre}</span>
+                  <span className="numbers-print-value">{pass.numeroPase ?? "-"}</span>
                 </div>
               ))}
             </div>

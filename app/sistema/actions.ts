@@ -14,6 +14,7 @@ import { MutationState } from "@/lib/types";
 import {
   canManageMentions,
   getDateOffset,
+  getWeekRangeFromCutoff,
   nextPassNumber
 } from "@/lib/utils";
 
@@ -251,7 +252,7 @@ export async function createInternalAction(
       llego: String(formData.get("llego") ?? "").trim() || new Date().toISOString().slice(0, 10),
       libre: String(formData.get("libre") ?? "").trim() || null,
       ubicacion: Number(formData.get("ubicacion") ?? 0),
-      telefono: String(formData.get("telefono") ?? "").trim() || null,
+      telefono: null,
       ubi_filiacion: String(formData.get("ubi_filiacion") ?? "").trim() || "Sin dato",
       apartado: "618",
       observaciones: String(formData.get("observaciones") ?? "").trim() || null,
@@ -285,6 +286,37 @@ export async function createInternalAction(
   }
 }
 
+export async function updateInternalStatusAction(
+  _prevState: MutationState,
+  formData: FormData
+): Promise<MutationState> {
+  try {
+    const profile = await requireProfile();
+    if (profile.roleKey !== "super-admin") {
+      return failure("Solo super-admin puede cambiar el estatus del interno.");
+    }
+
+    const supabase = await createServerSupabaseClient();
+    const internalId = String(formData.get("interno_id") ?? "").trim();
+    const estatus = String(formData.get("estatus") ?? "").trim();
+
+    if (!internalId || !estatus) {
+      return failure("Debes elegir el interno y el nuevo estatus.");
+    }
+
+    const { error } = await supabase.from("internos").update({ estatus }).eq("id", internalId);
+    if (error) {
+      return failure(error.message || "No se pudo actualizar el estatus.");
+    }
+
+    revalidatePath("/sistema/internos");
+    revalidatePath("/sistema/listado");
+    return success("Estatus actualizado.");
+  } catch (error) {
+    return failure(error instanceof Error ? error.message : "No se pudo actualizar el estatus.");
+  }
+}
+
 export async function createVisitorAction(
   _prevState: MutationState,
   formData: FormData
@@ -301,7 +333,9 @@ export async function createVisitorAction(
       sexo: String(formData.get("sexo") ?? "sin-definir").trim(),
       parentesco: String(formData.get("parentesco") ?? "").trim(),
       telefono: String(formData.get("telefono") ?? "").trim() || null,
-      betada: String(formData.get("betada") ?? "false") === "true",
+      betada:
+        ["super-admin", "control"].includes(profile.roleKey) &&
+        String(formData.get("betada") ?? "false") === "true",
       notas: String(formData.get("notas") ?? "").trim() || null,
       created_by: profile.id
     };
@@ -311,6 +345,7 @@ export async function createVisitorAction(
     if (
       !visitorPayload.nombres ||
       !visitorPayload.apellido_pat ||
+      !visitorPayload.apellido_mat ||
       !visitorPayload.fecha_nacimiento ||
       !visitorPayload.parentesco
     ) {
@@ -882,6 +917,40 @@ export async function saveModulePriceAction(
   }
 }
 
+export async function saveModuleSettingsAction(
+  _prevState: MutationState,
+  formData: FormData
+): Promise<MutationState> {
+  try {
+    const profile = await requireProfile();
+    if (profile.roleKey !== "super-admin") {
+      return failure("Solo super-admin puede cambiar la configuracion.");
+    }
+
+    const supabase = await createServerSupabaseClient();
+    const moduleKey = String(formData.get("module_key") ?? "").trim();
+    const cutoffWeekday = Number(formData.get("cutoff_weekday") ?? 1);
+
+    const { error } = await supabase.from("module_settings").upsert(
+      {
+        module_key: moduleKey,
+        cutoff_weekday: cutoffWeekday,
+        created_by: profile.id
+      },
+      { onConflict: "module_key" }
+    );
+
+    if (error) {
+      return failure(error.message || "No se pudo guardar el corte.");
+    }
+
+    revalidatePath(`/sistema/${moduleKey}`);
+    return success("Configuracion guardada.");
+  } catch (error) {
+    return failure(error instanceof Error ? error.message : "No se pudo guardar la configuracion.");
+  }
+}
+
 export async function assignModuleDeviceAction(
   _prevState: MutationState,
   formData: FormData
@@ -944,23 +1013,21 @@ export async function registerModulePaymentAction(
     const supabase = await createServerSupabaseClient();
     const moduleKey = String(formData.get("module_key") ?? "").trim();
     const internalDeviceId = String(formData.get("internal_device_id") ?? "").trim();
+    const internalId = String(formData.get("internal_id") ?? "").trim();
     const zoneId = String(formData.get("zone_id") ?? "").trim() || null;
     const amount = Number(formData.get("amount") ?? 0);
     const notes = String(formData.get("notes") ?? "").trim() || null;
 
-    if (!internalDeviceId) {
-      return failure("Debes elegir un aparato.");
+    if (!internalDeviceId && !internalId) {
+      return failure("Debes elegir un interno.");
     }
 
-    const today = new Date();
-    const day = today.getDay();
-    const diffToMonday = day === 0 ? -6 : 1 - day;
-    const weekStartDate = new Date(today);
-    weekStartDate.setDate(today.getDate() + diffToMonday);
-    const weekEndDate = new Date(weekStartDate);
-    weekEndDate.setDate(weekStartDate.getDate() + 6);
-    const weekStart = weekStartDate.toISOString().slice(0, 10);
-    const weekEnd = weekEndDate.toISOString().slice(0, 10);
+    const { data: settings } = await supabase
+      .from("module_settings")
+      .select("cutoff_weekday")
+      .eq("module_key", moduleKey)
+      .maybeSingle();
+    const { start: weekStart, end: weekEnd } = getWeekRangeFromCutoff(settings?.cutoff_weekday ?? 1);
 
     const { data: cycle, error: cycleError } = await supabase
       .from("device_payment_cycles")
@@ -983,20 +1050,36 @@ export async function registerModulePaymentAction(
       return failure("La semana ya esta cerrada y no admite cambios.");
     }
 
-    const { error } = await supabase.from("device_payments").upsert(
-      {
-        internal_device_id: internalDeviceId,
-        module_key: moduleKey,
-        zone_id: zoneId,
-        cycle_id: cycle.id,
-        amount,
-        status: "pagado",
-        paid_at: new Date().toISOString(),
-        paid_by: profile.id,
-        notes
-      },
-      { onConflict: "internal_device_id,cycle_id" }
-    );
+    const targetDevices = internalId
+      ? await supabase
+          .from("internal_devices")
+          .select("id, internal_id")
+          .eq("module_key", moduleKey)
+          .eq("internal_id", internalId)
+          .neq("status", "baja")
+      : { data: [{ id: internalDeviceId, internal_id: internalId || "" }], error: null };
+
+    if (targetDevices.error || !targetDevices.data || targetDevices.data.length === 0) {
+      return failure(targetDevices.error?.message || "No se encontraron aparatos para cobrar.");
+    }
+
+    const perDeviceAmount =
+      amount && targetDevices.data.length > 0 ? amount / targetDevices.data.length : amount;
+    const paymentsPayload = targetDevices.data.map((device) => ({
+      internal_device_id: device.id,
+      module_key: moduleKey,
+      zone_id: zoneId,
+      cycle_id: cycle.id,
+      amount: perDeviceAmount,
+      status: "pagado",
+      paid_at: new Date().toISOString(),
+      paid_by: profile.id,
+      notes
+    }));
+
+    const { error } = await supabase.from("device_payments").upsert(paymentsPayload, {
+      onConflict: "internal_device_id,cycle_id"
+    });
 
     if (error) {
       return failure(error.message || "No se pudo registrar el pago.");
@@ -1015,16 +1098,71 @@ export async function closeModuleWeekAction(
 ): Promise<MutationState> {
   try {
     const profile = await requireProfile();
-    if (!["super-admin", "control"].includes(profile.roleKey)) {
-      return failure("Tu rol no puede cerrar la semana.");
-    }
-
-    const supabase = await createServerSupabaseClient();
     const moduleKey = String(formData.get("module_key") ?? "").trim();
     const cycleId = String(formData.get("cycle_id") ?? "").trim();
+    const supabase = await createServerSupabaseClient();
+
+    let canClose = profile.roleKey === "super-admin";
+    if (!canClose) {
+      const { data: worker } = await supabase
+        .from("module_workers")
+        .select("id")
+        .eq("module_key", moduleKey)
+        .eq("user_profile_id", profile.id)
+        .eq("active", true)
+        .maybeSingle();
+
+      if (worker) {
+        const { data: permission } = await supabase
+          .from("module_worker_permissions")
+          .select("id")
+          .eq("worker_id", worker.id)
+          .eq("function_key", "encargado")
+          .maybeSingle();
+
+        canClose = Boolean(permission);
+      }
+    }
+
+    if (!canClose) {
+      return failure("Solo super-admin o Encargado del bloque puede cerrar la semana.");
+    }
 
     if (!cycleId) {
       return failure("No se encontro la semana activa.");
+    }
+
+    const { data: cycle } = await supabase
+      .from("device_payment_cycles")
+      .select("week_start, week_end")
+      .eq("id", cycleId)
+      .maybeSingle();
+
+    if (!cycle) {
+      return failure("No se encontro la semana activa.");
+    }
+
+    const { data: devices } = await supabase
+      .from("internal_devices")
+      .select("id, zone_id, status")
+      .eq("module_key", moduleKey)
+      .neq("status", "baja");
+
+    const activeDeviceIds = (devices ?? []).filter((item) => item.status === "activo").map((item) => item.id);
+    if (activeDeviceIds.length > 0) {
+      const { data: paidItems } = await supabase
+        .from("device_payments")
+        .select("internal_device_id, status")
+        .eq("module_key", moduleKey)
+        .eq("cycle_id", cycleId)
+        .in("internal_device_id", activeDeviceIds);
+
+      const paidSet = new Set(
+        (paidItems ?? []).filter((item) => item.status === "pagado").map((item) => item.internal_device_id)
+      );
+      if (paidSet.size !== activeDeviceIds.length) {
+        return failure("No puedes cerrar la semana si hay zonas o aparatos pendientes de cobro.");
+      }
     }
 
     const { error } = await supabase
@@ -1108,5 +1246,50 @@ export async function assignModuleWorkerAction(
     return success("Trabajador asignado.");
   } catch (error) {
     return failure(error instanceof Error ? error.message : "No se pudo asignar el trabajador.");
+  }
+}
+
+export async function assignModuleStaffAction(
+  _prevState: MutationState,
+  formData: FormData
+): Promise<MutationState> {
+  try {
+    const profile = await requireProfile();
+    if (!["super-admin", "control"].includes(profile.roleKey)) {
+      return failure("Tu rol no puede asignar puestos.");
+    }
+
+    const supabase = await createServerSupabaseClient();
+    const moduleKey = String(formData.get("module_key") ?? "").trim();
+    const internalId = String(formData.get("internal_id") ?? "").trim();
+    const userId = String(formData.get("user_id") ?? "").trim();
+    const positionKey = String(formData.get("position_key") ?? "").trim();
+
+    if (!internalId || !userId || !positionKey) {
+      return failure("Debes elegir interno, usuario y puesto.");
+    }
+
+    await supabase
+      .from("module_internal_staff")
+      .delete()
+      .eq("module_key", moduleKey)
+      .eq("user_profile_id", userId);
+
+    const { error } = await supabase.from("module_internal_staff").insert({
+      module_key: moduleKey,
+      internal_id: internalId,
+      user_profile_id: userId,
+      position_key: positionKey,
+      created_by: profile.id
+    });
+
+    if (error) {
+      return failure(error.message || "No se pudo asignar el puesto.");
+    }
+
+    revalidatePath(`/sistema/${moduleKey}`);
+    return success("Puesto asignado.");
+  } catch (error) {
+    return failure(error instanceof Error ? error.message : "No se pudo asignar el puesto.");
   }
 }

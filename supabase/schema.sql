@@ -23,7 +23,9 @@ values
   ('super-admin', 'Super Admin', 'Administra catálogos, usuarios y permisos'),
   ('control', 'Control', 'Valida ingresos y salidas'),
   ('supervisor', 'Supervisor', 'Revisa, autoriza y supervisa la operación'),
-  ('capturador', 'Capturador', 'Registra internos, fechas y pases')
+  ('capturador', 'Capturador', 'Registra internos, fechas y pases'),
+  ('visual', 'Visual', 'Opera el bloque visual'),
+  ('comunicacion', 'Comunicacion', 'Opera el bloque de comunicacion')
 on conflict (key) do nothing;
 
 create table if not exists public.user_profiles (
@@ -209,12 +211,24 @@ create table if not exists public.module_worker_functions (
 
 insert into public.module_worker_functions (key, name)
 values
+  ('encargado', 'Encargado'),
+  ('segundo', 'Segundo'),
+  ('supervisor', 'Supervisor'),
   ('altas', 'Altas'),
   ('cobranza', 'Cobranza'),
-  ('encargado', 'Encargado'),
-  ('consulta', 'Consulta'),
+  ('mantenimiento', 'Mantenimiento'),
   ('configuracion', 'Configuracion')
 on conflict (key) do nothing;
+
+create table if not exists public.module_settings (
+  id uuid primary key default gen_random_uuid(),
+  module_key text not null references public.block_modules (key) on delete cascade,
+  cutoff_weekday smallint not null default 1 check (cutoff_weekday between 0 and 6),
+  created_by uuid references public.user_profiles (id),
+  created_at timestamptz not null default timezone('utc', now()),
+  updated_at timestamptz not null default timezone('utc', now()),
+  unique (module_key)
+);
 
 create table if not exists public.module_workers (
   id uuid primary key default gen_random_uuid(),
@@ -359,6 +373,19 @@ create table if not exists public.device_payments (
   unique (internal_device_id, cycle_id)
 );
 
+create table if not exists public.module_internal_staff (
+  id uuid primary key default gen_random_uuid(),
+  module_key text not null references public.block_modules (key) on delete cascade,
+  internal_id uuid not null references public.internos (id) on delete cascade,
+  user_profile_id uuid not null references public.user_profiles (id) on delete cascade,
+  position_key text not null references public.module_worker_functions (key) on delete restrict,
+  active boolean not null default true,
+  created_by uuid references public.user_profiles (id),
+  created_at timestamptz not null default timezone('utc', now()),
+  updated_at timestamptz not null default timezone('utc', now()),
+  unique (module_key, internal_id, user_profile_id)
+);
+
 create index if not exists idx_internos_apartado on public.internos (apartado);
 create index if not exists idx_visitas_betada on public.visitas (betada);
 create index if not exists idx_fechas_fecha_completa on public.fechas (fecha_completa);
@@ -368,6 +395,7 @@ create index if not exists idx_interno_visitas_interno on public.interno_visitas
 create index if not exists idx_visita_interno_historial_visita on public.visita_interno_historial (visita_id);
 create index if not exists idx_internal_devices_module on public.internal_devices (module_key, internal_id);
 create index if not exists idx_device_payments_cycle on public.device_payments (module_key, cycle_id);
+create index if not exists idx_module_internal_staff_module on public.module_internal_staff (module_key, internal_id);
 
 create or replace view public.historial_ingresos as
 select
@@ -464,6 +492,12 @@ before update on public.module_workers
 for each row
 execute function public.set_updated_at();
 
+drop trigger if exists module_settings_set_updated_at on public.module_settings;
+create trigger module_settings_set_updated_at
+before update on public.module_settings
+for each row
+execute function public.set_updated_at();
+
 drop trigger if exists module_zones_set_updated_at on public.module_zones;
 create trigger module_zones_set_updated_at
 before update on public.module_zones
@@ -494,6 +528,12 @@ before update on public.device_payments
 for each row
 execute function public.set_updated_at();
 
+drop trigger if exists module_internal_staff_set_updated_at on public.module_internal_staff;
+create trigger module_internal_staff_set_updated_at
+before update on public.module_internal_staff
+for each row
+execute function public.set_updated_at();
+
 alter table public.roles enable row level security;
 alter table public.user_profiles enable row level security;
 alter table public.internos enable row level security;
@@ -506,6 +546,7 @@ alter table public.interno_visitas enable row level security;
 alter table public.visita_interno_historial enable row level security;
 alter table public.app_settings enable row level security;
 alter table public.block_modules enable row level security;
+alter table public.module_settings enable row level security;
 alter table public.module_workers enable row level security;
 alter table public.module_worker_permissions enable row level security;
 alter table public.module_zones enable row level security;
@@ -515,6 +556,7 @@ alter table public.internal_devices enable row level security;
 alter table public.listing_device_items enable row level security;
 alter table public.device_payment_cycles enable row level security;
 alter table public.device_payments enable row level security;
+alter table public.module_internal_staff enable row level security;
 
 grant usage on schema public to anon, authenticated, service_role;
 grant select on all tables in schema public to anon;
@@ -707,6 +749,13 @@ for select
 to authenticated
 using (true);
 
+drop policy if exists "read access module settings" on public.module_settings;
+create policy "read access module settings"
+on public.module_settings
+for select
+to authenticated
+using (true);
+
 drop policy if exists "read access module worker permissions" on public.module_worker_permissions;
 create policy "read access module worker permissions"
 on public.module_worker_permissions
@@ -763,9 +812,24 @@ for select
 to authenticated
 using (true);
 
+drop policy if exists "read access module internal staff" on public.module_internal_staff;
+create policy "read access module internal staff"
+on public.module_internal_staff
+for select
+to authenticated
+using (true);
+
 drop policy if exists "manage modules by authenticated users" on public.module_workers;
 create policy "manage modules by authenticated users"
 on public.module_workers
+for all
+to authenticated
+using (true)
+with check (true);
+
+drop policy if exists "manage module settings by authenticated users" on public.module_settings;
+create policy "manage module settings by authenticated users"
+on public.module_settings
 for all
 to authenticated
 using (true)
@@ -822,6 +886,14 @@ with check (true);
 drop policy if exists "manage device payments by authenticated users" on public.device_payments;
 create policy "manage device payments by authenticated users"
 on public.device_payments
+for all
+to authenticated
+using (true)
+with check (true);
+
+drop policy if exists "manage module internal staff by authenticated users" on public.module_internal_staff;
+create policy "manage module internal staff by authenticated users"
+on public.module_internal_staff
 for all
 to authenticated
 using (true)

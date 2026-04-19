@@ -6,7 +6,7 @@ import { createVisitorAction, reassignVisitorAction } from "@/app/sistema/action
 import { MutationBanner } from "@/components/mutation-banner";
 import { StatusBadge } from "@/components/status-badge";
 import { InternalRecord, MutationState, RoleKey, VisitorRecord } from "@/lib/types";
-import { formatLongDate } from "@/lib/utils";
+import { formatLongDate, getVisitorAvailabilityLabel, maskValue } from "@/lib/utils";
 
 const mutationInitialState: MutationState = {
   success: null,
@@ -27,12 +27,10 @@ function formatHistoryDate(value: string) {
 export function VisitorManager({
   visitors,
   internals,
-  operatingDate,
   roleKey
 }: {
   visitors: VisitorRecord[];
   internals: InternalRecord[];
-  operatingDate?: string | null;
   roleKey: RoleKey;
 }) {
   const pageSize = 20;
@@ -69,6 +67,8 @@ export function VisitorManager({
 
   const selected = visitors.find((visitor) => visitor.id === modalVisitorId) ?? null;
   const canReassign = roleKey === "super-admin" || roleKey === "control";
+  const canManageAvailability = roleKey === "super-admin" || roleKey === "control";
+  const canViewSensitiveData = roleKey === "super-admin";
   const reassignedInternalCount = selected
     ? new Set(
         [...selected.historialInterno, selected.currentInternalName ?? ""].filter(Boolean)
@@ -165,7 +165,7 @@ export function VisitorManager({
                       <td>{visitor.edad}</td>
                       <td>
                         <StatusBadge variant={visitor.betada ? "danger" : "ok"}>
-                          {visitor.betada ? "Betada" : "Activa"}
+                          {getVisitorAvailabilityLabel(visitor.betada)}
                         </StatusBadge>
                       </td>
                     </tr>
@@ -211,36 +211,38 @@ export function VisitorManager({
             autoComplete="off"
           >
             <div className="field">
-              <input name="nombres" placeholder="Nombres" autoComplete="off" />
+              <input name="nombres" placeholder="Nombres" autoComplete="off" required />
             </div>
             <div className="field">
-              <input name="apellido_pat" placeholder="Apellido paterno" autoComplete="off" />
+              <input name="apellido_pat" placeholder="Apellido paterno" autoComplete="off" required />
             </div>
             <div className="field">
-              <input name="apellido_mat" placeholder="Apellido materno" autoComplete="off" />
+              <input name="apellido_mat" placeholder="Apellido materno" autoComplete="off" required />
             </div>
             <div className="field">
-              <input name="fecha_nacimiento" type="date" autoComplete="off" />
+              <input name="fecha_nacimiento" type="date" autoComplete="off" required />
             </div>
             <div className="field">
-              <select name="sexo" defaultValue="sin-definir">
-                <option value="sin-definir">Sexo</option>
+              <select name="sexo" defaultValue="" required>
+                <option value="" disabled>Sexo</option>
                 <option value="hombre">Hombre</option>
                 <option value="mujer">Mujer</option>
               </select>
             </div>
             <div className="field">
-              <input name="parentesco" placeholder="Parentesco" autoComplete="off" />
+              <input name="parentesco" placeholder="Parentesco" autoComplete="off" required />
             </div>
             <div className="field">
               <input name="telefono" placeholder="Telefono" autoComplete="off" />
             </div>
-            <div className="field">
-              <select name="betada" defaultValue="false">
-                <option value="false">Activa</option>
-                <option value="true">Betada</option>
-              </select>
-            </div>
+            {canManageAvailability ? (
+              <div className="field">
+                <select name="betada" defaultValue="false">
+                  <option value="false">Activo</option>
+                  <option value="true">No disponible</option>
+                </select>
+              </div>
+            ) : null}
             <div className="field">
               <select name="interno_id" defaultValue="" required>
                 <option value="" disabled>
@@ -325,7 +327,7 @@ export function VisitorManager({
                   </div>
                   <div className="mini-row">
                     <span>Telefono</span>
-                    <strong>{selected.telefono ?? "-"}</strong>
+                    <strong>{maskValue(selected.telefono ?? "-", canViewSensitiveData)}</strong>
                   </div>
                   <div className="mini-row">
                     <span>Fecha de nacimiento</span>
@@ -334,7 +336,7 @@ export function VisitorManager({
                   <div className="mini-row">
                     <span>Estatus</span>
                     <StatusBadge variant={selected.betada ? "danger" : "ok"}>
-                      {selected.betada ? "Betada" : "Activa"}
+                      {getVisitorAvailabilityLabel(selected.betada)}
                     </StatusBadge>
                   </div>
                 </div>

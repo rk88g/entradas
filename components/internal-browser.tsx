@@ -5,7 +5,8 @@ import { useRouter } from "next/navigation";
 import {
   createInternalAction,
   createPassAction,
-  createVisitorAction
+  createVisitorAction,
+  updateInternalStatusAction
 } from "@/app/sistema/actions";
 import { MutationBanner } from "@/components/mutation-banner";
 import { StatusBadge } from "@/components/status-badge";
@@ -14,7 +15,8 @@ import {
   canManageMentions,
   formatLongDate,
   getDefaultDateStatusForRole,
-  getStatusDisplayLabel
+  getStatusDisplayLabel,
+  maskValue
 } from "@/lib/utils";
 
 const mutationInitialState: MutationState = {
@@ -97,7 +99,14 @@ export function InternalBrowser({
     createVisitorAction,
     mutationInitialState
   );
+  const [statusState, statusAction, statusPending] = useActionState(
+    updateInternalStatusAction,
+    mutationInitialState
+  );
   const visitorFormRef = useRef<HTMLFormElement>(null);
+  const internalFormRef = useRef<HTMLFormElement>(null);
+  const canViewSensitiveData = roleKey === "super-admin";
+  const canManageVisitorAvailability = roleKey === "super-admin" || roleKey === "control";
 
   const availableDates = useMemo(() => getDateOptions(openDate, nextDate), [openDate, nextDate]);
 
@@ -136,6 +145,18 @@ export function InternalBrowser({
       router.refresh();
     }
   }, [router, visitorState.success]);
+
+  useEffect(() => {
+    if (createState.success) {
+      internalFormRef.current?.reset();
+    }
+  }, [createState.success]);
+
+  useEffect(() => {
+    if (statusState.success) {
+      router.refresh();
+    }
+  }, [router, statusState.success]);
 
   useEffect(() => {
     if (!modalInternalId) {
@@ -233,15 +254,11 @@ export function InternalBrowser({
                       <td>
                         <div className="record-title">
                           <strong>{profile.fullName}</strong>
-                          <span>
-                            {profile.openDatePass || profile.nextDatePass
-                              ? "Con pase registrado"
-                              : "Sin pase"}
-                          </span>
+                          <span>{profile.estatus}</span>
                         </div>
                       </td>
                       <td>{profile.ubicacion}</td>
-                      <td>{profile.edad}</td>
+                      <td>{maskValue(profile.edad, canViewSensitiveData)}</td>
                     </tr>
                   ))
                 )}
@@ -278,6 +295,7 @@ export function InternalBrowser({
           <strong className="section-title">Nuevo interno</strong>
           <MutationBanner state={createState} />
           <form
+            ref={internalFormRef}
             action={createAction}
             className="field-grid"
             style={{ marginTop: "1rem" }}
@@ -297,9 +315,6 @@ export function InternalBrowser({
             </div>
             <div className="field">
               <input name="edad" type="number" placeholder="Edad" autoComplete="off" />
-            </div>
-            <div className="field">
-              <input name="telefono" placeholder="Telefono" autoComplete="off" />
             </div>
             <div className="field" style={{ gridColumn: "1 / -1" }}>
               <textarea name="observaciones" placeholder="Observaciones" autoComplete="off" />
@@ -338,7 +353,7 @@ export function InternalBrowser({
               <div className="record-title">
                 <strong className="section-title">{selected.fullName}</strong>
                 <span>
-                  Ubicacion {selected.ubicacion} - {selected.edad} anos
+                  Ubicacion {selected.ubicacion} - {maskValue(selected.edad, canViewSensitiveData)} anos
                 </span>
               </div>
               <button
@@ -355,7 +370,11 @@ export function InternalBrowser({
                 <div className="mini-list">
                   <div className="mini-row">
                     <span>Telefono</span>
-                    <strong>{selected.telefono || "-"}</strong>
+                    <strong>{maskValue(selected.telefono || "-", canViewSensitiveData)}</strong>
+                  </div>
+                  <div className="mini-row">
+                    <span>Estatus</span>
+                    <strong>{selected.estatus}</strong>
                   </div>
                 </div>
               </div>
@@ -363,7 +382,7 @@ export function InternalBrowser({
               <div className="data-card" style={{ padding: "1rem" }}>
                 <div className="mini-list">
                   <div className="mini-row">
-                    <span>Estatus</span>
+                    <span>Pase</span>
                     <div
                       style={{
                         display: "flex",
@@ -376,8 +395,6 @@ export function InternalBrowser({
                         <>
                           <StatusBadge variant="warn">Pase registrado</StatusBadge>
                           <span className="muted" style={{ fontSize: "0.88rem" }}>
-                            {selectedDateMeta ? getStatusDisplayLabel(selectedDateMeta.estado) : "FECHA"}
-                            {" - "}
                             {formatLongDate(selectedPass.fechaVisita)}
                           </span>
                         </>
@@ -389,6 +406,27 @@ export function InternalBrowser({
                 </div>
               </div>
             </div>
+
+            {roleKey === "super-admin" ? (
+              <div className="data-card" style={{ padding: "1rem", marginTop: "1rem" }}>
+                <strong style={{ display: "block", marginBottom: "0.75rem" }}>Cambiar estatus</strong>
+                <MutationBanner state={statusState} />
+                <form action={statusAction} className="actions-row" autoComplete="off">
+                  <input type="hidden" name="interno_id" value={selected.id} />
+                  <div className="field" style={{ flex: 1 }}>
+                    <select name="estatus" defaultValue={selected.estatus}>
+                      <option value="activo">Activo</option>
+                      <option value="150">150</option>
+                      <option value="retenido">Retenido</option>
+                      <option value="baja">Baja</option>
+                    </select>
+                  </div>
+                  <button type="submit" className="button-soft" disabled={statusPending}>
+                    Guardar estatus
+                  </button>
+                </form>
+              </div>
+            ) : null}
 
             {selectedPass ? (
               <div style={{ marginTop: "1rem" }}>
@@ -429,7 +467,7 @@ export function InternalBrowser({
                           border: "1px solid var(--line)",
                           borderRadius: "16px",
                           padding: "0.9rem 1rem",
-                          background: "white",
+                          background: "var(--surface)",
                           width: "100%",
                           textAlign: "left",
                           cursor: "pointer"
@@ -437,7 +475,7 @@ export function InternalBrowser({
                       >
                         <div className="record-title">
                           <strong>{item.visitor.fullName}</strong>
-                          <span>{item.visitor.edad} anos</span>
+                          <span>{maskValue(item.visitor.edad, canViewSensitiveData)} anos</span>
                         </div>
                       </button>
                     ))
@@ -464,7 +502,7 @@ export function InternalBrowser({
                           border: "1px solid var(--line)",
                           borderRadius: "16px",
                           padding: "0.9rem 1rem",
-                          background: "white",
+                          background: "var(--surface)",
                           width: "100%",
                           textAlign: "left",
                           cursor: "pointer"
@@ -472,7 +510,7 @@ export function InternalBrowser({
                       >
                         <div className="record-title">
                           <strong>{item.visitor.fullName}</strong>
-                          <span>{item.visitor.edad} anos</span>
+                          <span>{maskValue(item.visitor.edad, canViewSensitiveData)} anos</span>
                         </div>
                       </button>
                     ))
@@ -494,36 +532,38 @@ export function InternalBrowser({
                 >
                   <input type="hidden" name="interno_id" value={selected.id} />
                   <div className="field">
-                    <input name="nombres" placeholder="Nombres" autoComplete="off" />
+                    <input name="nombres" placeholder="Nombres" autoComplete="off" required />
                   </div>
                   <div className="field">
-                    <input name="apellido_pat" placeholder="Apellido paterno" autoComplete="off" />
+                    <input name="apellido_pat" placeholder="Apellido paterno" autoComplete="off" required />
                   </div>
                   <div className="field">
-                    <input name="apellido_mat" placeholder="Apellido materno" autoComplete="off" />
+                    <input name="apellido_mat" placeholder="Apellido materno" autoComplete="off" required />
                   </div>
                   <div className="field">
-                    <input name="fecha_nacimiento" type="date" autoComplete="off" />
+                    <input name="fecha_nacimiento" type="date" autoComplete="off" required />
                   </div>
                   <div className="field">
-                    <select name="sexo" defaultValue="sin-definir">
-                      <option value="sin-definir">Sexo</option>
+                    <select name="sexo" defaultValue="" required>
+                      <option value="" disabled>Sexo</option>
                       <option value="hombre">Hombre</option>
                       <option value="mujer">Mujer</option>
                     </select>
                   </div>
                   <div className="field">
-                    <input name="parentesco" placeholder="Parentesco" autoComplete="off" />
+                    <input name="parentesco" placeholder="Parentesco" autoComplete="off" required />
                   </div>
                   <div className="field">
                     <input name="telefono" placeholder="Telefono" autoComplete="off" />
                   </div>
-                  <div className="field">
-                    <select name="betada" defaultValue="false">
-                      <option value="false">Activa</option>
-                      <option value="true">Betada</option>
-                    </select>
-                  </div>
+                  {canManageVisitorAvailability ? (
+                    <div className="field">
+                      <select name="betada" defaultValue="false">
+                        <option value="false">Activo</option>
+                        <option value="true">No disponible</option>
+                      </select>
+                    </div>
+                  ) : null}
                   <div className="field" style={{ gridColumn: "1 / -1" }}>
                     <textarea name="notas" placeholder="Notas" autoComplete="off" />
                   </div>
@@ -565,7 +605,7 @@ export function InternalBrowser({
                     <span className="field-hint" style={{ color: "var(--muted)" }}>
                       Se creara para{" "}
                       {selectedDateMeta
-                        ? `${getStatusDisplayLabel(selectedDateMeta.estado)} - ${formatLongDate(selectedDateMeta.fechaCompleta)}`
+                        ? `${formatLongDate(selectedDateMeta.fechaCompleta)}`
                         : "la fecha configurada"}
                     </span>
                   </div>

@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { PassListing } from "@/components/pass-listing";
 import { getCurrentUserProfile, getListingBuilderData, getListado } from "@/lib/supabase/queries";
-import { formatLongDate, getStatusDisplayLabel } from "@/lib/utils";
+import { formatLongDate } from "@/lib/utils";
 
 export default async function ListadoPage() {
   const [profile, builderData, listado] = await Promise.all([
@@ -23,7 +23,7 @@ export default async function ListadoPage() {
     <>
       <section className="quick-grid hide-print">
         <article className="quick-card">
-          <h3>{builderData.openDate ? getStatusDisplayLabel(builderData.openDate.estado) : "PROXIMOS"}</h3>
+          <h3>Mañana</h3>
           <div className="mini-list">
             <div className="mini-row">
               <strong>
@@ -37,7 +37,7 @@ export default async function ListadoPage() {
           </div>
         </article>
         <article className="quick-card">
-          <h3>{builderData.nextDate ? getStatusDisplayLabel(builderData.nextDate.estado) : "EN ESPERA"}</h3>
+          <h3>618</h3>
           <div className="mini-list">
             <div className="mini-row">
               <strong>

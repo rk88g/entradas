@@ -1,20 +1,12 @@
 import { redirect } from "next/navigation";
 import { VisitorManager } from "@/components/visitor-manager";
-import {
-  getCurrentUserProfile,
-  getInternos,
-  getNextDate,
-  getOpenDate,
-  getVisitas
-} from "@/lib/supabase/queries";
+import { getCurrentUserProfile, getInternos, getVisitas } from "@/lib/supabase/queries";
 
 export default async function VisitasPage() {
-  const [profile, visitors, internals, nextDate, openDate] = await Promise.all([
+  const [profile, visitors, internals] = await Promise.all([
     getCurrentUserProfile(),
     getVisitas(),
-    getInternos(),
-    getNextDate(),
-    getOpenDate()
+    getInternos()
   ]);
 
   if (profile?.moduleOnly && profile.accessibleModules.length > 0) {
@@ -25,7 +17,6 @@ export default async function VisitasPage() {
     <VisitorManager
       visitors={visitors}
       internals={internals}
-      operatingDate={nextDate?.fechaCompleta ?? openDate?.fechaCompleta ?? null}
       roleKey={profile?.roleKey ?? "capturador"}
     />
   );

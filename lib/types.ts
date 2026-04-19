@@ -1,10 +1,18 @@
-export type RoleKey = "super-admin" | "control" | "supervisor" | "capturador";
+export type RoleKey =
+  | "super-admin"
+  | "control"
+  | "supervisor"
+  | "capturador"
+  | "visual"
+  | "comunicacion";
 export type ModuleKey = "visual" | "comunicacion" | "rentas";
 export type ModuleWorkerFunctionKey =
   | "altas"
   | "cobranza"
   | "encargado"
-  | "consulta"
+  | "segundo"
+  | "supervisor"
+  | "mantenimiento"
   | "configuracion";
 
 export type AccessArea = "618" | "INTIMA";
@@ -42,6 +50,7 @@ export interface InternalRecord {
   libre: string;
   ubicacion: number;
   telefono: string;
+  estatus: string;
   ubiFiliacion: string;
   clasificacion: AccessArea;
   createdAt: string;
@@ -264,5 +273,17 @@ export interface ModulePanelData {
   currentWeekLabel: string;
   weekClosed: boolean;
   currentCycleId?: string;
+  cutoffWeekday: number;
   assignableUsers: Array<{ id: string; fullName: string }>;
+  staffAssignments: ModuleStaffAssignment[];
+}
+
+export interface ModuleStaffAssignment {
+  id: string;
+  moduleKey: ModuleKey;
+  internalId: string;
+  internalName: string;
+  userId: string;
+  userName: string;
+  positionKey: ModuleWorkerFunctionKey;
 }
