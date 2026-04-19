@@ -33,6 +33,12 @@ export function VisitorManager({
   const [query, setQuery] = useState("");
   const [page, setPage] = useState(1);
   const [selectedVisitorId, setSelectedVisitorId] = useState<string | null>(visitors[0]?.id ?? null);
+  const [sectionsOpen, setSectionsOpen] = useState<Record<string, boolean>>({
+    perfil: true,
+    historial: true,
+    reasignacion: true,
+    nueva: true
+  });
   const [internalSearch, setInternalSearch] = useState("");
   const [createInternalSearch, setCreateInternalSearch] = useState("");
   const [selectedInternalId, setSelectedInternalId] = useState("");
@@ -116,8 +122,15 @@ export function VisitorManager({
     setPage(1);
   }, [query]);
 
+  function toggleSection(sectionKey: string) {
+    setSectionsOpen((current) => ({
+      ...current,
+      [sectionKey]: !current[sectionKey]
+    }));
+  }
+
   return (
-    <section className="module-grid">
+    <section className="module-grid module-grid-single">
       <article className="data-card">
         <div className="actions-row" style={{ justifyContent: "space-between", alignItems: "center", marginBottom: "0.8rem" }}>
           <strong className="section-title">Visitas</strong>
@@ -181,153 +194,174 @@ export function VisitorManager({
       <article className="form-card profile-shell compact">
         <strong className="section-title">Perfil de visita</strong>
         {selectedVisitor ? (
-          <>
+          <div className="collapse-stack">
             {reassignedInternalCount > 3 ? (
               <MutationBanner state={{ success: null, error: "Advertencia: esta visita ya fue reasignada varias veces." }} />
             ) : null}
 
-            <div className="profile-summary">
-              <article className="data-card">
-                <div className="mini-list">
-                  <div className="mini-row"><span>Interno actual</span><strong>{selectedVisitor.currentInternalName ?? "Sin interno"}</strong></div>
-                  <div className="mini-row"><span>Parentesco</span><strong>{selectedVisitor.parentesco}</strong></div>
-                  <div className="mini-row"><span>Telefono</span><strong>{maskValue(selectedVisitor.telefono ?? "No aplica", canViewSensitiveData)}</strong></div>
-                </div>
-              </article>
-              <article className="data-card">
-                <div className="mini-list">
-                  <div className="mini-row"><span>Nacimiento</span><strong>{formatHistoryDate(selectedVisitor.fechaNacimiento)}</strong></div>
-                  <div className="mini-row"><span>Edad</span><strong>{selectedVisitor.edad}</strong></div>
-                  <div className="mini-row">
-                    <span>Estatus</span>
-                    <StatusBadge variant={selectedVisitor.betada ? "danger" : "ok"}>
-                      {getVisitorAvailabilityLabel(selectedVisitor.betada)}
-                    </StatusBadge>
+            <article className="data-card section-collapse">
+              <button type="button" className="button-soft collapse-trigger" onClick={() => toggleSection("perfil")}>
+                <span>Perfil de visita</span>
+                <span>{sectionsOpen.perfil ? "−" : "+"}</span>
+              </button>
+              {sectionsOpen.perfil ? (
+                <div className="section-collapse-body">
+                  <div className="mini-list">
+                    <div className="mini-row"><span>Interno actual</span><strong>{selectedVisitor.currentInternalName ?? "Sin interno"}</strong></div>
+                    <div className="mini-row"><span>Parentesco</span><strong>{selectedVisitor.parentesco}</strong></div>
+                    <div className="mini-row"><span>Telefono</span><strong>{maskValue(selectedVisitor.telefono ?? "No aplica", canViewSensitiveData)}</strong></div>
+                    <div className="mini-row"><span>Nacimiento</span><strong>{formatHistoryDate(selectedVisitor.fechaNacimiento)}</strong></div>
+                    <div className="mini-row"><span>Edad</span><strong>{selectedVisitor.edad}</strong></div>
+                    <div className="mini-row">
+                      <span>Estatus</span>
+                      <StatusBadge variant={selectedVisitor.betada ? "danger" : "ok"}>
+                        {getVisitorAvailabilityLabel(selectedVisitor.betada)}
+                      </StatusBadge>
+                    </div>
                   </div>
                 </div>
-              </article>
-            </div>
-
-            <div className="profile-history-grid">
-              <article className="data-card">
-                <strong>Historial</strong>
-                <div className="record-stack" style={{ marginTop: "0.7rem" }}>
-                  {selectedVisitor.historial.length === 0 ? (
-                    <span className="muted">Sin historial.</span>
-                  ) : (
-                    selectedVisitor.historial.map((entry) => (
-                      <div key={entry.id} className="record-pill">
-                        <strong>{entry.internalName}</strong>
-                        <span>{formatHistoryDate(entry.date)}</span>
-                      </div>
-                    ))
-                  )}
-                </div>
-              </article>
-
-              {canReassign ? (
-                <article className="data-card">
-                  <strong>Reasignar interno</strong>
-                  <MutationBanner state={reassignState} />
-                  <form action={reassignAction} className="field-grid" style={{ marginTop: "0.7rem" }} autoComplete="off">
-                    <input type="hidden" name="visita_id" value={selectedVisitor.id} />
-                    <div className="field">
-                      <input
-                        value={internalSearch}
-                        onChange={(event) => setInternalSearch(event.target.value)}
-                        placeholder="Buscar interno"
-                        autoComplete="off"
-                      />
-                    </div>
-                    <div className="inline-search-list">
-                      {filteredInternalResults
-                        .filter((internal) => internal.id !== selectedVisitor.currentInternalId)
-                        .slice(0, 8)
-                        .map((internal) => (
-                          <button
-                            key={internal.id}
-                            type="submit"
-                            name="interno_id"
-                            value={internal.id}
-                            className="inline-search-item"
-                          >
-                            <strong>{internal.fullName}</strong>
-                            <span className="muted">{internal.ubicacion}</span>
-                          </button>
-                        ))}
-                    </div>
-                    <span className="muted">Selecciona un interno para reasignar.</span>
-                  </form>
-                </article>
               ) : null}
-            </div>
-          </>
+            </article>
+
+            <article className="data-card section-collapse">
+              <button type="button" className="button-soft collapse-trigger" onClick={() => toggleSection("historial")}>
+                <span>Historial</span>
+                <span>{selectedVisitor.historial.length} {sectionsOpen.historial ? "−" : "+"}</span>
+              </button>
+              {sectionsOpen.historial ? (
+                <div className="section-collapse-body">
+                  <div className="record-stack">
+                    {selectedVisitor.historial.length === 0 ? (
+                      <span className="muted">Sin historial.</span>
+                    ) : (
+                      selectedVisitor.historial.map((entry) => (
+                        <div key={entry.id} className="record-pill">
+                          <strong>{entry.internalName}</strong>
+                          <span>{formatHistoryDate(entry.date)}</span>
+                        </div>
+                      ))
+                    )}
+                  </div>
+                </div>
+              ) : null}
+            </article>
+
+            {canReassign ? (
+              <article className="data-card section-collapse">
+                <button type="button" className="button-soft collapse-trigger" onClick={() => toggleSection("reasignacion")}>
+                  <span>Reasignar interno</span>
+                  <span>{sectionsOpen.reasignacion ? "−" : "+"}</span>
+                </button>
+                {sectionsOpen.reasignacion ? (
+                  <div className="section-collapse-body">
+                    <MutationBanner state={reassignState} />
+                    <form action={reassignAction} className="field-grid" autoComplete="off">
+                      <input type="hidden" name="visita_id" value={selectedVisitor.id} />
+                      <div className="field">
+                        <input
+                          value={internalSearch}
+                          onChange={(event) => setInternalSearch(event.target.value)}
+                          placeholder="Buscar interno"
+                          autoComplete="off"
+                        />
+                      </div>
+                      <div className="inline-search-list">
+                        {filteredInternalResults
+                          .filter((internal) => internal.id !== selectedVisitor.currentInternalId)
+                          .slice(0, 8)
+                          .map((internal) => (
+                            <button
+                              key={internal.id}
+                              type="submit"
+                              name="interno_id"
+                              value={internal.id}
+                              className="inline-search-item"
+                            >
+                              <strong>{internal.fullName}</strong>
+                              <span className="muted">{internal.ubicacion}</span>
+                            </button>
+                          ))}
+                      </div>
+                      <span className="muted">Selecciona un interno para reasignar.</span>
+                    </form>
+                  </div>
+                ) : null}
+              </article>
+            ) : null}
+          </div>
         ) : (
           <span className="muted">Selecciona una visita para ver su perfil.</span>
         )}
 
-        <article className="data-card">
-          <strong>Nueva visita</strong>
-          <MutationBanner state={createState} />
-          <form ref={createFormRef} action={createAction} className="field-grid" style={{ marginTop: "0.8rem" }} autoComplete="off">
-            <div className="field">
-              <input
-                value={createInternalSearch}
-                onChange={(event) => setCreateInternalSearch(event.target.value)}
-                placeholder="Buscar interno"
-                autoComplete="off"
-              />
-            </div>
-            <div className="inline-search-list">
-              {filteredCreateInternalResults.slice(0, 8).map((internal) => (
-                <button
-                  key={internal.id}
-                  type="button"
-                  className={`inline-search-item ${selectedInternalId === internal.id ? "active" : ""}`}
-                  onClick={() => setSelectedInternalId(internal.id)}
-                >
-                  <strong>{internal.fullName}</strong>
-                  <span className="muted">{internal.ubicacion}</span>
-                </button>
-              ))}
-            </div>
+        <article className="data-card section-collapse">
+          <button type="button" className="button-soft collapse-trigger" onClick={() => toggleSection("nueva")}>
+            <span>Nueva visita</span>
+            <span>{sectionsOpen.nueva ? "−" : "+"}</span>
+          </button>
+          {sectionsOpen.nueva ? (
+            <div className="section-collapse-body">
+              <MutationBanner state={createState} />
+              <form ref={createFormRef} action={createAction} className="field-grid" autoComplete="off">
+                <div className="field">
+                  <input
+                    value={createInternalSearch}
+                    onChange={(event) => setCreateInternalSearch(event.target.value)}
+                    placeholder="Buscar interno"
+                    autoComplete="off"
+                  />
+                </div>
+                <div className="inline-search-list">
+                  {filteredCreateInternalResults.slice(0, 8).map((internal) => (
+                    <button
+                      key={internal.id}
+                      type="button"
+                      className={`inline-search-item ${selectedInternalId === internal.id ? "active" : ""}`}
+                      onClick={() => setSelectedInternalId(internal.id)}
+                    >
+                      <strong>{internal.fullName}</strong>
+                      <span className="muted">{internal.ubicacion}</span>
+                    </button>
+                  ))}
+                </div>
 
-            <input type="hidden" name="interno_id" value={selectedInternalId} />
-            {selectedCreateInternal ? (
-              <div className="record-pill">
-                <strong>{selectedCreateInternal.fullName}</strong>
-                <span>{selectedCreateInternal.ubicacion}</span>
-              </div>
-            ) : null}
+                <input type="hidden" name="interno_id" value={selectedInternalId} />
+                {selectedCreateInternal ? (
+                  <div className="record-pill">
+                    <strong>{selectedCreateInternal.fullName}</strong>
+                    <span>{selectedCreateInternal.ubicacion}</span>
+                  </div>
+                ) : null}
 
-            <div className="field"><input name="nombres" placeholder="Nombres" autoComplete="off" required /></div>
-            <div className="field"><input name="apellido_pat" placeholder="Apellido paterno" autoComplete="off" required /></div>
-            <div className="field"><input name="apellido_mat" placeholder="Apellido materno" autoComplete="off" required /></div>
-            <div className="field"><input name="fecha_nacimiento" type="date" autoComplete="off" required /></div>
-            <div className="field">
-              <select name="sexo" defaultValue="" required>
-                <option value="" disabled>Sexo</option>
-                <option value="hombre">Hombre</option>
-                <option value="mujer">Mujer</option>
-              </select>
+                <div className="field"><input name="nombres" placeholder="Nombres" autoComplete="off" required /></div>
+                <div className="field"><input name="apellido_pat" placeholder="Apellido paterno" autoComplete="off" required /></div>
+                <div className="field"><input name="apellido_mat" placeholder="Apellido materno" autoComplete="off" required /></div>
+                <div className="field"><input name="fecha_nacimiento" type="date" autoComplete="off" required /></div>
+                <div className="field">
+                  <select name="sexo" defaultValue="" required>
+                    <option value="" disabled>Sexo</option>
+                    <option value="hombre">Hombre</option>
+                    <option value="mujer">Mujer</option>
+                  </select>
+                </div>
+                <div className="field"><input name="parentesco" placeholder="Parentesco" autoComplete="off" required /></div>
+                <div className="field"><input name="telefono" placeholder="Telefono" autoComplete="off" /></div>
+                {canManageAvailability ? (
+                  <div className="field">
+                    <select name="betada" defaultValue="false">
+                      <option value="false">Activo</option>
+                      <option value="true">No disponible</option>
+                    </select>
+                  </div>
+                ) : null}
+                <div className="field" style={{ gridColumn: "1 / -1" }}>
+                  <textarea name="notas" placeholder="Notas" autoComplete="off" />
+                </div>
+                <div className="actions-row">
+                  <LoadingButton pending={createPending} label="Guardar" loadingLabel="Loading..." className="button" />
+                </div>
+              </form>
             </div>
-            <div className="field"><input name="parentesco" placeholder="Parentesco" autoComplete="off" required /></div>
-            <div className="field"><input name="telefono" placeholder="Telefono" autoComplete="off" /></div>
-            {canManageAvailability ? (
-              <div className="field">
-                <select name="betada" defaultValue="false">
-                  <option value="false">Activo</option>
-                  <option value="true">No disponible</option>
-                </select>
-              </div>
-            ) : null}
-            <div className="field" style={{ gridColumn: "1 / -1" }}>
-              <textarea name="notas" placeholder="Notas" autoComplete="off" />
-            </div>
-            <div className="actions-row">
-              <LoadingButton pending={createPending} label="Guardar" loadingLabel="Loading..." className="button" />
-            </div>
-          </form>
+          ) : null}
         </article>
       </article>
     </section>

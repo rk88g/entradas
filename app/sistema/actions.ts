@@ -1082,10 +1082,11 @@ export async function createModuleZoneAction(
 ): Promise<MutationState> {
   try {
     const profile = await requireProfile();
+    if (profile.roleKey !== "super-admin") {
+      return failure("Solo super-admin puede guardar zonas.");
+    }
     const supabase = await createServerSupabaseClient();
-    const moduleKey = String(formData.get("module_key") ?? "").trim();
     const name = String(formData.get("name") ?? "").trim();
-    const chargeWeekday = Number(formData.get("charge_weekday") ?? 0);
 
     if (!name) {
       return failure("Debes escribir el nombre de la zona.");
@@ -1095,10 +1096,8 @@ export async function createModuleZoneAction(
       return failure("La zona debe tener formato M + numero, por ejemplo M8.");
     }
 
-    const { error } = await supabase.from("module_zones").insert({
-      module_key: moduleKey,
+    const { error } = await supabase.from("zones").insert({
       name,
-      charge_weekday: chargeWeekday,
       created_by: profile.id
     });
 
@@ -1106,11 +1105,52 @@ export async function createModuleZoneAction(
       return failure(error.message || "No se pudo guardar la zona.");
     }
 
-    revalidatePath(`/sistema/${moduleKey}`);
     revalidatePath("/sistema/admin");
     return success("Zona guardada.");
   } catch (error) {
     return failure(error instanceof Error ? error.message : "No se pudo guardar la zona.");
+  }
+}
+
+export async function createModuleChargeRouteAction(
+  _prevState: MutationState,
+  formData: FormData
+): Promise<MutationState> {
+  try {
+    const profile = await requireProfile();
+    if (profile.roleKey !== "super-admin") {
+      return failure("Solo super-admin puede programar cobros.");
+    }
+
+    const supabase = await createServerSupabaseClient();
+    const moduleKey = String(formData.get("module_key") ?? "").trim();
+    const zoneId = String(formData.get("zone_id") ?? "").trim();
+    const chargeWeekday = Number(formData.get("charge_weekday") ?? 0);
+
+    if (!moduleKey || !zoneId || !Number.isFinite(chargeWeekday)) {
+      return failure("Debes elegir bloque, zona y dia de cobro.");
+    }
+
+    const { error } = await supabase.from("module_charge_routes").upsert(
+      {
+        module_key: moduleKey,
+        zone_id: zoneId,
+        charge_weekday: chargeWeekday,
+        active: true,
+        created_by: profile.id
+      },
+      { onConflict: "module_key,zone_id" }
+    );
+
+    if (error) {
+      return failure(error.message || "No se pudo guardar la programacion de cobro.");
+    }
+
+    revalidatePath("/sistema/admin");
+    revalidatePath(`/sistema/${moduleKey}`);
+    return success("Programacion de cobro guardada.");
+  } catch (error) {
+    return failure(error instanceof Error ? error.message : "No se pudo guardar la programacion de cobro.");
   }
 }
 

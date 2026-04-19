@@ -311,9 +311,11 @@ export function InternalBrowser({
                 </span>
               </div>
               <div className="actions-row">
-                <button type="button" className="button-soft" onClick={() => setHistoryOpen((current) => !current)}>
-                  Historial
-                </button>
+                {roleKey === "super-admin" ? (
+                  <button type="button" className="button-soft" onClick={() => setHistoryOpen((current) => !current)}>
+                    Historial
+                  </button>
+                ) : null}
                 <button type="button" className="button-soft" onClick={() => setModalInternalId(null)}>
                   Cerrar
                 </button>
@@ -365,8 +367,8 @@ export function InternalBrowser({
               </article>
             ) : null}
 
-            {historyOpen ? (
-              <section className="profile-history-grid">
+            {roleKey === "super-admin" && historyOpen ? (
+              <section className="profile-history-stack">
                 {[
                   {
                     key: "visitas",
@@ -487,15 +489,14 @@ export function InternalBrowser({
                     <article key={section.key} className="data-card">
                       <button
                         type="button"
-                        className="button-soft"
-                        style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center" }}
+                        className="button-soft collapse-trigger"
                         onClick={() => toggleHistorySection(section.key)}
                       >
                         <span>{section.title}</span>
                         <span>{section.count} {isOpen ? "−" : "+"}</span>
                       </button>
                       {isOpen ? (
-                        <div className="record-stack" style={{ marginTop: "0.7rem" }}>
+                        <div className="record-stack" style={{ marginTop: "0.9rem" }}>
                           {section.content}
                         </div>
                       ) : null}

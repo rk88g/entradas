@@ -610,6 +610,10 @@ html[data-theme="dark"] .role-badge {
   gap: 1rem;
 }
 
+.module-grid-single {
+  grid-template-columns: minmax(0, 1fr) !important;
+}
+
 .stat-card strong {
   font-size: 2rem;
   display: block;
@@ -726,6 +730,61 @@ tr:last-child td {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
   gap: 0.75rem;
+}
+
+.profile-history-stack {
+  display: grid;
+  gap: 0.85rem;
+  grid-column: 1 / -1;
+  order: 30;
+}
+
+.collapse-stack {
+  display: grid;
+  gap: 0.9rem;
+}
+
+.section-collapse {
+  padding: 0;
+  overflow: hidden;
+}
+
+.section-collapse summary {
+  list-style: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.95rem 1.1rem;
+  background: var(--surface-strong);
+  font-weight: 700;
+  border-bottom: 1px solid transparent;
+}
+
+.section-collapse summary::-webkit-details-marker {
+  display: none;
+}
+
+.section-collapse[open] summary {
+  border-bottom-color: var(--line);
+}
+
+.section-collapse summary span:last-child {
+  color: var(--muted);
+  font-size: 0.95rem;
+}
+
+.section-collapse-body {
+  padding: 1rem 1.1rem 1.1rem;
+}
+
+.collapse-trigger {
+  width: 100%;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 1rem;
 }
 
 .collapsible-panel {
@@ -1099,8 +1158,11 @@ html[data-theme="dark"] .note-box {
 }
 
 .apoyo-pass-headline {
-  display: grid;
-  gap: 0.12rem;
+  display: flex;
+  align-items: baseline;
+  justify-content: flex-start;
+  flex-wrap: wrap;
+  gap: 0.9rem;
   align-content: start;
 }
 
@@ -1109,13 +1171,61 @@ html[data-theme="dark"] .note-box {
   font-weight: 700;
   letter-spacing: 0.04em;
   text-transform: uppercase;
-  text-align: center;
+  text-align: left;
 }
 
 .apoyo-pass-date {
   font-size: 0.92rem;
   color: var(--muted);
-  text-align: center;
+  text-align: left;
+}
+
+.danger-zone-panel .section-title,
+.danger-zone-panel .toolbar .listing-toggle.active,
+.danger-zone-panel .toolbar .listing-toggle:hover,
+.danger-zone-panel .button,
+.danger-zone-panel .button-secondary,
+.danger-zone-panel .button-soft {
+  color: #fff1f2;
+}
+
+.danger-zone-panel .button,
+.danger-zone-panel .button-secondary,
+.danger-zone-panel .button-soft,
+.danger-zone-panel .toolbar .listing-toggle {
+  background: #7f1d1d !important;
+  border-color: #991b1b !important;
+}
+
+.danger-zone-panel .toolbar .listing-toggle.active {
+  background: #b91c1c !important;
+  border-color: #ef4444 !important;
+  color: #fff1f2 !important;
+}
+
+.danger-zone-panel .toolbar .listing-toggle:not(.active) {
+  color: #ffe4e6 !important;
+}
+
+.danger-zone-panel .toolbar .listing-toggle:focus,
+.danger-zone-panel .toolbar .listing-toggle:focus-visible,
+.danger-zone-panel .toolbar .listing-toggle:active,
+.danger-zone-panel .button:hover,
+.danger-zone-panel .button-secondary:hover,
+.danger-zone-panel .button-soft:hover {
+  background: #991b1b !important;
+  border-color: #ef4444 !important;
+  color: #fff1f2 !important;
+}
+
+.danger-zone-panel .section-collapse summary {
+  background: rgba(127, 29, 29, 0.12);
+  color: #7f1d1d;
+}
+
+html[data-theme="dark"] .danger-zone-panel .section-collapse summary {
+  background: rgba(153, 27, 27, 0.24);
+  color: #fecaca;
 }
 
 .apoyo-pass-number {
@@ -1274,6 +1384,10 @@ html[data-theme="dark"] .note-box {
   .module-grid,
   .records-grid {
     grid-template-columns: minmax(0, 1.15fr) minmax(360px, 0.85fr);
+  }
+
+  .module-grid.module-grid-single {
+    grid-template-columns: minmax(0, 1fr) !important;
   }
 
   .header-grid {

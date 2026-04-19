@@ -25,8 +25,8 @@ import {
   ModuleKey,
   ModulePanelData,
   ModulePriceRecord,
+  ModuleChargeRoute,
   ModuleStaffAssignment,
-  ModuleZone,
   ModuleWorkerRecord,
   DangerZoneConfigData,
   InternalEquipmentMovementRecord,
@@ -38,6 +38,7 @@ import {
   RoleKey,
   UserProfile,
   VisitorHistoryEntry,
+  ZoneRecord,
   VisitorRecord,
   VisitorSex,
   WorkplacePositionRecord,
@@ -738,7 +739,7 @@ export async function getInternalProfiles(options?: {
           ? supabase
               .from("internal_devices")
               .select(
-                "id, internal_id, module_key, device_type_id, zone_id, brand, model, characteristics, imei, chip_number, cameras_allowed, quantity, status, paid_through, weekly_price_override, discount_override, assigned_manually, notes, module_device_types!inner(name), module_zones(name)"
+                "id, internal_id, module_key, device_type_id, zone_id, brand, model, characteristics, imei, chip_number, cameras_allowed, quantity, status, paid_through, weekly_price_override, discount_override, assigned_manually, notes, module_device_types!inner(name), zones(name)"
               )
               .in("internal_id", internalIds)
               .neq("status", "baja")
@@ -867,7 +868,7 @@ export async function getInternalProfiles(options?: {
       deviceTypeId: item.device_type_id,
       deviceTypeName: getFirstRelation(item.module_device_types)?.name ?? "Aparato",
       zoneId: item.zone_id ?? undefined,
-      zoneName: getFirstRelation(item.module_zones)?.name ?? undefined,
+      zoneName: getFirstRelation(item.zones)?.name ?? undefined,
       brand: item.brand ?? undefined,
       model: item.model ?? undefined,
       characteristics: item.characteristics ?? undefined,
@@ -1087,6 +1088,7 @@ export async function getModulePanelData(moduleKey: ModuleKey, includeInactiveIn
     internals,
     deviceTypesResponse,
     zonesResponse,
+    chargeRoutesResponse,
     pricesResponse,
     devicesResponse,
     workersResponse,
@@ -1105,10 +1107,14 @@ export async function getModulePanelData(moduleKey: ModuleKey, includeInactiveIn
       .eq("active", true)
       .order("sort_order", { ascending: true }),
     supabase
-      .from("module_zones")
-      .select("id, module_key, name, charge_weekday, active")
-      .eq("module_key", moduleKey)
+      .from("zones")
+      .select("id, name, active")
       .order("name", { ascending: true }),
+    supabase
+      .from("module_charge_routes")
+      .select("id, module_key, zone_id, charge_weekday, active, zones!inner(name)")
+      .eq("module_key", moduleKey)
+      .order("charge_weekday", { ascending: true }),
     supabase
       .from("module_prices")
       .select("id, module_key, device_type_id, weekly_price, activation_price, fine_price, maintenance_price, retention_price, discount_amount, active, module_device_types!inner(name)")
@@ -1116,7 +1122,7 @@ export async function getModulePanelData(moduleKey: ModuleKey, includeInactiveIn
     supabase
       .from("internal_devices")
       .select(
-        "id, internal_id, module_key, device_type_id, zone_id, brand, model, characteristics, imei, chip_number, cameras_allowed, quantity, status, paid_through, weekly_price_override, discount_override, assigned_manually, notes, module_device_types!inner(name), module_zones(name)"
+        "id, internal_id, module_key, device_type_id, zone_id, brand, model, characteristics, imei, chip_number, cameras_allowed, quantity, status, paid_through, weekly_price_override, discount_override, assigned_manually, notes, module_device_types!inner(name), zones(name)"
       )
       .eq("module_key", moduleKey)
       .neq("status", "baja")
@@ -1168,10 +1174,17 @@ export async function getModulePanelData(moduleKey: ModuleKey, includeInactiveIn
     : deviceTypes;
   const visibleDeviceTypeIds = new Set(visibleDeviceTypes.map((item) => item.id));
 
-  const zones: ModuleZone[] = (zonesResponse.data ?? []).map((item) => ({
+  const zones: ZoneRecord[] = (zonesResponse.data ?? []).map((item) => ({
+    id: item.id,
+    name: item.name,
+    active: Boolean(item.active)
+  }));
+
+  const chargeRoutes: ModuleChargeRoute[] = (chargeRoutesResponse.data ?? []).map((item) => ({
     id: item.id,
     moduleKey: ensureModuleKey(item.module_key),
-    name: item.name,
+    zoneId: item.zone_id,
+    zoneName: getFirstRelation(item.zones)?.name ?? "Zona",
     chargeWeekday: item.charge_weekday,
     active: Boolean(item.active)
   }));
@@ -1192,6 +1205,8 @@ export async function getModulePanelData(moduleKey: ModuleKey, includeInactiveIn
 
   const internalMap = new Map(internals.map((item) => [item.id, item]));
   const zoneMap = new Map(zones.map((item) => [item.id, item]));
+  const moduleZoneIds = new Set(chargeRoutes.map((item) => item.zoneId));
+  const visibleZones = zones.filter((item) => moduleZoneIds.has(item.id));
   const cycleId = cyclesResponse.data?.id ?? null;
   const paymentMap = new Map(
     (paymentsResponse.data ?? [])
@@ -1212,7 +1227,7 @@ export async function getModulePanelData(moduleKey: ModuleKey, includeInactiveIn
         deviceTypeId: item.device_type_id,
         deviceTypeName: getFirstRelation(item.module_device_types)?.name ?? "Aparato",
         zoneId: item.zone_id ?? undefined,
-        zoneName: zone?.name ?? getFirstRelation(item.module_zones)?.name ?? undefined,
+        zoneName: zone?.name ?? getFirstRelation(item.zones)?.name ?? undefined,
         brand: item.brand ?? undefined,
         model: item.model ?? undefined,
         characteristics: item.characteristics ?? undefined,
@@ -1298,7 +1313,8 @@ export async function getModulePanelData(moduleKey: ModuleKey, includeInactiveIn
     moduleKey,
     moduleName,
     deviceTypes: visibleDeviceTypes,
-    zones,
+    zones: visibleZones,
+    chargeRoutes,
     prices,
     devices,
     workers,
@@ -1502,6 +1518,7 @@ export async function getAdminPanelData() {
     rolesResponse,
     settingsResponse,
     zonesResponse,
+    chargeRoutesResponse,
     pricesResponse,
     deviceTypesResponse,
     workplacesResponse,
@@ -1525,10 +1542,14 @@ export async function getAdminPanelData() {
     supabase.from("roles").select("id, key"),
     supabase.from("app_settings").select("key, value"),
     supabase
-      .from("module_zones")
-      .select("id, module_key, name, charge_weekday, active")
-      .order("module_key", { ascending: true })
+      .from("zones")
+      .select("id, name, active")
       .order("name", { ascending: true }),
+    supabase
+      .from("module_charge_routes")
+      .select("id, module_key, zone_id, charge_weekday, active, zones!inner(name)")
+      .order("module_key", { ascending: true })
+      .order("charge_weekday", { ascending: true }),
     supabase
       .from("module_prices")
       .select(
@@ -1669,8 +1690,14 @@ export async function getAdminPanelData() {
     cutoffWeekday,
     zones: (zonesResponse.data ?? []).map((item) => ({
       id: item.id,
-      moduleKey: ensureModuleKey(item.module_key),
       name: item.name,
+      active: Boolean(item.active)
+    })),
+    chargeRoutes: (chargeRoutesResponse.data ?? []).map((item) => ({
+      id: item.id,
+      moduleKey: ensureModuleKey(item.module_key),
+      zoneId: item.zone_id,
+      zoneName: getFirstRelation(item.zones)?.name ?? "Zona",
       chargeWeekday: item.charge_weekday,
       active: Boolean(item.active)
     })),

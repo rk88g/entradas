@@ -315,17 +315,56 @@ create table if not exists public.module_worker_permissions (
   unique (worker_id, function_key)
 );
 
-create table if not exists public.module_zones (
+create table if not exists public.zones (
+  id uuid primary key default gen_random_uuid(),
+  name text not null,
+  active boolean not null default true,
+  created_by uuid references public.user_profiles (id),
+  created_at timestamptz not null default timezone('utc', now()),
+  updated_at timestamptz not null default timezone('utc', now()),
+  unique (name)
+);
+
+create table if not exists public.module_charge_routes (
   id uuid primary key default gen_random_uuid(),
   module_key text not null references public.block_modules (key) on delete cascade,
-  name text not null,
+  zone_id uuid not null references public.zones (id) on delete cascade,
   charge_weekday smallint not null check (charge_weekday between 0 and 6),
   active boolean not null default true,
   created_by uuid references public.user_profiles (id),
   created_at timestamptz not null default timezone('utc', now()),
   updated_at timestamptz not null default timezone('utc', now()),
-  unique (module_key, name)
+  unique (module_key, zone_id)
 );
+
+do $$
+begin
+  if exists (
+    select 1
+    from information_schema.tables
+    where table_schema = 'public' and table_name = 'module_zones'
+  ) then
+    insert into public.zones (name, active, created_by)
+    select distinct mz.name, coalesce(mz.active, true), mz.created_by
+    from public.module_zones mz
+    on conflict (name) do nothing;
+
+    insert into public.module_charge_routes (module_key, zone_id, charge_weekday, active, created_by)
+    select
+      mz.module_key,
+      z.id,
+      mz.charge_weekday,
+      coalesce(mz.active, true),
+      mz.created_by
+    from public.module_zones mz
+    join public.zones z on z.name = mz.name
+    on conflict (module_key, zone_id) do update
+    set
+      charge_weekday = excluded.charge_weekday,
+      active = excluded.active,
+      updated_at = timezone('utc', now());
+  end if;
+end $$;
 
 create table if not exists public.module_device_types (
   id uuid primary key default gen_random_uuid(),
@@ -400,7 +439,7 @@ create table if not exists public.internal_devices (
   module_key text not null references public.block_modules (key) on delete cascade,
   device_type_id uuid not null references public.module_device_types (id) on delete restrict,
   source_listing_id uuid references public.listado (id) on delete set null,
-  zone_id uuid references public.module_zones (id) on delete set null,
+  zone_id uuid references public.zones (id) on delete set null,
   brand text,
   model text,
   characteristics text,
@@ -478,7 +517,7 @@ create table if not exists public.device_payments (
   id uuid primary key default gen_random_uuid(),
   internal_device_id uuid not null references public.internal_devices (id) on delete cascade,
   module_key text not null references public.block_modules (key) on delete cascade,
-  zone_id uuid references public.module_zones (id) on delete set null,
+  zone_id uuid references public.zones (id) on delete set null,
   cycle_id uuid not null references public.device_payment_cycles (id) on delete cascade,
   amount numeric(10,2) not null default 0,
   status text not null default 'pagado' check (status in ('pendiente', 'pagado', 'descuento', 'condonado')),
@@ -701,9 +740,15 @@ before update on public.module_settings
 for each row
 execute function public.set_updated_at();
 
-drop trigger if exists module_zones_set_updated_at on public.module_zones;
-create trigger module_zones_set_updated_at
-before update on public.module_zones
+drop trigger if exists zones_set_updated_at on public.zones;
+create trigger zones_set_updated_at
+before update on public.zones
+for each row
+execute function public.set_updated_at();
+
+drop trigger if exists module_charge_routes_set_updated_at on public.module_charge_routes;
+create trigger module_charge_routes_set_updated_at
+before update on public.module_charge_routes
 for each row
 execute function public.set_updated_at();
 
@@ -802,7 +847,8 @@ alter table public.block_modules enable row level security;
 alter table public.module_settings enable row level security;
 alter table public.module_workers enable row level security;
 alter table public.module_worker_permissions enable row level security;
-alter table public.module_zones enable row level security;
+alter table public.zones enable row level security;
+alter table public.module_charge_routes enable row level security;
 alter table public.module_device_types enable row level security;
 alter table public.module_prices enable row level security;
 alter table public.internal_devices enable row level security;
@@ -1054,9 +1100,16 @@ for select
 to authenticated
 using (true);
 
-drop policy if exists "read access module zones" on public.module_zones;
-create policy "read access module zones"
-on public.module_zones
+drop policy if exists "read access zones" on public.zones;
+create policy "read access zones"
+on public.zones
+for select
+to authenticated
+using (true);
+
+drop policy if exists "read access module charge routes" on public.module_charge_routes;
+create policy "read access module charge routes"
+on public.module_charge_routes
 for select
 to authenticated
 using (true);
@@ -1190,9 +1243,17 @@ to authenticated
 using (true)
 with check (true);
 
-drop policy if exists "manage module zones by authenticated users" on public.module_zones;
-create policy "manage module zones by authenticated users"
-on public.module_zones
+drop policy if exists "manage zones by authenticated users" on public.zones;
+create policy "manage zones by authenticated users"
+on public.zones
+for all
+to authenticated
+using (true)
+with check (true);
+
+drop policy if exists "manage module charge routes by authenticated users" on public.module_charge_routes;
+create policy "manage module charge routes by authenticated users"
+on public.module_charge_routes
 for all
 to authenticated
 using (true)

@@ -3,6 +3,7 @@
 import { useActionState, useMemo, useState } from "react";
 import {
   createModuleZoneAction,
+  createModuleChargeRouteAction,
   createWorkplaceAction,
   saveModulePriceAction,
   saveModuleSettingsAction,
@@ -71,11 +72,12 @@ export function AdminControlPanel({
   adminConfigured: boolean;
 }) {
   const [tab, setTab] = useState<"sesiones" | "acciones" | "usuarios" | "configuracion">("configuracion");
-  const [selectedModuleForZone, setSelectedModuleForZone] = useState<ModuleKey>("visual");
+  const [selectedModuleForRoute, setSelectedModuleForRoute] = useState<ModuleKey>("visual");
   const [selectedModuleForPrice, setSelectedModuleForPrice] = useState<ModuleKey>("visual");
   const [passwordState, passwordAction, passwordPending] = useActionState(updateAuthUserPasswordAction, mutationInitialState);
   const [cutoffState, cutoffAction, cutoffPending] = useActionState(saveModuleSettingsAction, mutationInitialState);
   const [zoneState, zoneAction, zonePending] = useActionState(createModuleZoneAction, mutationInitialState);
+  const [routeState, routeAction, routePending] = useActionState(createModuleChargeRouteAction, mutationInitialState);
   const [priceState, priceAction, pricePending] = useActionState(saveModulePriceAction, mutationInitialState);
   const [workplaceState, workplaceAction, workplacePending] = useActionState(createWorkplaceAction, mutationInitialState);
   const [positionState, positionAction, positionPending] = useActionState(saveWorkplacePositionAction, mutationInitialState);
@@ -86,7 +88,7 @@ export function AdminControlPanel({
   );
 
   return (
-    <section className="module-panel">
+    <section className="module-panel danger-zone-panel">
       <div className="toolbar">
         <button type="button" className={`button-secondary listing-toggle ${tab === "configuracion" ? "active" : ""}`} onClick={() => setTab("configuracion")}>
           Configuracion
@@ -103,11 +105,15 @@ export function AdminControlPanel({
       </div>
 
       {tab === "configuracion" ? (
-        <section className="module-grid" style={{ marginTop: "1rem" }}>
-          <article className="form-card">
-            <strong className="section-title">Corte global</strong>
-            <MutationBanner state={cutoffState} />
-            <form action={cutoffAction} className="field-grid" style={{ marginTop: "0.8rem" }} autoComplete="off">
+        <section className="collapse-stack" style={{ marginTop: "1rem" }}>
+          <details className="data-card section-collapse" open>
+            <summary>
+              <span>Corte global</span>
+              <span>Configuracion general</span>
+            </summary>
+            <div className="section-collapse-body">
+              <MutationBanner state={cutoffState} />
+              <form action={cutoffAction} className="field-grid" autoComplete="off">
               <div className="field">
                 <select name="cutoff_weekday" defaultValue={String(config.cutoffWeekday)}>
                   {weekdayOptions.map((option) => (
@@ -120,145 +126,212 @@ export function AdminControlPanel({
               <div className="actions-row">
                 <LoadingButton pending={cutoffPending} label="Guardar corte" loadingLabel="Loading..." className="button" />
               </div>
-            </form>
-          </article>
+              </form>
+            </div>
+          </details>
 
-          <article className="form-card">
-            <strong className="section-title">Zonas</strong>
-            <MutationBanner state={zoneState} />
-            <form action={zoneAction} className="field-grid" style={{ marginTop: "0.8rem" }} autoComplete="off">
-              <div className="field">
-                <select
-                  name="module_key"
-                  value={selectedModuleForZone}
-                  onChange={(event) => setSelectedModuleForZone(event.target.value as ModuleKey)}
-                >
-                  {moduleOptions.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
-              </div>
+          <details className="data-card section-collapse" open>
+            <summary>
+              <span>Zonas</span>
+              <span>{config.zones.length} registros</span>
+            </summary>
+            <div className="section-collapse-body">
+              <MutationBanner state={zoneState} />
+              <form action={zoneAction} className="field-grid" autoComplete="off">
               <div className="field">
                 <input name="name" placeholder="Codigo de zona, por ejemplo M8" autoComplete="off" />
-              </div>
-              <div className="field">
-                <select name="charge_weekday" defaultValue={String(config.cutoffWeekday)}>
-                  {weekdayOptions.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
-                    </option>
-                  ))}
-                </select>
               </div>
               <div className="actions-row">
                 <LoadingButton pending={zonePending} label="Guardar zona" loadingLabel="Loading..." className="button-secondary" />
               </div>
-            </form>
+              </form>
 
-            <div className="table-wrap compact-table" style={{ marginTop: "0.8rem" }}>
-              <table>
-                <thead>
-                  <tr>
-                    <th>Bloque</th>
-                    <th>Zona</th>
-                    <th>Dia</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {config.zones.length === 0 ? (
+              <div className="table-wrap compact-table" style={{ marginTop: "0.8rem" }}>
+                <table>
+                  <thead>
                     <tr>
-                      <td colSpan={3}>Sin zonas.</td>
+                      <th>Zona</th>
+                      <th>Activo</th>
                     </tr>
-                  ) : (
-                    config.zones.map((zone) => (
-                      <tr key={zone.id}>
-                        <td>{zone.moduleKey}</td>
-                        <td>{zone.name}</td>
-                        <td>{weekdayOptions.find((item) => Number(item.value) === zone.chargeWeekday)?.label ?? zone.chargeWeekday}</td>
+                  </thead>
+                  <tbody>
+                    {config.zones.length === 0 ? (
+                      <tr>
+                        <td colSpan={2}>Sin zonas.</td>
                       </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
+                    ) : (
+                      config.zones.map((zone) => (
+                        <tr key={zone.id}>
+                          <td>{zone.name}</td>
+                          <td>{zone.active ? "Si" : "No"}</td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
-          </article>
+          </details>
 
-          <article className="form-card">
-            <strong className="section-title">Lista de precios</strong>
-            <MutationBanner state={priceState} />
-            <form action={priceAction} className="field-grid" style={{ marginTop: "0.8rem" }} autoComplete="off">
-              <div className="field">
-                <select
-                  name="module_key"
-                  value={selectedModuleForPrice}
-                  onChange={(event) => setSelectedModuleForPrice(event.target.value as ModuleKey)}
-                >
-                  {moduleOptions.map((option) => (
-                    <option key={option.value} value={option.value}>
-                      {option.label}
+          <details className="data-card section-collapse" open>
+            <summary>
+              <span>Programacion de cobranza</span>
+              <span>{config.chargeRoutes.length} registros</span>
+            </summary>
+            <div className="section-collapse-body">
+              <MutationBanner state={routeState} />
+              <form action={routeAction} className="field-grid" autoComplete="off">
+                <div className="field">
+                  <select
+                    name="module_key"
+                    value={selectedModuleForRoute}
+                    onChange={(event) => setSelectedModuleForRoute(event.target.value as ModuleKey)}
+                  >
+                    {moduleOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="field">
+                  <select name="zone_id" defaultValue="">
+                    <option value="" disabled>
+                      Zona
                     </option>
-                  ))}
-                </select>
-              </div>
-              <div className="field">
-                <select name="device_type_id" defaultValue="">
-                  <option value="" disabled>
-                    Aparato
-                  </option>
-                  {filteredDeviceTypes.map((item) => (
-                    <option key={item.id} value={item.id}>
-                      {item.name}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <div className="field"><input name="weekly_price" type="number" step="0.01" placeholder="Cuota semanal" autoComplete="off" /></div>
-              <div className="field"><input name="activation_price" type="number" step="0.01" placeholder="Alta" autoComplete="off" /></div>
-              <div className="field"><input name="fine_price" type="number" step="0.01" placeholder="Multa" autoComplete="off" /></div>
-              <div className="field"><input name="maintenance_price" type="number" step="0.01" placeholder="Mantenimiento" autoComplete="off" /></div>
-              <div className="field"><input name="retention_price" type="number" step="0.01" placeholder="Retencion" autoComplete="off" /></div>
-              <div className="field"><input name="discount_amount" type="number" step="0.01" placeholder="Descuento" autoComplete="off" /></div>
-              <div className="actions-row">
-                <LoadingButton pending={pricePending} label="Guardar precio" loadingLabel="Loading..." className="button-secondary" />
-              </div>
-            </form>
+                    {config.zones.map((zone) => (
+                      <option key={zone.id} value={zone.id}>
+                        {zone.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="field">
+                  <select name="charge_weekday" defaultValue={String(config.cutoffWeekday)}>
+                    {weekdayOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="actions-row">
+                  <LoadingButton pending={routePending} label="Guardar programacion" loadingLabel="Loading..." className="button-secondary" />
+                </div>
+              </form>
 
-            <div className="table-wrap compact-table" style={{ marginTop: "0.8rem" }}>
-              <table>
-                <thead>
-                  <tr>
-                    <th>Bloque</th>
-                    <th>Aparato</th>
-                    <th>Semanal</th>
-                    <th>Alta</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {config.prices.length === 0 ? (
+              <div className="table-wrap compact-table" style={{ marginTop: "0.8rem" }}>
+                <table>
+                  <thead>
                     <tr>
-                      <td colSpan={4}>Sin precios.</td>
+                      <th>Bloque</th>
+                      <th>Zona</th>
+                      <th>Dia</th>
                     </tr>
-                  ) : (
-                    config.prices.map((price) => (
-                      <tr key={price.id}>
-                        <td>{price.moduleKey}</td>
-                        <td>{price.deviceTypeName}</td>
-                        <td>${price.weeklyPrice.toFixed(2)}</td>
-                        <td>${price.activationPrice.toFixed(2)}</td>
+                  </thead>
+                  <tbody>
+                    {config.chargeRoutes.length === 0 ? (
+                      <tr>
+                        <td colSpan={3}>Sin programaciones.</td>
                       </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
+                    ) : (
+                      config.chargeRoutes.map((route) => (
+                        <tr key={route.id}>
+                          <td>{route.moduleKey}</td>
+                          <td>{route.zoneName}</td>
+                          <td>{weekdayOptions.find((item) => Number(item.value) === route.chargeWeekday)?.label ?? route.chargeWeekday}</td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
-          </article>
+          </details>
 
-          <article className="form-card">
-            <strong className="section-title">Negocios y oficinas</strong>
-            <MutationBanner state={workplaceState} />
-            <form action={workplaceAction} className="field-grid" style={{ marginTop: "0.8rem" }} autoComplete="off">
+          <details className="data-card section-collapse" open>
+            <summary>
+              <span>Lista de precios</span>
+              <span>{config.prices.length} registros</span>
+            </summary>
+            <div className="section-collapse-body">
+              <MutationBanner state={priceState} />
+              <form action={priceAction} className="field-grid" autoComplete="off">
+                <div className="field">
+                  <select
+                    name="module_key"
+                    value={selectedModuleForPrice}
+                    onChange={(event) => setSelectedModuleForPrice(event.target.value as ModuleKey)}
+                  >
+                    {moduleOptions.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="field">
+                  <select name="device_type_id" defaultValue="">
+                    <option value="" disabled>
+                      Aparato
+                    </option>
+                    {filteredDeviceTypes.map((item) => (
+                      <option key={item.id} value={item.id}>
+                        {item.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="field"><input name="weekly_price" type="number" step="0.01" placeholder="Cuota semanal" autoComplete="off" /></div>
+                <div className="field"><input name="activation_price" type="number" step="0.01" placeholder="Alta" autoComplete="off" /></div>
+                <div className="field"><input name="fine_price" type="number" step="0.01" placeholder="Multa" autoComplete="off" /></div>
+                <div className="field"><input name="maintenance_price" type="number" step="0.01" placeholder="Mantenimiento" autoComplete="off" /></div>
+                <div className="field"><input name="retention_price" type="number" step="0.01" placeholder="Retencion" autoComplete="off" /></div>
+                <div className="field"><input name="discount_amount" type="number" step="0.01" placeholder="Descuento" autoComplete="off" /></div>
+                <div className="actions-row">
+                  <LoadingButton pending={pricePending} label="Guardar precio" loadingLabel="Loading..." className="button-secondary" />
+                </div>
+              </form>
+
+              <div className="table-wrap compact-table" style={{ marginTop: "0.8rem" }}>
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Bloque</th>
+                      <th>Aparato</th>
+                      <th>Semanal</th>
+                      <th>Alta</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {config.prices.length === 0 ? (
+                      <tr>
+                        <td colSpan={4}>Sin precios.</td>
+                      </tr>
+                    ) : (
+                      config.prices.map((price) => (
+                        <tr key={price.id}>
+                          <td>{price.moduleKey}</td>
+                          <td>{price.deviceTypeName}</td>
+                          <td>${price.weeklyPrice.toFixed(2)}</td>
+                          <td>${price.activationPrice.toFixed(2)}</td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </details>
+
+          <details className="data-card section-collapse" open>
+            <summary>
+              <span>Negocios y oficinas</span>
+              <span>{config.workplacePositions.length} puestos</span>
+            </summary>
+            <div className="section-collapse-body">
+              <MutationBanner state={workplaceState} />
+              <form action={workplaceAction} className="field-grid" autoComplete="off">
               <div className="field"><input name="name" placeholder="Nombre del negocio u oficina" autoComplete="off" /></div>
               <div className="field">
                 <select name="type" defaultValue="negocio">
@@ -269,10 +342,10 @@ export function AdminControlPanel({
               <div className="actions-row">
                 <LoadingButton pending={workplacePending} label="Guardar centro" loadingLabel="Loading..." className="button-secondary" />
               </div>
-            </form>
+              </form>
 
-            <MutationBanner state={positionState} />
-            <form action={positionAction} className="field-grid" style={{ marginTop: "0.8rem" }} autoComplete="off">
+              <MutationBanner state={positionState} />
+              <form action={positionAction} className="field-grid" style={{ marginTop: "0.8rem" }} autoComplete="off">
               <div className="field">
                 <select name="workplace_id" defaultValue="">
                   <option value="" disabled>
@@ -300,47 +373,52 @@ export function AdminControlPanel({
               <div className="actions-row">
                 <LoadingButton pending={positionPending} label="Guardar puesto" loadingLabel="Loading..." className="button-secondary" />
               </div>
-            </form>
+              </form>
 
-            <div className="table-wrap compact-table" style={{ marginTop: "0.8rem" }}>
-              <table>
-                <thead>
-                  <tr>
-                    <th>Centro</th>
-                    <th>Puesto</th>
-                    <th>Sueldo</th>
-                    <th>Interno</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {config.workplacePositions.length === 0 ? (
+              <div className="table-wrap compact-table" style={{ marginTop: "0.8rem" }}>
+                <table>
+                  <thead>
                     <tr>
-                      <td colSpan={4}>Sin puestos.</td>
+                      <th>Centro</th>
+                      <th>Puesto</th>
+                      <th>Sueldo</th>
+                      <th>Interno</th>
                     </tr>
-                  ) : (
-                    config.workplacePositions.map((position) => (
-                      <tr key={position.id}>
-                        <td>{position.workplaceName}</td>
-                        <td>{position.title}</td>
-                        <td>${position.salary.toFixed(2)}</td>
-                        <td>{position.assignedInternalName ?? "Vacante"}</td>
+                  </thead>
+                  <tbody>
+                    {config.workplacePositions.length === 0 ? (
+                      <tr>
+                        <td colSpan={4}>Sin puestos.</td>
                       </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
+                    ) : (
+                      config.workplacePositions.map((position) => (
+                        <tr key={position.id}>
+                          <td>{position.workplaceName}</td>
+                          <td>{position.title}</td>
+                          <td>${position.salary.toFixed(2)}</td>
+                          <td>{position.assignedInternalName ?? "Vacante"}</td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
-          </article>
+          </details>
         </section>
       ) : null}
 
       {tab === "usuarios" ? (
-        <section className="module-grid" style={{ marginTop: "1rem" }}>
-          <article className="form-card">
-            <strong className="section-title">Cambiar contrasena</strong>
-            {!adminConfigured ? <div className="alert-box">Falta configurar `SUPABASE_SERVICE_ROLE_KEY`.</div> : null}
-            <MutationBanner state={passwordState} />
-            <form action={passwordAction} className="field-grid" style={{ marginTop: "0.8rem" }} autoComplete="off">
+        <section className="collapse-stack" style={{ marginTop: "1rem" }}>
+          <details className="data-card section-collapse" open>
+            <summary>
+              <span>Cambiar contrasena</span>
+              <span>Control de acceso</span>
+            </summary>
+            <div className="section-collapse-body">
+              {!adminConfigured ? <div className="alert-box">Falta configurar `SUPABASE_SERVICE_ROLE_KEY`.</div> : null}
+              <MutationBanner state={passwordState} />
+              <form action={passwordAction} className="field-grid" autoComplete="off">
               <div className="field">
                 <select name="user_id" defaultValue="">
                   <option value="" disabled>
@@ -359,12 +437,17 @@ export function AdminControlPanel({
               <div className="actions-row">
                 <LoadingButton pending={passwordPending} label="Actualizar contrasena" loadingLabel="Loading..." className="button" disabled={!adminConfigured} />
               </div>
-            </form>
-          </article>
+              </form>
+            </div>
+          </details>
 
-          <article className="data-card">
-            <strong className="section-title">Usuarios detectados</strong>
-            <div className="table-wrap compact-table" style={{ marginTop: "0.8rem" }}>
+          <details className="data-card section-collapse" open>
+            <summary>
+              <span>Usuarios detectados</span>
+              <span>{users.length} registros</span>
+            </summary>
+            <div className="section-collapse-body">
+              <div className="table-wrap compact-table">
               <table>
                 <thead>
                   <tr>
@@ -392,14 +475,19 @@ export function AdminControlPanel({
                 </tbody>
               </table>
             </div>
-          </article>
+            </div>
+          </details>
         </section>
       ) : null}
 
       {tab === "sesiones" ? (
-        <article className="data-card" style={{ marginTop: "1rem" }}>
-          <strong className="section-title">Logs de conexion</strong>
-          <div className="table-wrap compact-table" style={{ marginTop: "0.8rem" }}>
+        <details className="data-card section-collapse" style={{ marginTop: "1rem" }} open>
+          <summary>
+            <span>Logs de conexion</span>
+            <span>{connectionLogs.length} registros</span>
+          </summary>
+          <div className="section-collapse-body">
+            <div className="table-wrap compact-table">
             <table>
               <thead>
                 <tr>
@@ -429,13 +517,18 @@ export function AdminControlPanel({
               </tbody>
             </table>
           </div>
-        </article>
+          </div>
+        </details>
       ) : null}
 
       {tab === "acciones" ? (
-        <article className="data-card" style={{ marginTop: "1rem" }}>
-          <strong className="section-title">Logs de acciones</strong>
-          <div className="table-wrap compact-table" style={{ marginTop: "0.8rem" }}>
+        <details className="data-card section-collapse" style={{ marginTop: "1rem" }} open>
+          <summary>
+            <span>Logs de acciones</span>
+            <span>{actionLogs.length} registros</span>
+          </summary>
+          <div className="section-collapse-body">
+            <div className="table-wrap compact-table">
             <table>
               <thead>
                 <tr>
@@ -467,7 +560,8 @@ export function AdminControlPanel({
               </tbody>
             </table>
           </div>
-        </article>
+          </div>
+        </details>
       ) : null}
     </section>
   );

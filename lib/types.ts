@@ -207,10 +207,17 @@ export interface ModuleDeviceType {
   allowCamerasFlag: boolean;
 }
 
-export interface ModuleZone {
+export interface ZoneRecord {
+  id: string;
+  name: string;
+  active: boolean;
+}
+
+export interface ModuleChargeRoute {
   id: string;
   moduleKey: ModuleKey;
-  name: string;
+  zoneId: string;
+  zoneName: string;
   chargeWeekday: number;
   active: boolean;
 }
@@ -295,7 +302,8 @@ export interface ModulePanelData {
   moduleKey: ModuleKey;
   moduleName: string;
   deviceTypes: ModuleDeviceType[];
-  zones: ModuleZone[];
+  zones: ZoneRecord[];
+  chargeRoutes: ModuleChargeRoute[];
   prices: ModulePriceRecord[];
   devices: InternalDeviceRecord[];
   workers: ModuleWorkerRecord[];
@@ -446,7 +454,8 @@ export interface AdminUserRecord {
 
 export interface DangerZoneConfigData {
   cutoffWeekday: number;
-  zones: ModuleZone[];
+  zones: ZoneRecord[];
+  chargeRoutes: ModuleChargeRoute[];
   prices: ModulePriceRecord[];
   deviceTypes: ModuleDeviceType[];
   workplaces: WorkplaceRecord[];
