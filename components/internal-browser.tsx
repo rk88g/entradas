@@ -8,6 +8,7 @@ import {
   createVisitorAction,
   updateInternalStatusAction
 } from "@/app/sistema/actions";
+import { LoadingButton } from "@/components/loading-button";
 import { MutationBanner } from "@/components/mutation-banner";
 import { StatusBadge } from "@/components/status-badge";
 import { DateRecord, InternalProfile, ModuleDeviceType, MutationState, RoleKey } from "@/lib/types";
@@ -320,9 +321,7 @@ export function InternalBrowser({
               <textarea name="observaciones" placeholder="Observaciones" autoComplete="off" />
             </div>
             <div className="actions-row">
-              <button type="submit" className="button" disabled={createPending}>
-                Guardar
-              </button>
+              <LoadingButton pending={createPending} label="Guardar" loadingLabel="Loading..." className="button" />
             </div>
           </form>
         </article>
@@ -421,9 +420,12 @@ export function InternalBrowser({
                       <option value="baja">Baja</option>
                     </select>
                   </div>
-                  <button type="submit" className="button-soft" disabled={statusPending}>
-                    Guardar estatus
-                  </button>
+                  <LoadingButton
+                    pending={statusPending}
+                    label="Guardar estatus"
+                    loadingLabel="Loading..."
+                    className="button-soft"
+                  />
                 </form>
               </div>
             ) : null}
@@ -568,9 +570,7 @@ export function InternalBrowser({
                     <textarea name="notas" placeholder="Notas" autoComplete="off" />
                   </div>
                   <div className="actions-row">
-                    <button type="submit" className="button-secondary" disabled={visitorPending}>
-                      Guardar visita
-                    </button>
+                    <LoadingButton pending={visitorPending} label="Guardar visita" loadingLabel="Loading..." className="button-secondary" />
                   </div>
                 </form>
               </div>
@@ -651,13 +651,13 @@ export function InternalBrowser({
 
                   {!selectedPass ? (
                     <div className="actions-row">
-                      <button
-                        type="submit"
+                      <LoadingButton
+                        pending={passPending}
+                        label="CREAR PASE"
+                        loadingLabel="Loading..."
                         className="button"
-                        disabled={passPending || !canSubmitPass}
-                      >
-                        CREAR PASE
-                      </button>
+                        disabled={!canSubmitPass}
+                      />
                     </div>
                   ) : null}
                 </form>

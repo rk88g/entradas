@@ -83,32 +83,16 @@ alter table public.internos
 alter table public.internos
   drop constraint if exists internos_laborando_check;
 
-do $$
-declare
-  laborando_type text;
-begin
-  select data_type
-  into laborando_type
-  from information_schema.columns
-  where table_schema = 'public'
-    and table_name = 'internos'
-    and column_name = 'laborando';
+alter table public.internos
+  add column if not exists laborando boolean not null default false;
 
-  if laborando_type is null then
-    alter table public.internos
-      add column laborando boolean not null default false;
-  elsif laborando_type <> 'boolean' then
-    execute $sql$
-      alter table public.internos
-      alter column laborando type boolean
-      using case
-        when nullif(trim(laborando::text), '') is null then false
-        when lower(trim(laborando::text)) in ('true', 't', '1', 'si', 'activo', '618', 'intima') then true
-        else false
-      end
-    $sql$;
-  end if;
-end $$;
+alter table public.internos
+  alter column laborando type boolean
+  using case
+    when nullif(trim(laborando::text), '') is null then false
+    when lower(trim(laborando::text)) in ('true', 't', '1', 'si', 'activo', '618', 'intima') then true
+    else false
+  end;
 
 alter table public.internos
   alter column laborando set default false;
@@ -225,6 +209,30 @@ create table if not exists public.app_settings (
   value text,
   updated_by uuid references public.user_profiles (id),
   updated_at timestamptz not null default timezone('utc', now())
+);
+
+create table if not exists public.connection_logs (
+  id uuid primary key default gen_random_uuid(),
+  user_profile_id uuid references public.user_profiles (id) on delete set null,
+  email text not null,
+  success boolean not null default false,
+  failure_reason text,
+  ip_address text,
+  user_agent text,
+  created_at timestamptz not null default timezone('utc', now())
+);
+
+create table if not exists public.action_audit_logs (
+  id uuid primary key default gen_random_uuid(),
+  user_profile_id uuid references public.user_profiles (id) on delete set null,
+  module_key text not null,
+  section_key text not null,
+  action_key text not null,
+  entity_type text not null,
+  entity_id text,
+  before_data jsonb,
+  after_data jsonb,
+  created_at timestamptz not null default timezone('utc', now())
 );
 
 create table if not exists public.listado_visitas (
@@ -498,6 +506,8 @@ create index if not exists idx_device_payments_cycle on public.device_payments (
 create index if not exists idx_module_internal_staff_module on public.module_internal_staff (module_key, internal_id);
 create index if not exists idx_escalera_entries_fecha on public.escalera_entries (fecha_visita, status);
 create index if not exists idx_internal_log_notes_internal on public.internal_log_notes (internal_id, created_at desc);
+create index if not exists idx_connection_logs_created_at on public.connection_logs (created_at desc);
+create index if not exists idx_action_audit_logs_created_at on public.action_audit_logs (created_at desc);
 
 create or replace view public.historial_ingresos as
 select
@@ -665,6 +675,8 @@ alter table public.listado_visitas enable row level security;
 alter table public.interno_visitas enable row level security;
 alter table public.visita_interno_historial enable row level security;
 alter table public.app_settings enable row level security;
+alter table public.connection_logs enable row level security;
+alter table public.action_audit_logs enable row level security;
 alter table public.block_modules enable row level security;
 alter table public.module_settings enable row level security;
 alter table public.module_workers enable row level security;
@@ -779,6 +791,20 @@ for select
 to authenticated
 using (true);
 
+drop policy if exists "read access connection logs" on public.connection_logs;
+create policy "read access connection logs"
+on public.connection_logs
+for select
+to authenticated
+using (public.current_role_key() = 'super-admin');
+
+drop policy if exists "read access audit logs" on public.action_audit_logs;
+create policy "read access audit logs"
+on public.action_audit_logs
+for select
+to authenticated
+using (public.current_role_key() = 'super-admin');
+
 drop policy if exists "read access betadas" on public.betadas;
 create policy "read access betadas"
 on public.betadas
@@ -845,6 +871,22 @@ with check (public.current_role_key() in ('super-admin', 'control'));
 drop policy if exists "manage app settings" on public.app_settings;
 create policy "manage app settings"
 on public.app_settings
+for all
+to authenticated
+using (public.current_role_key() = 'super-admin')
+with check (public.current_role_key() = 'super-admin');
+
+drop policy if exists "manage connection logs" on public.connection_logs;
+create policy "manage connection logs"
+on public.connection_logs
+for all
+to authenticated
+using (public.current_role_key() = 'super-admin')
+with check (public.current_role_key() = 'super-admin');
+
+drop policy if exists "manage audit logs" on public.action_audit_logs;
+create policy "manage audit logs"
+on public.action_audit_logs
 for all
 to authenticated
 using (public.current_role_key() = 'super-admin')

@@ -2,6 +2,7 @@
 
 import { useActionState, useMemo, useState } from "react";
 import { addEscaleraItemAction, saveEscaleraEntryAction } from "@/app/sistema/actions";
+import { LoadingButton } from "@/components/loading-button";
 import { MutationBanner } from "@/components/mutation-banner";
 import { EscaleraRecord, MutationState, RoleKey } from "@/lib/types";
 import { formatLongDate, getEscaleraStatusLabel } from "@/lib/utils";
@@ -235,9 +236,7 @@ export function EscalerasPanel({
                     />
                   </div>
                   <div className="actions-row">
-                    <button type="submit" className="button" disabled={entryPending}>
-                      Guardar registro
-                    </button>
+                    <LoadingButton pending={entryPending} label="Guardar registro" loadingLabel="Loading..." className="button" />
                   </div>
                 </form>
 
@@ -268,9 +267,7 @@ export function EscalerasPanel({
                     <textarea name="notes" placeholder="Notas del articulo" autoComplete="off" />
                   </div>
                   <div className="actions-row">
-                    <button type="submit" className="button-secondary" disabled={itemPending}>
-                      Agregar articulo
-                    </button>
+                    <LoadingButton pending={itemPending} label="Agregar articulo" loadingLabel="Loading..." className="button-secondary" />
                   </div>
                 </form>
 

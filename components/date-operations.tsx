@@ -2,6 +2,7 @@
 
 import { useActionState, useMemo, useState } from "react";
 import { closeDateAction, createDateAction, updateClosePasswordAction } from "@/app/sistema/actions";
+import { LoadingButton } from "@/components/loading-button";
 import { MutationBanner } from "@/components/mutation-banner";
 import { DateRecord, MutationState, RoleKey } from "@/lib/types";
 import { canCloseMexicoCityDate, formatLongDate, getDateOffset } from "@/lib/utils";
@@ -157,9 +158,7 @@ export function DateOperations({
               </select>
             </div>
             <div className="actions-row">
-              <button type="submit" className="button" disabled={createPending}>
-                Guardar
-              </button>
+              <LoadingButton pending={createPending} label="Guardar" loadingLabel="Loading..." className="button" />
             </div>
           </form>
         </div>
@@ -203,13 +202,13 @@ export function DateOperations({
                   />
                 </div>
                 <div className="actions-row">
-                  <button
+                  <LoadingButton
+                    pending={closePending}
+                    label={`Cerrar ${openDate ? formatLongDate(openDate.fechaCompleta) : "MAÑANA"}`}
+                    loadingLabel="Loading..."
                     className="button-secondary"
-                    type="submit"
-                    disabled={closePending || !openDate || !canCloseNow}
-                  >
-                    Cerrar {openDate ? formatLongDate(openDate.fechaCompleta) : "MAÑANA"}
-                  </button>
+                    disabled={!openDate || !canCloseNow}
+                  />
                 </div>
               </form>
             </div>
@@ -241,9 +240,12 @@ export function DateOperations({
                   />
                 </div>
                 <div className="actions-row">
-                  <button type="submit" className="button" disabled={passwordPending}>
-                    Guardar contrasena
-                  </button>
+                  <LoadingButton
+                    pending={passwordPending}
+                    label="Guardar contrasena"
+                    loadingLabel="Loading..."
+                    className="button"
+                  />
                 </div>
               </form>
             </div>

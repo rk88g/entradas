@@ -34,6 +34,9 @@ export function AppShell({
   const [open, setOpen] = useState(false);
   const visibleNavItems = [
     ...(canAccessCoreSystem(user.roleKey, user.moduleOnly) ? coreNavItems : []),
+    ...(user.roleKey === "super-admin"
+      ? [{ href: "/sistema/admin", icon: "AD", label: "Admin" }]
+      : []),
     ...moduleNavItems.filter((item) => canAccessModule(user.roleKey, user.accessibleModules, item.moduleKey))
   ];
 

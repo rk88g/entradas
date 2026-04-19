@@ -1,6 +1,7 @@
 "use server";
 
 import { redirect } from "next/navigation";
+import { logConnectionEvent } from "@/lib/audit";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 export interface AuthActionState {
@@ -15,17 +16,33 @@ export async function signInAction(
   const password = String(formData.get("password") ?? "");
 
   if (!email || !password) {
-    return { error: "Escribe tu correo y tu contraseña." };
+    return { error: "Escribe tu correo y tu contrasena." };
   }
 
   try {
     const supabase = await createServerSupabaseClient();
-    const { error } = await supabase.auth.signInWithPassword({ email, password });
+    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
 
     if (error) {
-      return { error: "No se pudo iniciar sesión. Revisa correo, contraseña y permisos." };
+      await logConnectionEvent({
+        email,
+        success: false,
+        failureReason: error.message
+      });
+      return { error: "No se pudo iniciar sesion. Revisa correo, contrasena y permisos." };
     }
+
+    await logConnectionEvent({
+      userId: data.user?.id ?? null,
+      email,
+      success: true
+    });
   } catch {
+    await logConnectionEvent({
+      email,
+      success: false,
+      failureReason: "No se pudo conectar con Supabase."
+    });
     return { error: "No se pudo conectar con Supabase. Revisa tus variables de entorno." };
   }
 
@@ -37,4 +54,3 @@ export async function signOutAction() {
   await supabase.auth.signOut();
   redirect("/");
 }
-

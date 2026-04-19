@@ -332,3 +332,29 @@ export interface EscaleraRecord {
   authorizedDevices: EscaleraAuthorizedDevice[];
   manualItems: EscaleraManualItem[];
 }
+
+export interface ConnectionLogRecord {
+  id: string;
+  userId?: string | null;
+  userName?: string | null;
+  email: string;
+  success: boolean;
+  failureReason?: string | null;
+  ipAddress?: string | null;
+  userAgent?: string | null;
+  createdAt: string;
+}
+
+export interface ActionAuditRecord {
+  id: string;
+  userId?: string | null;
+  userName?: string | null;
+  moduleKey: string;
+  sectionKey: string;
+  actionKey: string;
+  entityType: string;
+  entityId?: string | null;
+  beforeData?: string | null;
+  afterData?: string | null;
+  createdAt: string;
+}

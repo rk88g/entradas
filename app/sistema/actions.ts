@@ -1,6 +1,9 @@
 "use server";
 
 import { revalidatePath } from "next/cache";
+import { logAuditEvent } from "@/lib/audit";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { isSupabaseAdminConfigured } from "@/lib/supabase/env";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import {
   getCurrentUserProfile,
@@ -93,6 +96,19 @@ async function requireProfile() {
   return profile;
 }
 
+async function auditAction(params: {
+  userId: string;
+  moduleKey: string;
+  sectionKey: string;
+  actionKey: string;
+  entityType: string;
+  entityId?: string | null;
+  beforeData?: unknown;
+  afterData?: unknown;
+}) {
+  await logAuditEvent(params);
+}
+
 export async function createDateAction(
   _prevState: MutationState,
   formData: FormData
@@ -153,6 +169,16 @@ export async function createDateAction(
     if (error) {
       return failure(error.message || "No se pudo registrar la fecha.");
     }
+
+    await auditAction({
+      userId: profile.id,
+      moduleKey: "fechas",
+      sectionKey: "crear-fecha",
+      actionKey: "create",
+      entityType: "fecha",
+      entityId: dateValue,
+      afterData: { fechaCompleta: dateValue, estado: status }
+    });
 
     revalidatePath("/sistema");
     revalidatePath("/sistema/fechas");
@@ -254,6 +280,17 @@ export async function closeDateAction(
       return failure(closeError.message || "No se pudo cerrar la fecha.");
     }
 
+    await auditAction({
+      userId: profile.id,
+      moduleKey: "fechas",
+      sectionKey: "cerrar-fecha",
+      actionKey: "close",
+      entityType: "fecha",
+      entityId: selectedDate.id,
+      beforeData: { fechaCompleta: selectedDate.fechaCompleta, cierre: selectedDate.cierre },
+      afterData: { fechaCompleta: selectedDate.fechaCompleta, cierre: true, pasesNumerados: orderedPendingPasses.length }
+    });
+
     revalidatePath("/sistema");
     revalidatePath("/sistema/fechas");
     revalidatePath("/sistema/listado");
@@ -311,6 +348,16 @@ export async function createInternalAction(
       return failure(error.message || "No se pudo guardar el interno.");
     }
 
+    await auditAction({
+      userId: profile.id,
+      moduleKey: "internos",
+      sectionKey: "alta",
+      actionKey: "create",
+      entityType: "interno",
+      entityId: payload.expediente,
+      afterData: payload
+    });
+
     revalidatePath("/sistema");
     revalidatePath("/sistema/internos");
     revalidatePath("/sistema/listado");
@@ -338,10 +385,27 @@ export async function updateInternalStatusAction(
       return failure("Debes elegir el interno y el nuevo estatus.");
     }
 
+    const { data: previousInternal } = await supabase
+      .from("internos")
+      .select("id, estatus, laborando")
+      .eq("id", internalId)
+      .maybeSingle();
+
     const { error } = await supabase.from("internos").update({ estatus }).eq("id", internalId);
     if (error) {
       return failure(error.message || "No se pudo actualizar el estatus.");
     }
+
+    await auditAction({
+      userId: profile.id,
+      moduleKey: "internos",
+      sectionKey: "estatus",
+      actionKey: "update",
+      entityType: "interno",
+      entityId: internalId,
+      beforeData: previousInternal,
+      afterData: { estatus }
+    });
 
     revalidatePath("/sistema/internos");
     revalidatePath("/sistema/listado");
@@ -460,6 +524,19 @@ export async function createVisitorAction(
       }
     }
 
+    await auditAction({
+      userId: profile.id,
+      moduleKey: "visitas",
+      sectionKey: "alta",
+      actionKey: "create",
+      entityType: "visita",
+      entityId: insertedVisitor.id,
+      afterData: {
+        ...visitorPayload,
+        internoId: internalId
+      }
+    });
+
     revalidatePath("/sistema");
     revalidatePath("/sistema/internos");
     revalidatePath("/sistema/visitas");
@@ -538,6 +615,17 @@ export async function reassignVisitorAction(
       return failure(insertError.message || "No se pudo reasignar la visita.");
     }
 
+    await auditAction({
+      userId: profile.id,
+      moduleKey: "visitas",
+      sectionKey: "reasignacion",
+      actionKey: "update",
+      entityType: "visita",
+      entityId: visitaId,
+      beforeData: { previousInternalIds },
+      afterData: { internoId }
+    });
+
     revalidatePath("/sistema/internos");
     revalidatePath("/sistema/visitas");
     revalidatePath("/sistema/listado");
@@ -576,10 +664,65 @@ export async function updateClosePasswordAction(
       return failure(error.message || "No se pudo guardar la contraseña.");
     }
 
+    await auditAction({
+      userId: profile.id,
+      moduleKey: "admin",
+      sectionKey: "contrasena-cierre",
+      actionKey: "update",
+      entityType: "app_setting",
+      entityId: "close_password",
+      afterData: { updated: true }
+    });
+
     revalidatePath("/sistema/listado");
     return success("Contraseña guardada.");
   } catch (error) {
     return failure(error instanceof Error ? error.message : "No se pudo guardar la contraseña.");
+  }
+}
+
+export async function updateAuthUserPasswordAction(
+  _prevState: MutationState,
+  formData: FormData
+): Promise<MutationState> {
+  try {
+    const profile = await requireProfile();
+    if (profile.roleKey !== "super-admin") {
+      return failure("Solo super-admin puede cambiar contrasenas de usuarios.");
+    }
+
+    if (!isSupabaseAdminConfigured()) {
+      return failure("Falta configurar SUPABASE_SERVICE_ROLE_KEY en el entorno.");
+    }
+
+    const userId = String(formData.get("user_id") ?? "").trim();
+    const password = String(formData.get("password") ?? "").trim();
+
+    if (!userId || !password) {
+      return failure("Debes elegir el usuario y escribir la nueva contrasena.");
+    }
+
+    const admin = createSupabaseAdminClient();
+    const { error } = await admin.auth.admin.updateUserById(userId, { password });
+
+    if (error) {
+      return failure(error.message || "No se pudo actualizar la contrasena.");
+    }
+
+    await auditAction({
+      userId: profile.id,
+      moduleKey: "admin",
+      sectionKey: "usuarios",
+      actionKey: "update-password",
+      entityType: "auth_user",
+      entityId: userId,
+      afterData: { updated: true }
+    });
+
+    revalidatePath("/sistema/admin");
+    return success("Contrasena actualizada.");
+  } catch (error) {
+    return failure(error instanceof Error ? error.message : "No se pudo actualizar la contrasena.");
   }
 }
 
@@ -905,6 +1048,22 @@ export async function createPassAction(
     revalidatePath("/sistema/listado");
     revalidatePath("/sistema/visual");
     revalidatePath("/sistema/comunicacion");
+    await auditAction({
+      userId: profile.id,
+      moduleKey: "listado",
+      sectionKey: "crear-pase",
+      actionKey: "create",
+      entityType: "pase",
+      entityId: passId,
+      afterData: {
+        internoId: internoId,
+        fechaVisita: targetDate.fechaCompleta,
+        visitorIds,
+        mentions,
+        specials,
+        articlePayload
+      }
+    });
     return success("Pase creado.");
   } catch (error) {
     return failure(error instanceof Error ? error.message : "No se pudo crear el pase.");
@@ -1010,6 +1169,15 @@ export async function saveModuleSettingsAction(
     }
 
     revalidatePath(`/sistema/${moduleKey}`);
+    await auditAction({
+      userId: profile.id,
+      moduleKey,
+      sectionKey: "configuracion",
+      actionKey: "update",
+      entityType: "module_settings",
+      entityId: moduleKey,
+      afterData: { cutoffWeekday }
+    });
     return success("Configuracion guardada.");
   } catch (error) {
     return failure(error instanceof Error ? error.message : "No se pudo guardar la configuracion.");
@@ -1079,6 +1247,22 @@ export async function assignModuleDeviceAction(
     }
 
     revalidatePath(`/sistema/${moduleKey}`);
+    await auditAction({
+      userId: profile.id,
+      moduleKey,
+      sectionKey: "aparatos",
+      actionKey: "create",
+      entityType: "aparato",
+      entityId: deviceTypeId,
+      afterData: {
+        internalId,
+        deviceTypeId,
+        zoneId,
+        brand,
+        model,
+        quantity
+      }
+    });
     return success("Aparato asignado.");
   } catch (error) {
     return failure(error instanceof Error ? error.message : "No se pudo asignar el aparato.");
@@ -1182,6 +1366,20 @@ export async function registerModulePaymentAction(
     }
 
     revalidatePath(`/sistema/${moduleKey}`);
+    await auditAction({
+      userId: profile.id,
+      moduleKey,
+      sectionKey: "cobranza",
+      actionKey: "create",
+      entityType: "pago",
+      entityId: cycle.id,
+      afterData: {
+        internalId,
+        amount,
+        zoneId,
+        cycleId: cycle.id
+      }
+    });
     return success("Pago registrado.");
   } catch (error) {
     return failure(error instanceof Error ? error.message : "No se pudo registrar el pago.");
@@ -1284,6 +1482,16 @@ export async function closeModuleWeekAction(
     }
 
     revalidatePath(`/sistema/${moduleKey}`);
+    await auditAction({
+      userId: profile.id,
+      moduleKey,
+      sectionKey: "cierre-semana",
+      actionKey: "close",
+      entityType: "semana",
+      entityId: cycleId,
+      beforeData: cycle,
+      afterData: { closed: true }
+    });
     return success("Semana cerrada.");
   } catch (error) {
     return failure(error instanceof Error ? error.message : "No se pudo cerrar la semana.");
@@ -1360,6 +1568,25 @@ export async function saveEscaleraEntryAction(
     }
 
     revalidatePath("/sistema/escaleras");
+    await auditAction({
+      userId: profile.id,
+      moduleKey: "escaleras",
+      sectionKey: "registro",
+      actionKey: "update",
+      entityType: "escalera_entry",
+      entityId: listadoId,
+      afterData: {
+        internalId,
+        fechaVisita,
+        off8Aplica,
+        off8Type,
+        off8Value,
+        ticketAmount,
+        status,
+        comentarios,
+        retenciones
+      }
+    });
     return success("Registro de Escaleras guardado.");
   } catch (error) {
     return failure(error instanceof Error ? error.message : "No se pudo guardar Escaleras.");
@@ -1425,6 +1652,22 @@ export async function addEscaleraItemAction(
     }
 
     revalidatePath("/sistema/escaleras");
+    await auditAction({
+      userId: profile.id,
+      moduleKey: "escaleras",
+      sectionKey: "articulos",
+      actionKey: "create",
+      entityType: "escalera_item",
+      entityId: entry.id,
+      afterData: {
+        description,
+        quantity,
+        unitLabel,
+        weightKg,
+        liters,
+        notes
+      }
+    });
     return success("Articulo agregado.");
   } catch (error) {
     return failure(error instanceof Error ? error.message : "No se pudo guardar el articulo.");
@@ -1490,6 +1733,15 @@ export async function assignModuleWorkerAction(
       .eq("id", userId);
 
     revalidatePath(`/sistema/${moduleKey}`);
+    await auditAction({
+      userId: profile.id,
+      moduleKey,
+      sectionKey: "trabajadores",
+      actionKey: "update",
+      entityType: "module_worker",
+      entityId: userId,
+      afterData: { functions, moduleOnly }
+    });
     return success("Trabajador asignado.");
   } catch (error) {
     return failure(error instanceof Error ? error.message : "No se pudo asignar el trabajador.");
@@ -1535,6 +1787,15 @@ export async function assignModuleStaffAction(
     }
 
     revalidatePath(`/sistema/${moduleKey}`);
+    await auditAction({
+      userId: profile.id,
+      moduleKey,
+      sectionKey: "puestos",
+      actionKey: "update",
+      entityType: "module_internal_staff",
+      entityId: `${internalId}:${userId}`,
+      afterData: { internalId, userId, positionKey }
+    });
     return success("Puesto asignado.");
   } catch (error) {
     return failure(error instanceof Error ? error.message : "No se pudo asignar el puesto.");

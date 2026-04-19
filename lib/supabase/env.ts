@@ -15,3 +15,17 @@ export function getSupabaseEnv() {
   return { url, anonKey };
 }
 
+export function isSupabaseAdminConfigured() {
+  return Boolean(process.env.SUPABASE_SERVICE_ROLE_KEY && isSupabaseConfigured());
+}
+
+export function getSupabaseAdminEnv() {
+  const { url } = getSupabaseEnv();
+  const serviceRoleKey = process.env.SUPABASE_SERVICE_ROLE_KEY;
+
+  if (!serviceRoleKey) {
+    throw new Error("Falta la variable SUPABASE_SERVICE_ROLE_KEY.");
+  }
+
+  return { url, serviceRoleKey };
+}

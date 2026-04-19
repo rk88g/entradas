@@ -4,7 +4,9 @@ import { SupabaseClient } from "@supabase/supabase-js";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import {
   AccessStatus,
+  ActionAuditRecord,
   BetadaRecord,
+  ConnectionLogRecord,
   DateRecord,
   EscaleraAuthorizedDevice,
   EscaleraManualItem,
@@ -1226,4 +1228,83 @@ export async function getIntegratedModuleCounts() {
     },
     { visual: 0, comunicacion: 0 }
   );
+}
+
+export async function getAdminPanelData() {
+  const supabase = await createServerSupabaseClient();
+  const [connectionLogsResponse, auditLogsResponse, usersResponse] = await Promise.all([
+    supabase
+      .from("connection_logs")
+      .select("id, user_profile_id, email, success, failure_reason, ip_address, user_agent, created_at")
+      .order("created_at", { ascending: false })
+      .limit(100),
+    supabase
+      .from("action_audit_logs")
+      .select("id, user_profile_id, module_key, section_key, action_key, entity_type, entity_id, before_data, after_data, created_at")
+      .order("created_at", { ascending: false })
+      .limit(200),
+    supabase
+      .from("user_profiles")
+      .select("id, full_name, roles!inner(key)")
+      .eq("active", true)
+      .order("full_name", { ascending: true })
+  ]);
+
+  const profileIds = [
+    ...new Set([
+      ...(connectionLogsResponse.data ?? []).map((item) => item.user_profile_id).filter(Boolean),
+      ...(auditLogsResponse.data ?? []).map((item) => item.user_profile_id).filter(Boolean)
+    ])
+  ] as string[];
+  const namesMap = new Map(
+    (usersResponse.data ?? []).map((item) => [item.id, item.full_name ?? "Usuario"])
+  );
+
+  if (profileIds.length > 0) {
+    const { data: extraProfiles } = await supabase
+      .from("user_profiles")
+      .select("id, full_name")
+      .in("id", profileIds);
+    (extraProfiles ?? []).forEach((item) => namesMap.set(item.id, item.full_name ?? "Usuario"));
+  }
+
+  const connectionLogs: ConnectionLogRecord[] = (connectionLogsResponse.data ?? []).map((item) => ({
+    id: item.id,
+    userId: item.user_profile_id,
+    userName: item.user_profile_id ? namesMap.get(item.user_profile_id) ?? "Usuario" : null,
+    email: item.email,
+    success: Boolean(item.success),
+    failureReason: item.failure_reason ?? null,
+    ipAddress: item.ip_address ?? null,
+    userAgent: item.user_agent ?? null,
+    createdAt: item.created_at
+  }));
+
+  const actionLogs: ActionAuditRecord[] = (auditLogsResponse.data ?? []).map((item) => ({
+    id: item.id,
+    userId: item.user_profile_id,
+    userName: item.user_profile_id ? namesMap.get(item.user_profile_id) ?? "Usuario" : null,
+    moduleKey: item.module_key,
+    sectionKey: item.section_key,
+    actionKey: item.action_key,
+    entityType: item.entity_type,
+    entityId: item.entity_id ?? null,
+    beforeData:
+      item.before_data === null ? null : JSON.stringify(item.before_data, null, 2),
+    afterData:
+      item.after_data === null ? null : JSON.stringify(item.after_data, null, 2),
+    createdAt: item.created_at
+  }));
+
+  const assignableUsers = (usersResponse.data ?? []).map((item) => ({
+    id: item.id,
+    fullName: item.full_name ?? "Usuario",
+    roleKey: item.roles?.[0]?.key ?? "capturador"
+  }));
+
+  return {
+    connectionLogs,
+    actionLogs,
+    users: assignableUsers
+  };
 }

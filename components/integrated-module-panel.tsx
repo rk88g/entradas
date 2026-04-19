@@ -11,6 +11,7 @@ import {
   saveModulePriceAction,
   saveModuleSettingsAction
 } from "@/app/sistema/actions";
+import { LoadingButton } from "@/components/loading-button";
 import { MutationBanner } from "@/components/mutation-banner";
 import {
   InternalDeviceRecord,
@@ -316,9 +317,7 @@ export function IntegratedModulePanel({
                   <input type="hidden" name="module_key" value={data.moduleKey} />
                   <input type="hidden" name="cycle_id" value={data.currentCycleId} />
                   <div className="actions-row">
-                    <button type="submit" className="button" disabled={closePending || data.weekClosed}>
-                      Cerrar semana
-                    </button>
+                  <LoadingButton pending={closePending} label="Cerrar semana" loadingLabel="Loading..." className="button" disabled={data.weekClosed} />
                   </div>
                 </form>
               </div>
@@ -430,9 +429,7 @@ export function IntegratedModulePanel({
                   <textarea name="notes" placeholder="Notas" autoComplete="off" disabled={!canManageEntries || data.weekClosed} />
                 </div>
                 <div className="actions-row">
-                  <button type="submit" className="button" disabled={devicePending || !canManageEntries || data.weekClosed}>
-                    Guardar aparato
-                  </button>
+                  <LoadingButton pending={devicePending} label="Guardar aparato" loadingLabel="Loading..." className="button" disabled={!canManageEntries || data.weekClosed} />
                 </div>
               </form>
             </article>
@@ -543,9 +540,7 @@ export function IntegratedModulePanel({
                   <textarea name="notes" placeholder="Notas del pago" autoComplete="off" disabled={!canManageCharges || data.weekClosed} />
                 </div>
                 <div className="actions-row">
-                  <button type="submit" className="button" disabled={paymentPending || !canManageCharges || data.weekClosed || !selectedChargeInternal}>
-                    Registrar pago
-                  </button>
+                  <LoadingButton pending={paymentPending} label="Registrar pago" loadingLabel="Loading..." className="button" disabled={!canManageCharges || data.weekClosed || !selectedChargeInternal} />
                 </div>
               </form>
             </article>
@@ -569,9 +564,7 @@ export function IntegratedModulePanel({
                   </select>
                 </div>
                 <div className="actions-row">
-                  <button type="submit" className="button-secondary" disabled={settingsPending}>
-                    Guardar corte
-                  </button>
+                  <LoadingButton pending={settingsPending} label="Guardar corte" loadingLabel="Loading..." className="button-secondary" />
                 </div>
               </form>
 
@@ -591,9 +584,7 @@ export function IntegratedModulePanel({
                   </select>
                 </div>
                 <div className="actions-row">
-                  <button type="submit" className="button-secondary" disabled={zonePending || data.weekClosed}>
-                    Guardar zona
-                  </button>
+                  <LoadingButton pending={zonePending} label="Guardar zona" loadingLabel="Loading..." className="button-secondary" disabled={data.weekClosed} />
                 </div>
               </form>
 
@@ -619,9 +610,7 @@ export function IntegratedModulePanel({
                   <input name="discount_amount" type="number" step="0.01" placeholder="Descuento" autoComplete="off" disabled={data.weekClosed} />
                 </div>
                 <div className="actions-row">
-                  <button type="submit" className="button-secondary" disabled={pricePending || data.weekClosed}>
-                    Guardar precio
-                  </button>
+                  <LoadingButton pending={pricePending} label="Guardar precio" loadingLabel="Loading..." className="button-secondary" disabled={data.weekClosed} />
                 </div>
               </form>
             </article>
@@ -659,9 +648,7 @@ export function IntegratedModulePanel({
                   </label>
                 </div>
                 <div className="actions-row">
-                  <button type="submit" className="button-secondary" disabled={workerPending}>
-                    Guardar trabajador
-                  </button>
+                  <LoadingButton pending={workerPending} label="Guardar trabajador" loadingLabel="Loading..." className="button-secondary" />
                 </div>
               </form>
 
@@ -705,9 +692,7 @@ export function IntegratedModulePanel({
                   </select>
                 </div>
                 <div className="actions-row">
-                  <button type="submit" className="button-secondary" disabled={staffPending}>
-                    Guardar puesto
-                  </button>
+                  <LoadingButton pending={staffPending} label="Guardar puesto" loadingLabel="Loading..." className="button-secondary" />
                 </div>
               </form>
 

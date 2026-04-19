@@ -2,19 +2,12 @@
 
 import { useActionState } from "react";
 import { signInAction, type AuthActionState } from "@/app/auth/actions";
+import { LoadingButton } from "@/components/loading-button";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
 
 const initialState: AuthActionState = {
   error: null
 };
-
-function SubmitButton({ disabled }: { disabled: boolean }) {
-  return (
-    <button type="submit" className="button button-full" disabled={disabled}>
-      Entrar
-    </button>
-  );
-}
 
 export function LoginForm({
   configured,
@@ -73,7 +66,13 @@ export function LoginForm({
       </div>
 
       <div className="actions-row">
-        <SubmitButton disabled={disabled} />
+        <LoadingButton
+          pending={pending}
+          label="Entrar"
+          loadingLabel="Loading..."
+          className="button button-full"
+          disabled={!configured || !isSupabaseConfigured()}
+        />
       </div>
     </form>
   );

@@ -3,6 +3,7 @@
 import { useActionState, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createVisitorAction, reassignVisitorAction } from "@/app/sistema/actions";
+import { LoadingButton } from "@/components/loading-button";
 import { MutationBanner } from "@/components/mutation-banner";
 import { StatusBadge } from "@/components/status-badge";
 import { InternalRecord, MutationState, RoleKey, VisitorRecord } from "@/lib/types";
@@ -259,9 +260,7 @@ export function VisitorManager({
               <textarea name="notas" placeholder="Notas" autoComplete="off" />
             </div>
             <div className="actions-row">
-              <button type="submit" className="button" disabled={createPending}>
-                Guardar
-              </button>
+              <LoadingButton pending={createPending} label="Guardar" loadingLabel="Loading..." className="button" />
             </div>
           </form>
         </article>
@@ -392,9 +391,7 @@ export function VisitorManager({
                     </select>
                   </div>
                   <div className="actions-row">
-                    <button type="submit" className="button-secondary" disabled={reassignPending}>
-                      Reasignar
-                    </button>
+                    <LoadingButton pending={reassignPending} label="Reasignar" loadingLabel="Loading..." className="button-secondary" />
                   </div>
                 </form>
               </div>

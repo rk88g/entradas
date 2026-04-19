@@ -401,6 +401,48 @@ html[data-theme="dark"] .segmented-button {
   transform: translateY(0);
 }
 
+.button.is-loading,
+.button-secondary.is-loading,
+.button-soft.is-loading {
+  position: relative;
+}
+
+.loading-inline {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.7rem;
+}
+
+.loading-spinner {
+  width: 1rem;
+  height: 1rem;
+  border-radius: 999px;
+  border: 2px solid rgba(255, 255, 255, 0.28);
+  border-top-color: currentColor;
+  animation: spin 0.8s linear infinite;
+}
+
+.button-soft .loading-spinner,
+.button-secondary .loading-spinner {
+  border-color: rgba(255, 255, 255, 0.28);
+  border-top-color: currentColor;
+}
+
+.audit-pre {
+  margin: 0;
+  white-space: pre-wrap;
+  word-break: break-word;
+  font-family: "Cascadia Code", "Consolas", monospace;
+  font-size: 0.76rem;
+  line-height: 1.35;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .button-full {
   width: 100%;
   justify-content: center;
