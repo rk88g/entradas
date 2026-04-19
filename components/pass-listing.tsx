@@ -94,7 +94,7 @@ function renderMainPass(pass: ListingRecord) {
         </div>
       </div>
 
-      <div className="apoyo-pass-section">
+      <div className="apoyo-pass-section visits-section">
         <strong>Visitas:</strong>
         <div className="apoyo-pass-list">
           {listedVisitors.map((visitor) => (
@@ -119,7 +119,7 @@ function renderMainPass(pass: ListingRecord) {
       </div>
 
       {basic.length > 0 ? (
-        <div className="apoyo-pass-section">
+        <div className="apoyo-pass-section basic-section">
           <strong>Peticion:</strong>
           <div className="apoyo-pass-list">
             {basic.map((item, index) => (
@@ -132,7 +132,7 @@ function renderMainPass(pass: ListingRecord) {
       ) : null}
 
       {specialLines.length > 0 ? (
-        <div className="apoyo-pass-section">
+        <div className="apoyo-pass-section special-section">
           <strong>Peticion especial:</strong>
           <div className="apoyo-pass-list">
             {specialLines.map((item, index) => (

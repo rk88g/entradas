@@ -1304,6 +1304,8 @@ html[data-theme="dark"] .note-box {
   }
 
   .apoyo-print-grid .apoyo-pass-card {
+    display: flex;
+    flex-direction: column;
     min-height: 5.45cm;
     height: 5.45cm;
     padding: 0.24cm 0.28cm;
@@ -1355,6 +1357,21 @@ html[data-theme="dark"] .note-box {
   .apoyo-pass-meta,
   .apoyo-pass-footer {
     gap: 0.08cm;
+  }
+
+  .apoyo-print-grid .visits-section {
+    flex: 1 1 auto;
+    min-height: 0;
+    overflow: hidden;
+  }
+
+  .apoyo-print-grid .visits-section .apoyo-pass-list {
+    overflow: hidden;
+  }
+
+  .apoyo-print-grid .basic-section,
+  .apoyo-print-grid .special-section {
+    flex: 0 0 auto;
   }
 
   .apoyo-numbers-grid .delivery-print {
