@@ -54,11 +54,27 @@ function formatDeviceItems(pass: ListingRecord) {
   return pass.deviceItems.map((item) => `${item.quantity} ${item.name}`);
 }
 
+function formatDeviceSummary(pass: ListingRecord) {
+  if (pass.deviceItems.length === 0) {
+    return null;
+  }
+
+  return pass.deviceItems
+    .map((item) => `${item.name} [${item.quantity}]`)
+    .join(", ");
+}
+
 function renderMainPass(pass: ListingRecord) {
   const { listedVisitors, hiddenVisitorsCount, underTwelveCount } = getCompactVisibleVisitors(pass);
   const { basic, special } = splitMentions(pass.menciones);
   const extraSpecials = splitMentions(pass.especiales);
-  const specialLines = [...formatDeviceItems(pass), ...extraSpecials.basic, ...extraSpecials.special, ...special];
+  const deviceSummary = formatDeviceSummary(pass);
+  const specialLines = [
+    ...extraSpecials.basic,
+    ...extraSpecials.special,
+    ...special,
+    ...(deviceSummary ? [deviceSummary] : [])
+  ];
 
   return (
     <article key={pass.id} className="pass-card apoyo-pass-card">
@@ -184,11 +200,12 @@ function renderSeparatedPasses(pass: ListingRecord) {
 function renderMentionPass(pass: ListingRecord) {
   const { basic, special } = splitMentions(pass.menciones);
   const extraSpecials = splitMentions(pass.especiales);
+  const deviceSummary = formatDeviceSummary(pass);
   const mergedSpecialLines = [
     ...special,
-    ...formatDeviceItems(pass),
     ...extraSpecials.basic,
-    ...extraSpecials.special
+    ...extraSpecials.special,
+    ...(deviceSummary ? [deviceSummary] : [])
   ];
 
   return (

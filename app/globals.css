@@ -645,6 +645,69 @@ tr:last-child td {
   border-radius: 18px;
 }
 
+.floating-alert {
+  position: fixed;
+  top: 1.15rem;
+  left: 50%;
+  transform: translateX(-50%);
+  z-index: 9999;
+  width: min(520px, calc(100vw - 2rem));
+  padding: 0;
+  border-radius: 22px;
+  box-shadow: 0 24px 60px rgba(15, 23, 42, 0.24);
+  backdrop-filter: blur(12px);
+  overflow: hidden;
+  display: grid;
+  grid-template-columns: 8px minmax(0, 1fr);
+  pointer-events: none;
+}
+
+.floating-alert.is-error {
+  background: rgba(255, 244, 244, 0.98);
+  border: 1px solid rgba(194, 48, 48, 0.24);
+  color: #7f1d1d;
+}
+
+.floating-alert.is-success {
+  background: rgba(239, 250, 247, 0.98);
+  border: 1px solid rgba(15, 118, 110, 0.22);
+  color: #155e63;
+}
+
+.floating-alert-accent {
+  min-height: 100%;
+}
+
+.floating-alert.is-error .floating-alert-accent {
+  background: linear-gradient(180deg, #dc2626, #991b1b);
+}
+
+.floating-alert.is-success .floating-alert-accent {
+  background: linear-gradient(180deg, #0f766e, #155e75);
+}
+
+.floating-alert-body {
+  padding: 0.95rem 1.1rem 1rem;
+  display: grid;
+  gap: 0.2rem;
+}
+
+.floating-alert-title {
+  font-size: 0.95rem;
+  letter-spacing: 0.04em;
+  text-transform: uppercase;
+}
+
+html[data-theme="dark"] .floating-alert.is-error {
+  background: rgba(69, 10, 10, 0.94);
+  color: #fecaca;
+}
+
+html[data-theme="dark"] .floating-alert.is-success {
+  background: rgba(8, 47, 73, 0.94);
+  color: #ecfeff;
+}
+
 .alert-box {
   background: rgba(255, 225, 225, 0.82);
   border: 1px solid rgba(194, 48, 48, 0.22);
@@ -1241,9 +1304,9 @@ html[data-theme="dark"] .note-box {
   }
 
   .apoyo-print-grid .apoyo-pass-card {
-    min-height: 4.9cm;
-    height: 4.9cm;
-    padding: 0.2cm 0.24cm;
+    min-height: 5.45cm;
+    height: 5.45cm;
+    padding: 0.24cm 0.28cm;
     overflow: hidden;
     break-inside: avoid;
     page-break-inside: avoid;
@@ -1254,8 +1317,8 @@ html[data-theme="dark"] .note-box {
   }
 
   .apoyo-secondary-grid .apoyo-pass-card {
-    min-height: 4.1cm;
-    height: 4.1cm;
+    min-height: 4.45cm;
+    height: 4.45cm;
     padding: 0.24cm 0.28cm;
     border-radius: 0;
     box-shadow: none;

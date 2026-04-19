@@ -460,15 +460,20 @@ export async function getCurrentUserProfile(): Promise<UserProfile | null> {
   };
 }
 
-export async function getInternos(): Promise<InternalRecord[]> {
+export async function getInternos(includeAll = false): Promise<InternalRecord[]> {
   const supabase = await createServerSupabaseClient();
-  const { data, error } = await supabase
+  let query = supabase
     .from("internos")
     .select(
       "id, expediente, nombres, apellido_pat, apellido_mat, nacimiento, llego, libre, ubicacion, telefono, ubi_filiacion, apartado, estatus, observaciones, created_at, updated_at"
     )
-    .neq("estatus", "150")
     .order("ubicacion", { ascending: true });
+
+  if (!includeAll) {
+    query = query.neq("estatus", "150");
+  }
+
+  const { data, error } = await query;
 
   if (error || !data) {
     return [];
@@ -490,7 +495,7 @@ export async function getVisitas(): Promise<VisitorRecord[]> {
     supabase
       .from("interno_visitas")
       .select("visita_id, interno_id"),
-    getInternos()
+    getInternos(true)
   ]);
 
   if (error || !data) {
@@ -651,10 +656,11 @@ export async function getListado(filters?: {
 export async function getInternalProfiles(options?: {
   nextDateValue?: string | null;
   openDateValue?: string | null;
+  includeInactive?: boolean;
 }): Promise<InternalProfile[]> {
   const supabase = await createServerSupabaseClient();
   const [internos, nextDate, openDate] = await Promise.all([
-    getInternos(),
+    getInternos(options?.includeInactive ?? false),
     options?.nextDateValue ? getDateByValue(options.nextDateValue) : getNextDate(),
     options?.openDateValue ? getDateByValue(options.openDateValue) : getOpenDate()
   ]);
@@ -731,13 +737,14 @@ export async function getInternalProfiles(options?: {
   }));
 }
 
-export async function getListingBuilderData(): Promise<ListingBuilderData> {
+export async function getListingBuilderData(includeInactive = false): Promise<ListingBuilderData> {
   const [openDate, nextDate] = await Promise.all([getOpenDate(), getNextDate()]);
   const [closePasswordConfigured, internalProfiles, todaysPasses, passArticles] = await Promise.all([
     getClosePasswordConfigured(),
     getInternalProfiles({
       nextDateValue: nextDate?.fechaCompleta,
-      openDateValue: openDate?.fechaCompleta
+      openDateValue: openDate?.fechaCompleta,
+      includeInactive
     }),
     getListado({ fechaVisita: getTodayDate() }),
     getPassDeviceTypes()
@@ -789,7 +796,7 @@ export async function getPassDeviceTypes(): Promise<ModuleDeviceType[]> {
   }));
 }
 
-export async function getModulePanelData(moduleKey: ModuleKey): Promise<ModulePanelData> {
+export async function getModulePanelData(moduleKey: ModuleKey, includeInactiveInternals = false): Promise<ModulePanelData> {
   const supabase = await createServerSupabaseClient();
   const moduleName = getModuleDisplayName(moduleKey);
   const { data: settingsSeed } = await supabase
@@ -813,7 +820,7 @@ export async function getModulePanelData(moduleKey: ModuleKey): Promise<ModulePa
     userProfilesResponse,
     staffAssignmentsResponse
   ] = await Promise.all([
-    getInternos(),
+    getInternos(includeInactiveInternals),
     supabase
       .from("module_device_types")
       .select("id, module_key, key, name, sort_order, requires_imei, requires_chip, allow_cameras_flag")

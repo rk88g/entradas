@@ -6,10 +6,8 @@ import {
 } from "@/lib/supabase/queries";
 
 export default async function InternosPage() {
-  const [profile, builderData] = await Promise.all([
-    getCurrentUserProfile(),
-    getListingBuilderData()
-  ]);
+  const [profile] = await Promise.all([getCurrentUserProfile()]);
+  const builderData = await getListingBuilderData(profile?.roleKey === "super-admin");
 
   if (profile?.moduleOnly && profile.accessibleModules.length > 0) {
     redirect(`/sistema/${profile.accessibleModules[0].moduleKey}`);

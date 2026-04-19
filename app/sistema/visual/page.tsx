@@ -4,10 +4,11 @@ import { getCurrentUserProfile, getInternos, getModulePanelData } from "@/lib/su
 import { canAccessModule } from "@/lib/utils";
 
 export default async function VisualPage() {
-  const [profile, data, internals] = await Promise.all([
-    getCurrentUserProfile(),
-    getModulePanelData("visual"),
-    getInternos()
+  const profile = await getCurrentUserProfile();
+  const includeInactive = profile?.roleKey === "super-admin";
+  const [data, internals] = await Promise.all([
+    getModulePanelData("visual", includeInactive),
+    getInternos(includeInactive)
   ]);
 
   if (!profile?.active || !canAccessModule(profile.roleKey, profile.accessibleModules, "visual")) {

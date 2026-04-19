@@ -4,10 +4,11 @@ import { getCurrentUserProfile, getInternos, getModulePanelData } from "@/lib/su
 import { canAccessModule } from "@/lib/utils";
 
 export default async function ComunicacionPage() {
-  const [profile, data, internals] = await Promise.all([
-    getCurrentUserProfile(),
-    getModulePanelData("comunicacion"),
-    getInternos()
+  const profile = await getCurrentUserProfile();
+  const includeInactive = profile?.roleKey === "super-admin";
+  const [data, internals] = await Promise.all([
+    getModulePanelData("comunicacion", includeInactive),
+    getInternos(includeInactive)
   ]);
 
   if (!profile?.active || !canAccessModule(profile.roleKey, profile.accessibleModules, "comunicacion")) {
