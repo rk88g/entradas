@@ -10,7 +10,6 @@ import {
 } from "@/app/sistema/actions";
 import { LoadingButton } from "@/components/loading-button";
 import { MutationBanner } from "@/components/mutation-banner";
-import { StatusBadge } from "@/components/status-badge";
 import { DateRecord, InternalProfile, ModuleDeviceType, MutationState, RoleKey } from "@/lib/types";
 import {
   canManageMentions,
@@ -195,7 +194,7 @@ export function InternalBrowser({
 
   return (
     <>
-      <section className="module-grid">
+      <section className="module-grid module-grid-single">
         <article className="data-card">
           <div className="actions-row" style={{ justifyContent: "space-between", alignItems: "center", marginBottom: "0.8rem" }}>
             <strong className="section-title">Internos</strong>
@@ -287,15 +286,7 @@ export function InternalBrowser({
 
       {selected ? (
         <div
-          style={{
-            position: "fixed",
-            inset: 0,
-            background: "rgba(15, 23, 42, 0.45)",
-            display: "grid",
-            placeItems: "center",
-            padding: "0.8rem",
-            zIndex: 100
-          }}
+          className="modal-backdrop"
           onClick={() => setModalInternalId(null)}
         >
           <div
@@ -322,324 +313,337 @@ export function InternalBrowser({
               </div>
             </div>
 
-            <div className="profile-summary">
-              <article className="data-card">
-                <div className="mini-list">
-                  <div className="mini-row"><span>Estatus</span><strong>{selected.estatus}</strong></div>
-                  <div className="mini-row"><span>Laborando</span><strong>{selected.laborando ? "Si" : "No"}</strong></div>
-                  <div className="mini-row"><span>Telefono</span><strong>{maskValue(selected.telefono || "No aplica", canViewSensitiveData)}</strong></div>
-                </div>
-              </article>
-              <article className="data-card">
-                <div className="mini-list">
-                  <div className="mini-row"><span>Visitas</span><strong>{selected.visitors.length}</strong></div>
-                  <div className="mini-row"><span>Aparatos</span><strong>{selected.devices.length}</strong></div>
-                  <div className="mini-row"><span>Pagos semanales</span><strong>{selected.weeklyPayments.length}</strong></div>
-                </div>
-              </article>
-              <article className="data-card">
-                <div className="mini-list">
-                  <div className="mini-row">
-                    <span>Pase</span>
-                    {selectedPass ? <StatusBadge variant="warn">Registrado</StatusBadge> : <StatusBadge variant="ok">Sin pase</StatusBadge>}
+            <section className="collapse-stack" style={{ marginTop: "1rem" }}>
+              <details className="data-card section-collapse">
+                <summary>
+                  <span>Resumen</span>
+                  <span>{selectedPass ? "Con pase" : "Sin pase"}</span>
+                </summary>
+                <div className="section-collapse-body">
+                  <div className="mini-list">
+                    <div className="mini-row"><span>Estatus</span><strong>{selected.estatus}</strong></div>
+                    <div className="mini-row"><span>Laborando</span><strong>{selected.laborando ? "Si" : "No"}</strong></div>
+                    <div className="mini-row"><span>Telefono</span><strong>{maskValue(selected.telefono || "No aplica", canViewSensitiveData)}</strong></div>
+                    <div className="mini-row"><span>Visitas</span><strong>{selected.visitors.length}</strong></div>
+                    <div className="mini-row"><span>Aparatos</span><strong>{selected.devices.length}</strong></div>
+                    <div className="mini-row"><span>Pagos semanales</span><strong>{selected.weeklyPayments.length}</strong></div>
+                    <div className="mini-row"><span>Fecha elegida</span><strong>{selectedDateValue ? formatLongDate(selectedDateValue) : "Sin fecha"}</strong></div>
                   </div>
-                  <div className="mini-row"><span>Fecha elegida</span><strong>{selectedDateValue ? formatLongDate(selectedDateValue) : "Sin fecha"}</strong></div>
                 </div>
-              </article>
-            </div>
+              </details>
 
-            {roleKey === "super-admin" ? (
-              <article className="data-card">
-                <strong style={{ display: "block", marginBottom: "0.7rem" }}>Cambiar estatus</strong>
-                <MutationBanner state={statusState} />
-                <form action={statusAction} className="actions-row" autoComplete="off">
-                  <input type="hidden" name="interno_id" value={selected.id} />
-                  <div className="field" style={{ flex: 1 }}>
-                    <select name="estatus" defaultValue={selected.estatus}>
-                      <option value="activo">Activo</option>
-                      <option value="150">150</option>
-                      <option value="retenido">Retenido</option>
-                      <option value="baja">Baja</option>
-                    </select>
+              {roleKey === "super-admin" ? (
+                <details className="data-card section-collapse">
+                  <summary>
+                    <span>Cambiar estatus</span>
+                    <span>{selected.estatus}</span>
+                  </summary>
+                  <div className="section-collapse-body">
+                    <MutationBanner state={statusState} />
+                    <form action={statusAction} className="actions-row" autoComplete="off">
+                      <input type="hidden" name="interno_id" value={selected.id} />
+                      <div className="field" style={{ flex: 1 }}>
+                        <select name="estatus" defaultValue={selected.estatus}>
+                          <option value="activo">Activo</option>
+                          <option value="150">150</option>
+                          <option value="retenido">Retenido</option>
+                          <option value="baja">Baja</option>
+                        </select>
+                      </div>
+                      <LoadingButton pending={statusPending} label="Guardar estatus" loadingLabel="Loading..." className="button-soft" />
+                    </form>
                   </div>
-                  <LoadingButton pending={statusPending} label="Guardar estatus" loadingLabel="Loading..." className="button-soft" />
-                </form>
-              </article>
-            ) : null}
+                </details>
+              ) : null}
 
-            {roleKey === "super-admin" && historyOpen ? (
-              <section className="profile-history-stack">
-                {[
-                  {
-                    key: "visitas",
-                    title: "Visitas",
-                    count: selected.visitors.length,
-                    content: selected.visitors.length === 0 ? <span className="muted">Sin visitas.</span> : selected.visitors.map((item) => (
-                      <div key={item.id} className="record-pill">
+              {selectedPass ? (
+                <MutationBanner state={{ success: null, error: `Ese interno ya tiene pase para ${formatLongDate(selectedPass.fechaVisita)}.` }} />
+              ) : null}
+
+              {!canSubmitPass && selectedVisitors.length > 0 && selectedAdults.length === 0 ? (
+                <MutationBanner state={{ success: null, error: "Debes incluir al menos un adulto en el pase." }} />
+              ) : null}
+
+              <details className="data-card section-collapse">
+                <summary>
+                  <span>No vendran</span>
+                  <span>{availableVisitors.length}</span>
+                </summary>
+                <div className="section-collapse-body">
+                  <div className="record-stack">
+                    {availableVisitors.length === 0 ? <span className="muted">Sin registros.</span> : availableVisitors.map((item) => (
+                      <button key={item.id} type="button" className="inline-search-item" onClick={() => toggleVisitor(item.visitaId)}>
                         <strong>{item.visitor.fullName}</strong>
-                        <span>{item.parentesco}</span>
-                      </div>
-                    ))
-                  },
-                  {
-                    key: "aparatos",
-                    title: "Aparatos registrados",
-                    count: selected.devices.length,
-                    content: selected.devices.length === 0 ? <span className="muted">Sin aparatos.</span> : selected.devices.map((item) => (
-                      <div key={item.id} className="record-pill">
-                        <strong>{item.deviceTypeName}</strong>
-                        <span>{item.moduleKey} · {item.quantity}</span>
-                        <small>{[item.brand, item.model].filter(Boolean).join(" / ") || "Sin detalle"}</small>
-                      </div>
-                    ))
-                  },
-                  {
-                    key: "trabajo",
-                    title: "Negocios y oficinas",
-                    count: selected.workplaceAssignments.length,
-                    content: selected.workplaceAssignments.length === 0 ? <span className="muted">Sin asignaciones.</span> : selected.workplaceAssignments.map((item) => (
-                      <div key={item.id} className="record-pill">
-                        <strong>{item.workplaceName}</strong>
-                        <span>{item.title}</span>
-                        <small>{item.workplaceType} · ${item.salary.toFixed(2)}</small>
-                      </div>
-                    ))
-                  },
-                  {
-                    key: "pases",
-                    title: "Historico de visitas y pases",
-                    count: selected.recentPasses.length,
-                    content: selected.recentPasses.length === 0 ? <span className="muted">Sin historial.</span> : selected.recentPasses.map((item) => (
-                      <div key={item.id} className="record-pill">
-                        <strong>{formatLongDate(item.fechaVisita)}</strong>
-                        <span>{item.visitantes.length} visitas</span>
-                      </div>
-                    ))
-                  },
-                  {
-                    key: "pagos",
-                    title: "Pagos semanales",
-                    count: selected.weeklyPayments.length,
-                    content: selected.weeklyPayments.length === 0 ? <span className="muted">Sin pagos.</span> : selected.weeklyPayments.map((item) => (
-                      <div key={item.id} className="record-pill">
-                        <strong>{item.deviceTypeName}</strong>
-                        <span>{compactMoney(item.amount)} · {item.status}</span>
-                      </div>
-                    ))
-                  },
-                  {
-                    key: "escaleras",
-                    title: "Escaleras",
-                    count: selected.escalerasHistory.length,
-                    content: selected.escalerasHistory.length === 0 ? <span className="muted">Sin registros.</span> : selected.escalerasHistory.map((item) => (
-                      <div key={item.id} className="record-pill">
-                        <strong>{formatLongDate(item.fechaVisita)}</strong>
-                        <span>{item.status}</span>
-                      </div>
-                    ))
-                  },
-                  {
-                    key: "multas",
-                    title: "Multas y decomisos",
-                    count: selected.fines.length + selected.seizures.length,
-                    content: selected.fines.length === 0 && selected.seizures.length === 0 ? <span className="muted">Sin registros.</span> : (
-                      <>
-                        {selected.fines.map((item) => (
-                          <div key={item.id} className="record-pill">
-                            <strong>{item.concept}</strong>
-                            <span>{compactMoney(item.amount)} · {item.status}</span>
-                          </div>
-                        ))}
-                        {selected.seizures.map((item) => (
-                          <div key={item.id} className="record-pill">
-                            <strong>{item.concept}</strong>
-                            <span>{item.status}</span>
-                          </div>
-                        ))}
-                      </>
-                    )
-                  },
-                  {
-                    key: "movimientos",
-                    title: "Cambios, venta, renta y compra",
-                    count: selected.equipmentMovements.length,
-                    content: selected.equipmentMovements.length === 0 ? <span className="muted">Sin movimientos.</span> : selected.equipmentMovements.map((item) => (
-                      <div key={item.id} className="record-pill">
-                        <strong>{item.movementType}</strong>
-                        <span>{item.description}</span>
-                        <small>{item.amount ? compactMoney(item.amount) : "Sin monto"}</small>
-                      </div>
-                    ))
-                  },
-                  {
-                    key: "notas",
-                    title: "Notas y temporalidad",
-                    count: selected.notes.length,
-                    content: selected.notes.length === 0 ? <span className="muted">Sin notas.</span> : selected.notes.map((item) => (
-                      <div key={item.id} className="record-pill">
-                        <strong>{item.title}</strong>
-                        <span>{item.sourceModule}</span>
-                        <small>{item.notes}</small>
-                      </div>
-                    ))
-                  }
-                ].map((section) => {
-                  const isOpen = Boolean(historySections[section.key]);
-                  return (
-                    <article key={section.key} className="data-card">
-                      <button
-                        type="button"
-                        className="button-soft collapse-trigger"
-                        onClick={() => toggleHistorySection(section.key)}
-                      >
-                        <span>{section.title}</span>
-                        <span>{section.count} {isOpen ? "−" : "+"}</span>
+                        <span className="muted">{maskValue(item.visitor.edad, canViewSensitiveData)} años</span>
                       </button>
-                      {isOpen ? (
-                        <div className="record-stack" style={{ marginTop: "0.9rem" }}>
-                          {section.content}
-                        </div>
-                      ) : null}
-                    </article>
-                  );
-                })}
-              </section>
-            ) : null}
-
-            {selectedPass ? (
-              <MutationBanner state={{ success: null, error: `Ese interno ya tiene pase para ${formatLongDate(selectedPass.fechaVisita)}.` }} />
-            ) : null}
-
-            {!canSubmitPass && selectedVisitors.length > 0 && selectedAdults.length === 0 ? (
-              <MutationBanner state={{ success: null, error: "Debes incluir al menos un adulto en el pase." }} />
-            ) : null}
-
-            <div className="split-grid">
-              <article className="data-card">
-                <strong>No vendran</strong>
-                <div className="record-stack" style={{ marginTop: "0.7rem" }}>
-                  {availableVisitors.length === 0 ? <span className="muted">Sin registros.</span> : availableVisitors.map((item) => (
-                    <button key={item.id} type="button" className="inline-search-item" onClick={() => toggleVisitor(item.visitaId)}>
-                      <strong>{item.visitor.fullName}</strong>
-                      <span className="muted">{maskValue(item.visitor.edad, canViewSensitiveData)} años</span>
-                    </button>
-                  ))}
-                </div>
-              </article>
-
-              <article className="data-card">
-                <strong>Vendran</strong>
-                <div className="record-stack" style={{ marginTop: "0.7rem" }}>
-                  {selectedVisitors.length === 0 ? <span className="muted">Sin registros.</span> : selectedVisitors.map((item) => (
-                    <button key={item.id} type="button" className="inline-search-item active" onClick={() => toggleVisitor(item.visitaId)}>
-                      <strong>{item.visitor.fullName}</strong>
-                      <span className="muted">{maskValue(item.visitor.edad, canViewSensitiveData)} años</span>
-                    </button>
-                  ))}
-                </div>
-              </article>
-            </div>
-
-            <div className="split-grid">
-              <article className="data-card">
-                <strong>Nueva visita</strong>
-                <MutationBanner state={visitorState} />
-                <form
-                  key={`visitor-form-${selected.id}-${formSeed}`}
-                  ref={visitorFormRef}
-                  action={visitorAction}
-                  className="field-grid"
-                  style={{ marginTop: "0.8rem" }}
-                  autoComplete="off"
-                >
-                  <input type="hidden" name="interno_id" value={selected.id} />
-                  <div className="field"><input name="nombres" placeholder="Nombres" autoComplete="off" required /></div>
-                  <div className="field"><input name="apellido_pat" placeholder="Apellido paterno" autoComplete="off" required /></div>
-                  <div className="field"><input name="apellido_mat" placeholder="Apellido materno" autoComplete="off" required /></div>
-                  <div className="field"><input name="fecha_nacimiento" type="date" autoComplete="off" required /></div>
-                  <div className="field">
-                    <select name="sexo" defaultValue="" required>
-                      <option value="" disabled>Sexo</option>
-                      <option value="hombre">Hombre</option>
-                      <option value="mujer">Mujer</option>
-                    </select>
+                    ))}
                   </div>
-                  <div className="field"><input name="parentesco" placeholder="Parentesco" autoComplete="off" required /></div>
-                  <div className="field"><input name="telefono" placeholder="Telefono" autoComplete="off" /></div>
-                  {canManageVisitorAvailability ? (
+                </div>
+              </details>
+
+              <details className="data-card section-collapse">
+                <summary>
+                  <span>Vendran</span>
+                  <span>{selectedVisitors.length}</span>
+                </summary>
+                <div className="section-collapse-body">
+                  <div className="record-stack">
+                    {selectedVisitors.length === 0 ? <span className="muted">Sin registros.</span> : selectedVisitors.map((item) => (
+                      <button key={item.id} type="button" className="inline-search-item active" onClick={() => toggleVisitor(item.visitaId)}>
+                        <strong>{item.visitor.fullName}</strong>
+                        <span className="muted">{maskValue(item.visitor.edad, canViewSensitiveData)} años</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              </details>
+
+              <details className="data-card section-collapse">
+                <summary>
+                  <span>Nueva visita</span>
+                  <span>Asignar al interno</span>
+                </summary>
+                <div className="section-collapse-body">
+                  <MutationBanner state={visitorState} />
+                  <form
+                    key={`visitor-form-${selected.id}-${formSeed}`}
+                    ref={visitorFormRef}
+                    action={visitorAction}
+                    className="field-grid"
+                    autoComplete="off"
+                  >
+                    <input type="hidden" name="interno_id" value={selected.id} />
+                    <div className="field"><input name="nombres" placeholder="Nombres" autoComplete="off" required /></div>
+                    <div className="field"><input name="apellido_pat" placeholder="Apellido paterno" autoComplete="off" required /></div>
+                    <div className="field"><input name="apellido_mat" placeholder="Apellido materno" autoComplete="off" required /></div>
+                    <div className="field"><input name="fecha_nacimiento" type="date" autoComplete="off" required /></div>
                     <div className="field">
-                      <select name="betada" defaultValue="false">
-                        <option value="false">Activo</option>
-                        <option value="true">No disponible</option>
+                      <select name="sexo" defaultValue="" required>
+                        <option value="" disabled>Sexo</option>
+                        <option value="hombre">Hombre</option>
+                        <option value="mujer">Mujer</option>
                       </select>
                     </div>
-                  ) : null}
-                  <div className="field" style={{ gridColumn: "1 / -1" }}>
-                    <textarea name="notas" placeholder="Notas" autoComplete="off" />
-                  </div>
-                  <div className="actions-row">
-                    <LoadingButton pending={visitorPending} label="Guardar visita" loadingLabel="Loading..." className="button-secondary" />
-                  </div>
-                </form>
-              </article>
-
-              <article className="data-card">
-                <strong>Crear pase</strong>
-                <MutationBanner state={passState} />
-                <form
-                  key={`pass-form-${selected.id}-${formSeed}`}
-                  action={passAction}
-                  className="field-grid"
-                  style={{ marginTop: "0.8rem" }}
-                  autoComplete="off"
-                >
-                  <input type="hidden" name="interno_id" value={selected.id} />
-                  <input type="hidden" name="fecha_visita" value={selectedDateValue} />
-                  {selectedVisitorIds.map((visitorId) => (
-                    <input key={visitorId} type="hidden" name="visitor_ids" value={visitorId} />
-                  ))}
-
-                  <div className="field">
-                    <label htmlFor="fecha_visita_modal">Fecha del pase</label>
-                    <select id="fecha_visita_modal" value={selectedDateValue} onChange={(event) => setSelectedDateValue(event.target.value)}>
-                      {availableDates.map((date) => (
-                        <option key={date.id} value={date.fechaCompleta}>
-                          {formatLongDate(date.fechaCompleta)}
-                        </option>
-                      ))}
-                    </select>
-                  </div>
-
-                  {canManageMentions(roleKey) ? (
-                    <>
-                      <div className="field" style={{ gridColumn: "1 / -1" }}>
-                        <textarea name="menciones" placeholder="Peticiones basicas" autoComplete="off" />
+                    <div className="field"><input name="parentesco" placeholder="Parentesco" autoComplete="off" required /></div>
+                    <div className="field"><input name="telefono" placeholder="Telefono" autoComplete="off" /></div>
+                    {canManageVisitorAvailability ? (
+                      <div className="field">
+                        <select name="betada" defaultValue="false">
+                          <option value="false">Activo</option>
+                          <option value="true">No disponible</option>
+                        </select>
                       </div>
-                      <div className="field" style={{ gridColumn: "1 / -1" }}>
-                        <textarea name="especiales" placeholder="Peticiones especiales" autoComplete="off" />
+                    ) : null}
+                    <div className="field" style={{ gridColumn: "1 / -1" }}>
+                      <textarea name="notas" placeholder="Notas" autoComplete="off" />
+                    </div>
+                    <div className="actions-row">
+                      <LoadingButton pending={visitorPending} label="Guardar visita" loadingLabel="Loading..." className="button-secondary" />
+                    </div>
+                  </form>
+                </div>
+              </details>
+
+              <details className="data-card section-collapse">
+                <summary>
+                  <span>Crear pase</span>
+                  <span>{selectedDateValue ? formatLongDate(selectedDateValue) : "Sin fecha"}</span>
+                </summary>
+                <div className="section-collapse-body">
+                  <MutationBanner state={passState} />
+                  <form
+                    key={`pass-form-${selected.id}-${formSeed}`}
+                    action={passAction}
+                    className="field-grid"
+                    autoComplete="off"
+                  >
+                    <input type="hidden" name="interno_id" value={selected.id} />
+                    <input type="hidden" name="fecha_visita" value={selectedDateValue} />
+                    {selectedVisitorIds.map((visitorId) => (
+                      <input key={visitorId} type="hidden" name="visitor_ids" value={visitorId} />
+                    ))}
+
+                    <div className="field">
+                      <label htmlFor="fecha_visita_modal">Fecha del pase</label>
+                      <select id="fecha_visita_modal" value={selectedDateValue} onChange={(event) => setSelectedDateValue(event.target.value)}>
+                        {availableDates.map((date) => (
+                          <option key={date.id} value={date.fechaCompleta}>
+                            {formatLongDate(date.fechaCompleta)}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    {canManageMentions(roleKey) ? (
+                      <>
+                        <div className="field" style={{ gridColumn: "1 / -1" }}>
+                          <textarea name="menciones" placeholder="Peticiones basicas" autoComplete="off" />
+                        </div>
+                        <div className="field" style={{ gridColumn: "1 / -1" }}>
+                          <textarea name="especiales" placeholder="Peticiones especiales" autoComplete="off" />
+                        </div>
+                        <div className="field" style={{ gridColumn: "1 / -1" }}>
+                          <label>Articulos</label>
+                          <div className="article-grid">
+                            {passArticles.map((article) => (
+                              <div key={article.id} className="field">
+                                <label htmlFor={`article_${article.id}`}>{article.name}</label>
+                                <input id={`article_${article.id}`} type="number" min="0" name={`article_qty_${article.id}`} placeholder="0" autoComplete="off" />
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </>
+                    ) : null}
+
+                    {!selectedPass ? (
+                      <div className="actions-row">
+                        <LoadingButton pending={passPending} label="CREAR PASE" loadingLabel="Loading..." className="button" disabled={!canSubmitPass} />
                       </div>
-                      <div className="field" style={{ gridColumn: "1 / -1" }}>
-                        <label>Articulos</label>
-                        <div className="article-grid">
-                          {passArticles.map((article) => (
-                            <div key={article.id} className="field">
-                              <label htmlFor={`article_${article.id}`}>{article.name}</label>
-                              <input id={`article_${article.id}`} type="number" min="0" name={`article_qty_${article.id}`} placeholder="0" autoComplete="off" />
+                    ) : null}
+                  </form>
+                </div>
+              </details>
+
+              {roleKey === "super-admin" && historyOpen ? (
+                <section className="profile-history-stack">
+                  {[
+                    {
+                      key: "visitas",
+                      title: "Visitas",
+                      count: selected.visitors.length,
+                      content: selected.visitors.length === 0 ? <span className="muted">Sin visitas.</span> : selected.visitors.map((item) => (
+                        <div key={item.id} className="record-pill">
+                          <strong>{item.visitor.fullName}</strong>
+                          <span>{item.parentesco}</span>
+                        </div>
+                      ))
+                    },
+                    {
+                      key: "aparatos",
+                      title: "Aparatos registrados",
+                      count: selected.devices.length,
+                      content: selected.devices.length === 0 ? <span className="muted">Sin aparatos.</span> : selected.devices.map((item) => (
+                        <div key={item.id} className="record-pill">
+                          <strong>{item.deviceTypeName}</strong>
+                          <span>{item.moduleKey} · {item.quantity}</span>
+                          <small>{[item.brand, item.model].filter(Boolean).join(" / ") || "Sin detalle"}</small>
+                        </div>
+                      ))
+                    },
+                    {
+                      key: "trabajo",
+                      title: "Negocios y oficinas",
+                      count: selected.workplaceAssignments.length,
+                      content: selected.workplaceAssignments.length === 0 ? <span className="muted">Sin asignaciones.</span> : selected.workplaceAssignments.map((item) => (
+                        <div key={item.id} className="record-pill">
+                          <strong>{item.workplaceName}</strong>
+                          <span>{item.title}</span>
+                          <small>{item.workplaceType} · ${item.salary.toFixed(2)}</small>
+                        </div>
+                      ))
+                    },
+                    {
+                      key: "pases",
+                      title: "Historico de visitas y pases",
+                      count: selected.recentPasses.length,
+                      content: selected.recentPasses.length === 0 ? <span className="muted">Sin historial.</span> : selected.recentPasses.map((item) => (
+                        <div key={item.id} className="record-pill">
+                          <strong>{formatLongDate(item.fechaVisita)}</strong>
+                          <span>{item.visitantes.length} visitas</span>
+                        </div>
+                      ))
+                    },
+                    {
+                      key: "pagos",
+                      title: "Pagos semanales",
+                      count: selected.weeklyPayments.length,
+                      content: selected.weeklyPayments.length === 0 ? <span className="muted">Sin pagos.</span> : selected.weeklyPayments.map((item) => (
+                        <div key={item.id} className="record-pill">
+                          <strong>{item.deviceTypeName}</strong>
+                          <span>{compactMoney(item.amount)} · {item.status}</span>
+                        </div>
+                      ))
+                    },
+                    {
+                      key: "escaleras",
+                      title: "Escaleras",
+                      count: selected.escalerasHistory.length,
+                      content: selected.escalerasHistory.length === 0 ? <span className="muted">Sin registros.</span> : selected.escalerasHistory.map((item) => (
+                        <div key={item.id} className="record-pill">
+                          <strong>{formatLongDate(item.fechaVisita)}</strong>
+                          <span>{item.status}</span>
+                        </div>
+                      ))
+                    },
+                    {
+                      key: "multas",
+                      title: "Multas y decomisos",
+                      count: selected.fines.length + selected.seizures.length,
+                      content: selected.fines.length === 0 && selected.seizures.length === 0 ? <span className="muted">Sin registros.</span> : (
+                        <>
+                          {selected.fines.map((item) => (
+                            <div key={item.id} className="record-pill">
+                              <strong>{item.concept}</strong>
+                              <span>{compactMoney(item.amount)} · {item.status}</span>
                             </div>
                           ))}
+                          {selected.seizures.map((item) => (
+                            <div key={item.id} className="record-pill">
+                              <strong>{item.concept}</strong>
+                              <span>{item.status}</span>
+                            </div>
+                          ))}
+                        </>
+                      )
+                    },
+                    {
+                      key: "movimientos",
+                      title: "Cambios, venta, renta y compra",
+                      count: selected.equipmentMovements.length,
+                      content: selected.equipmentMovements.length === 0 ? <span className="muted">Sin movimientos.</span> : selected.equipmentMovements.map((item) => (
+                        <div key={item.id} className="record-pill">
+                          <strong>{item.movementType}</strong>
+                          <span>{item.description}</span>
+                          <small>{item.amount ? compactMoney(item.amount) : "Sin monto"}</small>
                         </div>
-                      </div>
-                    </>
-                  ) : null}
-
-                  {!selectedPass ? (
-                    <div className="actions-row">
-                      <LoadingButton pending={passPending} label="CREAR PASE" loadingLabel="Loading..." className="button" disabled={!canSubmitPass} />
-                    </div>
-                  ) : null}
-                </form>
-              </article>
-            </div>
+                      ))
+                    },
+                    {
+                      key: "notas",
+                      title: "Notas y temporalidad",
+                      count: selected.notes.length,
+                      content: selected.notes.length === 0 ? <span className="muted">Sin notas.</span> : selected.notes.map((item) => (
+                        <div key={item.id} className="record-pill">
+                          <strong>{item.title}</strong>
+                          <span>{item.sourceModule}</span>
+                          <small>{item.notes}</small>
+                        </div>
+                      ))
+                    }
+                  ].map((section) => {
+                    const isOpen = Boolean(historySections[section.key]);
+                    return (
+                      <article key={section.key} className="data-card section-collapse">
+                        <button
+                          type="button"
+                          className="button-soft collapse-trigger"
+                          onClick={() => toggleHistorySection(section.key)}
+                        >
+                          <span>{section.title}</span>
+                          <span>{section.count} {isOpen ? "−" : "+"}</span>
+                        </button>
+                        {isOpen ? (
+                          <div className="record-stack" style={{ marginTop: "0.9rem" }}>
+                            {section.content}
+                          </div>
+                        ) : null}
+                      </article>
+                    );
+                  })}
+                </section>
+              ) : null}
+            </section>
           </div>
         </div>
       ) : null}

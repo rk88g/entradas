@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useMemo, useState } from "react";
+import { useActionState, useMemo } from "react";
 import { closeDateAction, createDateAction, updateClosePasswordAction } from "@/app/sistema/actions";
 import { LoadingButton } from "@/components/loading-button";
 import { MutationBanner } from "@/components/mutation-banner";
@@ -25,7 +25,6 @@ export function DateOperations({
   roleKey: RoleKey;
   closePasswordConfigured: boolean;
 }) {
-  const [selectedStatus, setSelectedStatus] = useState<"abierto" | "proximo">("abierto");
   const [createState, createAction, createPending] = useActionState(createDateAction, mutationInitialState);
   const [closeState, closeAction, closePending] = useActionState(closeDateAction, mutationInitialState);
   const [passwordState, passwordAction, passwordPending] = useActionState(updateClosePasswordAction, mutationInitialState);
@@ -37,7 +36,7 @@ export function DateOperations({
   const waitingDate = registeredDates.find((item) => item.fechaCompleta === waitingValue) ?? null;
 
   return (
-    <section className="module-grid">
+    <section className="module-grid module-grid-single">
       <article className="data-card">
         <strong className="section-title">Fechas</strong>
 
@@ -58,102 +57,115 @@ export function DateOperations({
           ))}
         </div>
 
-        <article className="data-card date-section-card">
-          <strong className="section-title">Fechas registradas</strong>
-          <div className="table-wrap compact-table" style={{ marginTop: "0.8rem" }}>
-            <table>
-              <thead>
-                <tr>
-                  <th>Fecha</th>
-                  <th>Tipo</th>
-                  <th>Estatus</th>
-                </tr>
-              </thead>
-              <tbody>
-                {registeredDates.length === 0 ? (
-                  <tr><td colSpan={3}>Sin fechas registradas.</td></tr>
-                ) : (
-                  registeredDates.map((date) => (
-                    <tr key={date.id}>
-                      <td>{formatLongDate(date.fechaCompleta)}</td>
-                      <td>
-                        {date.fechaCompleta === tomorrowValue
-                          ? "MAÑANA"
-                          : date.fechaCompleta === waitingValue
-                            ? "EN ESPERA"
-                            : "Registrada"}
-                      </td>
-                      <td>{date.cierre ? "Cerrada" : "Disponible"}</td>
-                    </tr>
-                  ))
-                )}
-              </tbody>
-            </table>
+        <details className="data-card section-collapse date-section-card">
+          <summary>
+            <span>Fechas registradas</span>
+            <span>{registeredDates.length} registros</span>
+          </summary>
+          <div className="section-collapse-body">
+            <div className="table-wrap compact-table">
+              <table>
+                <thead>
+                  <tr>
+                    <th>Fecha</th>
+                    <th>Tipo</th>
+                    <th>Estatus</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {registeredDates.length === 0 ? (
+                    <tr><td colSpan={3}>Sin fechas registradas.</td></tr>
+                  ) : (
+                    registeredDates.map((date) => (
+                      <tr key={date.id}>
+                        <td>{formatLongDate(date.fechaCompleta)}</td>
+                        <td>
+                          {date.fechaCompleta === tomorrowValue
+                            ? "MAÑANA"
+                            : date.fechaCompleta === waitingValue
+                              ? "EN ESPERA"
+                              : "Registrada"}
+                        </td>
+                        <td>{date.cierre ? "Cerrada" : "Disponible"}</td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
           </div>
-        </article>
+        </details>
       </article>
 
       {roleKey === "super-admin" ? (
-        <article className="form-card">
-          <article className="data-card date-section-card">
-            <strong className="section-title">Crear</strong>
-            <MutationBanner state={createState} />
-            <form action={createAction} className="field-grid" style={{ marginTop: "0.8rem" }} autoComplete="off">
-              <div className="field">
-                <label htmlFor="fecha_completa">Fecha de visita</label>
-                <input id="fecha_completa" name="fecha_completa" type="date" min={tomorrowValue} max={waitingValue} autoComplete="off" />
-              </div>
-              <div className="field">
-                <label htmlFor="estado">Tipo</label>
-                <select id="estado" name="estado" value={selectedStatus} onChange={(event) => setSelectedStatus(event.target.value as "abierto" | "proximo")}>
-                  <option value="abierto">MAÑANA</option>
-                  <option value="proximo">EN ESPERA</option>
-                </select>
-              </div>
-              <div className="actions-row">
-                <LoadingButton pending={createPending} label="Guardar" loadingLabel="Loading..." className="button" />
-              </div>
-            </form>
-          </article>
+        <article className="form-card collapse-stack">
+          <details className="data-card section-collapse date-section-card">
+            <summary>
+              <span>Crear</span>
+              <span>Fecha nueva</span>
+            </summary>
+            <div className="section-collapse-body">
+              <MutationBanner state={createState} />
+              <form action={createAction} className="field-grid" autoComplete="off">
+                <div className="field">
+                  <label htmlFor="fecha_completa">Fecha de visita</label>
+                  <input id="fecha_completa" name="fecha_completa" type="date" min={tomorrowValue} max={waitingValue} autoComplete="off" />
+                </div>
+                <div className="actions-row">
+                  <LoadingButton pending={createPending} label="Guardar" loadingLabel="Loading..." className="button" />
+                </div>
+              </form>
+            </div>
+          </details>
 
-          <article className="data-card date-section-card">
-            <strong className="section-title">Cerrar</strong>
-            <p className="muted" style={{ marginTop: "0.4rem" }}>
-              {openDate ? `Vas a cerrar la fecha ${formatLongDate(openDate.fechaCompleta)}.` : "No hay fecha registrada para MAÑANA."}
-            </p>
-            {!canCloseNow ? (
-              <p className="muted" style={{ marginTop: "0.4rem" }}>
-                Solo puedes cerrar la fecha despues de las 18:00 horas de Mexico.
+          <details className="data-card section-collapse date-section-card">
+            <summary>
+              <span>Cerrar</span>
+              <span>{openDate ? formatLongDate(openDate.fechaCompleta) : "Sin fecha"}</span>
+            </summary>
+            <div className="section-collapse-body">
+              <p className="muted">
+                {openDate ? `Vas a cerrar la fecha ${formatLongDate(openDate.fechaCompleta)}.` : "No hay fecha registrada para MAÑANA."}
               </p>
-            ) : null}
-            <MutationBanner state={closeState} />
-            <form action={closeAction} className="field-grid" style={{ marginTop: "0.8rem" }} autoComplete="off">
-              <input type="hidden" name="fecha_completa" value={openDate?.fechaCompleta ?? ""} />
-              <div className="field">
-                <label htmlFor="close_password">Contraseña de cierre</label>
-                <input id="close_password" name="close_password" type="password" placeholder="Contraseña" autoComplete="off" />
-              </div>
-              <div className="actions-row">
-                <LoadingButton pending={closePending} label="Cerrar fecha" loadingLabel="Loading..." className="button-secondary" disabled={!openDate || !canCloseNow} />
-              </div>
-            </form>
-          </article>
+              {!canCloseNow ? (
+                <p className="muted" style={{ marginTop: "0.4rem" }}>
+                  Solo puedes cerrar la fecha despues de las 18:00 horas de Mexico.
+                </p>
+              ) : null}
+              <MutationBanner state={closeState} />
+              <form action={closeAction} className="field-grid" style={{ marginTop: "0.8rem" }} autoComplete="off">
+                <input type="hidden" name="fecha_completa" value={openDate?.fechaCompleta ?? ""} />
+                <div className="field">
+                  <label htmlFor="close_password">Contraseña de cierre</label>
+                  <input id="close_password" name="close_password" type="password" placeholder="Contraseña" autoComplete="off" />
+                </div>
+                <div className="actions-row">
+                  <LoadingButton pending={closePending} label="Cerrar fecha" loadingLabel="Loading..." className="button-secondary" disabled={!openDate || !canCloseNow} />
+                </div>
+              </form>
+            </div>
+          </details>
 
-          <article className="data-card date-section-card">
-            <strong className="section-title">Contraseña</strong>
-            <MutationBanner state={passwordState} />
-            <form action={passwordAction} className="field-grid" style={{ marginTop: "0.8rem" }} autoComplete="off">
-              <div className="field">
-                <label htmlFor="new_close_password">
-                  {closePasswordConfigured ? "Nueva contraseña de cierre" : "Crear contraseña de cierre"}
-                </label>
-                <input id="new_close_password" name="close_password" type="password" placeholder="Contraseña" autoComplete="off" />
-              </div>
-              <div className="actions-row">
-                <LoadingButton pending={passwordPending} label="Guardar contraseña" loadingLabel="Loading..." className="button" />
-              </div>
-            </form>
-          </article>
+          <details className="data-card section-collapse date-section-card">
+            <summary>
+              <span>Contraseña</span>
+              <span>{closePasswordConfigured ? "Actualizable" : "Sin definir"}</span>
+            </summary>
+            <div className="section-collapse-body">
+              <MutationBanner state={passwordState} />
+              <form action={passwordAction} className="field-grid" autoComplete="off">
+                <div className="field">
+                  <label htmlFor="new_close_password">
+                    {closePasswordConfigured ? "Nueva contraseña de cierre" : "Crear contraseña de cierre"}
+                  </label>
+                  <input id="new_close_password" name="close_password" type="password" placeholder="Contraseña" autoComplete="off" />
+                </div>
+                <div className="actions-row">
+                  <LoadingButton pending={passwordPending} label="Guardar contraseña" loadingLabel="Loading..." className="button" />
+                </div>
+              </form>
+            </div>
+          </details>
         </article>
       ) : null}
     </section>

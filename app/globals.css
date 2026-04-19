@@ -504,8 +504,18 @@ html[data-theme="dark"] .segmented-button {
   color: var(--text);
 }
 
+.nav-link.danger-link.active {
+  background: linear-gradient(135deg, rgba(127, 29, 29, 0.18), rgba(185, 28, 28, 0.2));
+  color: #7f1d1d;
+}
+
 html[data-theme="dark"] .nav-link.active {
   background: linear-gradient(135deg, rgba(15, 118, 110, 0.2), rgba(21, 94, 117, 0.24));
+}
+
+html[data-theme="dark"] .nav-link.danger-link.active {
+  background: linear-gradient(135deg, rgba(127, 29, 29, 0.34), rgba(185, 28, 28, 0.38));
+  color: #fecaca;
 }
 
 .icon-pill,
@@ -524,6 +534,16 @@ html[data-theme="dark"] .nav-link.active {
   background: rgba(15, 118, 110, 0.12);
   color: var(--brand);
   font-size: 0.8rem;
+}
+
+.danger-link .icon-pill {
+  background: rgba(127, 29, 29, 0.12);
+  color: #991b1b;
+}
+
+html[data-theme="dark"] .danger-link .icon-pill {
+  background: rgba(185, 28, 28, 0.26);
+  color: #fecaca;
 }
 
 .role-badge,
@@ -717,7 +737,7 @@ tr:last-child td {
 
 .profile-summary {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  grid-template-columns: minmax(0, 1fr);
   gap: 0.75rem;
 }
 
@@ -1382,10 +1402,8 @@ html[data-theme="dark"] .danger-zone-panel .section-collapse summary {
   }
 
   .module-grid,
-  .records-grid {
-    grid-template-columns: minmax(0, 1.15fr) minmax(360px, 0.85fr);
-  }
-
+  .records-grid,
+  .split-grid,
   .module-grid.module-grid-single {
     grid-template-columns: minmax(0, 1fr) !important;
   }
@@ -1395,9 +1413,6 @@ html[data-theme="dark"] .danger-zone-panel .section-collapse summary {
     align-items: stretch;
   }
 
-  .split-grid {
-    grid-template-columns: repeat(2, minmax(0, 1fr));
-  }
 }
 
 @media (max-width: 899px) {

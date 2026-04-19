@@ -116,16 +116,11 @@ export async function createDateAction(
   try {
     const profile = await requireProfile();
     if (profile.roleKey !== "super-admin") {
-      return failure("Solo super-admin puede guardar zonas.");
+      return failure("Tu rol no puede registrar fechas.");
     }
     const supabase = await createServerSupabaseClient();
 
-    if (profile.roleKey !== "super-admin") {
-      return failure("Tu rol no puede registrar fechas.");
-    }
-
     const dateValue = String(formData.get("fecha_completa") ?? "").trim();
-    const status = String(formData.get("estado") ?? "abierto").trim();
     const parsedDate = parseDateParts(dateValue);
 
     if (!parsedDate) {
@@ -140,8 +135,18 @@ export async function createDateAction(
     const dates = await getFechas();
     const allowedOpenDate = getDateOffset(1);
     const allowedNextDate = getDateOffset(2);
+    const status =
+      dateValue === allowedOpenDate
+        ? "abierto"
+        : dateValue === allowedNextDate
+          ? "proximo"
+          : "";
     const activeOpenDate = dates.find((item) => item.estado === "abierto" && !item.cierre);
     const waitingDate = dates.find((item) => item.estado === "proximo" && !item.cierre);
+
+    if (!status) {
+      return failure("Solo puedes registrar fechas para MAÑANA o EN ESPERA.");
+    }
 
     if (status === "abierto" && dateValue !== allowedOpenDate) {
       return failure("La fecha abierta solo puede ser para manana.");

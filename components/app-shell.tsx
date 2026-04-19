@@ -35,7 +35,7 @@ export function AppShell({
   const visibleNavItems = [
     ...(canAccessCoreSystem(user.roleKey, user.moduleOnly) ? coreNavItems : []),
     ...(user.roleKey === "super-admin"
-      ? [{ href: "/sistema/admin", icon: "DZ", label: "Danger Zone" }]
+      ? [{ href: "/sistema/admin", icon: "DZ", label: "Danger Zone", danger: true }]
       : []),
     ...moduleNavItems.filter((item) => canAccessModule(user.roleKey, user.accessibleModules, item.moduleKey))
   ];
@@ -65,7 +65,7 @@ export function AppShell({
                     <Link
                       key={item.href}
                       href={item.href}
-                      className={`nav-link ${active ? "active" : ""}`}
+                      className={`nav-link ${active ? "active" : ""} ${"danger" in item && item.danger ? "danger-link" : ""}`}
                       onClick={() => setOpen(false)}
                     >
                       <span className="icon-pill">{item.icon}</span>

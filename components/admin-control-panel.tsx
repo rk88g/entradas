@@ -106,7 +106,7 @@ export function AdminControlPanel({
 
       {tab === "configuracion" ? (
         <section className="collapse-stack" style={{ marginTop: "1rem" }}>
-          <details className="data-card section-collapse" open>
+          <details className="data-card section-collapse">
             <summary>
               <span>Corte global</span>
               <span>Configuracion general</span>
@@ -130,7 +130,7 @@ export function AdminControlPanel({
             </div>
           </details>
 
-          <details className="data-card section-collapse" open>
+          <details className="data-card section-collapse">
             <summary>
               <span>Zonas</span>
               <span>{config.zones.length} registros</span>
@@ -173,7 +173,7 @@ export function AdminControlPanel({
             </div>
           </details>
 
-          <details className="data-card section-collapse" open>
+          <details className="data-card section-collapse">
             <summary>
               <span>Programacion de cobranza</span>
               <span>{config.chargeRoutes.length} registros</span>
@@ -249,7 +249,7 @@ export function AdminControlPanel({
             </div>
           </details>
 
-          <details className="data-card section-collapse" open>
+          <details className="data-card section-collapse">
             <summary>
               <span>Lista de precios</span>
               <span>{config.prices.length} registros</span>
@@ -287,7 +287,6 @@ export function AdminControlPanel({
                 <div className="field"><input name="fine_price" type="number" step="0.01" placeholder="Multa" autoComplete="off" /></div>
                 <div className="field"><input name="maintenance_price" type="number" step="0.01" placeholder="Mantenimiento" autoComplete="off" /></div>
                 <div className="field"><input name="retention_price" type="number" step="0.01" placeholder="Retencion" autoComplete="off" /></div>
-                <div className="field"><input name="discount_amount" type="number" step="0.01" placeholder="Descuento" autoComplete="off" /></div>
                 <div className="actions-row">
                   <LoadingButton pending={pricePending} label="Guardar precio" loadingLabel="Loading..." className="button-secondary" />
                 </div>
@@ -324,7 +323,7 @@ export function AdminControlPanel({
             </div>
           </details>
 
-          <details className="data-card section-collapse" open>
+          <details className="data-card section-collapse">
             <summary>
               <span>Negocios y oficinas</span>
               <span>{config.workplacePositions.length} puestos</span>
@@ -410,7 +409,7 @@ export function AdminControlPanel({
 
       {tab === "usuarios" ? (
         <section className="collapse-stack" style={{ marginTop: "1rem" }}>
-          <details className="data-card section-collapse" open>
+          <details className="data-card section-collapse">
             <summary>
               <span>Cambiar contrasena</span>
               <span>Control de acceso</span>
@@ -441,7 +440,7 @@ export function AdminControlPanel({
             </div>
           </details>
 
-          <details className="data-card section-collapse" open>
+          <details className="data-card section-collapse">
             <summary>
               <span>Usuarios detectados</span>
               <span>{users.length} registros</span>
@@ -481,7 +480,7 @@ export function AdminControlPanel({
       ) : null}
 
       {tab === "sesiones" ? (
-        <details className="data-card section-collapse" style={{ marginTop: "1rem" }} open>
+        <details className="data-card section-collapse" style={{ marginTop: "1rem" }}>
           <summary>
             <span>Logs de conexion</span>
             <span>{connectionLogs.length} registros</span>
@@ -522,7 +521,7 @@ export function AdminControlPanel({
       ) : null}
 
       {tab === "acciones" ? (
-        <details className="data-card section-collapse" style={{ marginTop: "1rem" }} open>
+        <details className="data-card section-collapse" style={{ marginTop: "1rem" }}>
           <summary>
             <span>Logs de acciones</span>
             <span>{actionLogs.length} registros</span>

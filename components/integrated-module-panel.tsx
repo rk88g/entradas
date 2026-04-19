@@ -170,28 +170,34 @@ export function IntegratedModulePanel({
         </div>
 
         {tab === "resumen" ? (
-          <div className="stack" style={{ marginTop: "1rem" }}>
+          <div className="collapse-stack" style={{ marginTop: "1rem" }}>
             <article className="data-card" style={{ padding: "0.9rem 1.1rem" }}>
               <strong>{`Semana del ${formatLongDate(data.currentWeekLabel.slice(0, 10))} al ${formatLongDate(data.currentWeekLabel.slice(-10))}`}</strong>
             </article>
 
-            {data.pendingDevices.length > 0 ? (
-              <div className="alert-box">
-                {data.pendingDevices.length} altas pendientes en {data.moduleName}.
-              </div>
-            ) : null}
+            <details className="data-card section-collapse">
+              <summary>
+                <span>Resumen</span>
+                <span>{data.moduleName}</span>
+              </summary>
+              <div className="section-collapse-body">
+                {data.pendingDevices.length > 0 ? (
+                  <div className="alert-box" style={{ marginBottom: "0.8rem" }}>
+                    {data.pendingDevices.length} altas pendientes en {data.moduleName}.
+                  </div>
+                ) : null}
 
-            <section className="stats-grid">
-              <article className="stat-card"><small>Pagados</small><strong>{data.paidDevices.length}</strong></article>
-              <article className="stat-card"><small>Pendientes</small><strong>{data.unpaidDevices.length}</strong></article>
-              <article className="stat-card"><small>Altas</small><strong>{data.pendingDevices.length}</strong></article>
-              <article className="stat-card"><small>Mantenimiento</small><strong>{data.devices.filter((item) => item.status === "reparacion").length}</strong></article>
-              <article className="stat-card"><small>Retenidos</small><strong>{data.devices.filter((item) => item.status === "retenido").length}</strong></article>
-              <article className="stat-card"><small>Ingresos</small><strong>${data.totalIncome.toFixed(2)}</strong></article>
-            </section>
+                <section className="stats-grid">
+                  <article className="stat-card"><small>Pagados</small><strong>{data.paidDevices.length}</strong></article>
+                  <article className="stat-card"><small>Pendientes</small><strong>{data.unpaidDevices.length}</strong></article>
+                  <article className="stat-card"><small>Altas</small><strong>{data.pendingDevices.length}</strong></article>
+                  <article className="stat-card"><small>Mantenimiento</small><strong>{data.devices.filter((item) => item.status === "reparacion").length}</strong></article>
+                  <article className="stat-card"><small>Retenidos</small><strong>{data.devices.filter((item) => item.status === "retenido").length}</strong></article>
+                  <article className="stat-card"><small>Ingresos</small><strong>${data.totalIncome.toFixed(2)}</strong></article>
+                </section>
 
-            <div className="table-wrap compact-table">
-              <table>
+                <div className="table-wrap compact-table" style={{ marginTop: "0.8rem" }}>
+                  <table>
                 <thead>
                   <tr>
                     <th>Zona</th>
@@ -214,30 +220,41 @@ export function IntegratedModulePanel({
                     ))
                   )}
                 </tbody>
-              </table>
-            </div>
+                  </table>
+                </div>
+              </div>
+            </details>
 
             {canCloseWeek && data.currentCycleId ? (
-              <article className="form-card">
-                <strong className="section-title">Cerrar semana</strong>
-                <MutationBanner state={closeState} />
-                <form action={closeAction} className="field-grid" style={{ marginTop: "0.8rem" }} autoComplete="off">
+              <details className="data-card section-collapse">
+                <summary>
+                  <span>Cerrar semana</span>
+                  <span>{data.weekClosed ? "Cerrada" : "Disponible"}</span>
+                </summary>
+                <div className="section-collapse-body">
+                  <MutationBanner state={closeState} />
+                  <form action={closeAction} className="field-grid" autoComplete="off">
                   <input type="hidden" name="module_key" value={data.moduleKey} />
                   <input type="hidden" name="cycle_id" value={data.currentCycleId} />
                   <div className="actions-row">
                     <LoadingButton pending={closePending} label="Cerrar semana" loadingLabel="Loading..." className="button" disabled={data.weekClosed} />
                   </div>
-                </form>
-              </article>
+                  </form>
+                </div>
+              </details>
             ) : null}
           </div>
         ) : null}
 
         {tab === "aparatos" ? (
-          <div className="module-grid" style={{ marginTop: "1rem" }}>
-            <article className="data-card">
-              <strong className="section-title">Listado</strong>
-              <div className="table-wrap compact-table" style={{ marginTop: "0.8rem" }}>
+          <div className="collapse-stack" style={{ marginTop: "1rem" }}>
+            <details className="data-card section-collapse">
+              <summary>
+                <span>Listado</span>
+                <span>{data.devices.length} registros</span>
+              </summary>
+              <div className="section-collapse-body">
+                <div className="table-wrap compact-table">
                 <table>
                   <thead>
                     <tr>
@@ -262,13 +279,18 @@ export function IntegratedModulePanel({
                     )}
                   </tbody>
                 </table>
+                </div>
               </div>
-            </article>
+            </details>
 
-            <article className="form-card">
-              <strong className="section-title">Alta manual</strong>
-              <MutationBanner state={deviceState} />
-              <form action={deviceAction} className="field-grid" style={{ marginTop: "0.8rem" }} autoComplete="off">
+            <details className="data-card section-collapse">
+              <summary>
+                <span>Alta manual</span>
+                <span>Pendiente hasta pago de alta</span>
+              </summary>
+              <div className="section-collapse-body">
+                <MutationBanner state={deviceState} />
+                <form action={deviceAction} className="field-grid" autoComplete="off">
                 <input type="hidden" name="module_key" value={data.moduleKey} />
                 <div className="field">
                   <select name="internal_id" defaultValue="" disabled={!canManageEntries || data.weekClosed}>
@@ -321,21 +343,27 @@ export function IntegratedModulePanel({
                 <div className="actions-row">
                   <LoadingButton pending={devicePending} label="Guardar aparato" loadingLabel="Loading..." className="button" disabled={!canManageEntries || data.weekClosed} />
                 </div>
-              </form>
-            </article>
+                </form>
+              </div>
+            </details>
           </div>
         ) : null}
 
         {tab === "cobranza" ? (
-          <div className="module-grid" style={{ marginTop: "1rem" }}>
-            <article className="data-card">
-              <div className="actions-row" style={{ justifyContent: "space-between", marginBottom: "0.8rem" }}>
-                <strong className="section-title">Cobranza por zona</strong>
-                <button type="button" className="button-soft hide-print" onClick={() => window.print()}>
-                  Imprimir registros
-                </button>
-              </div>
-              <div className="field" style={{ marginBottom: "0.8rem" }}>
+          <div className="collapse-stack" style={{ marginTop: "1rem" }}>
+            <details className="data-card section-collapse">
+              <summary>
+                <span>Cobranza por zona</span>
+                <span>{filteredInternalsForZone.length} internos</span>
+              </summary>
+              <div className="section-collapse-body">
+                <div className="actions-row" style={{ justifyContent: "space-between", marginBottom: "0.8rem" }}>
+                  <span className="muted">Listado listo para impresión</span>
+                  <button type="button" className="button-soft hide-print" onClick={() => window.print()}>
+                    Imprimir registros
+                  </button>
+                </div>
+                <div className="field" style={{ marginBottom: "0.8rem" }}>
                 <select value={selectedZoneFilter} onChange={(event) => setSelectedZoneFilter(event.target.value)}>
                   <option value="">Todas las zonas</option>
                   {data.zones.map((zone) => (
@@ -344,9 +372,9 @@ export function IntegratedModulePanel({
                     </option>
                   ))}
                 </select>
-              </div>
-              <div className="table-wrap compact-table">
-                <table>
+                </div>
+                <div className="table-wrap compact-table">
+                  <table>
                   <thead>
                     <tr>
                       <th>Ubicacion</th>
@@ -369,14 +397,19 @@ export function IntegratedModulePanel({
                       ))
                     )}
                   </tbody>
-                </table>
+                  </table>
+                </div>
               </div>
-            </article>
+            </details>
 
-            <article className="form-card">
-              <strong className="section-title">Registrar pago</strong>
-              <MutationBanner state={paymentState} />
-              <form action={paymentAction} className="field-grid" style={{ marginTop: "0.8rem" }} autoComplete="off">
+            <details className="data-card section-collapse">
+              <summary>
+                <span>Registrar pago</span>
+                <span>{selectedChargeInternal ? selectedChargeInternal.internalName : "Sin interno"}</span>
+              </summary>
+              <div className="section-collapse-body">
+                <MutationBanner state={paymentState} />
+                <form action={paymentAction} className="field-grid" autoComplete="off">
                 <input type="hidden" name="module_key" value={data.moduleKey} />
                 <input type="hidden" name="amount" value={selectedChargeInternal?.totalDue ?? 0} />
                 <div className="field">
@@ -423,8 +456,9 @@ export function IntegratedModulePanel({
                 <div className="actions-row">
                   <LoadingButton pending={paymentPending} label="Registrar pago" loadingLabel="Loading..." className="button" disabled={!canManageCharges || data.weekClosed || !selectedChargeInternal} />
                 </div>
-              </form>
-            </article>
+                </form>
+              </div>
+            </details>
           </div>
         ) : null}
       </section>

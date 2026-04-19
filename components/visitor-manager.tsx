@@ -34,10 +34,10 @@ export function VisitorManager({
   const [page, setPage] = useState(1);
   const [selectedVisitorId, setSelectedVisitorId] = useState<string | null>(visitors[0]?.id ?? null);
   const [sectionsOpen, setSectionsOpen] = useState<Record<string, boolean>>({
-    perfil: true,
-    historial: true,
-    reasignacion: true,
-    nueva: true
+    perfil: false,
+    historial: false,
+    reasignacion: false,
+    nueva: false
   });
   const [internalSearch, setInternalSearch] = useState("");
   const [createInternalSearch, setCreateInternalSearch] = useState("");
