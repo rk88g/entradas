@@ -250,6 +250,43 @@ export function nextPassNumber(seed: number) {
   return seed + 1;
 }
 
+export function isValidInternalLocation(value: string) {
+  return /^(?:[1-9]|1[0-5])-\d+$/.test(value.trim());
+}
+
+export function parseInternalLocation(value: string) {
+  const normalized = String(value ?? "").trim();
+  const match = /^(\d+)-(\d+)$/.exec(normalized);
+  if (!match) {
+    return {
+      primary: Number.MAX_SAFE_INTEGER,
+      secondary: Number.MAX_SAFE_INTEGER,
+      raw: normalized
+    };
+  }
+
+  return {
+    primary: Number(match[1]),
+    secondary: Number(match[2]),
+    raw: normalized
+  };
+}
+
+export function compareInternalLocations(a: string, b: string) {
+  const locationA = parseInternalLocation(a);
+  const locationB = parseInternalLocation(b);
+
+  if (locationA.primary !== locationB.primary) {
+    return locationA.primary - locationB.primary;
+  }
+
+  if (locationA.secondary !== locationB.secondary) {
+    return locationA.secondary - locationB.secondary;
+  }
+
+  return locationA.raw.localeCompare(locationB.raw);
+}
+
 export function sortListingsForPrint(listings: ListingRecord[]) {
   return [...listings].sort((a, b) => {
     const numberA = a.numeroPase ?? Number.MAX_SAFE_INTEGER;
@@ -260,7 +297,7 @@ export function sortListingsForPrint(listings: ListingRecord[]) {
     }
 
     if (a.numeroPase && b.numeroPase) {
-      return a.internoUbicacion - b.internoUbicacion || a.createdAt.localeCompare(b.createdAt);
+      return compareInternalLocations(a.internoUbicacion, b.internoUbicacion) || a.createdAt.localeCompare(b.createdAt);
     }
 
     if (a.numeroPase !== b.numeroPase) {
@@ -272,9 +309,9 @@ export function sortListingsForPrint(listings: ListingRecord[]) {
     }
 
     if (a.cierreAplicado && b.cierreAplicado) {
-      return a.internoUbicacion - b.internoUbicacion || a.createdAt.localeCompare(b.createdAt);
+      return compareInternalLocations(a.internoUbicacion, b.internoUbicacion) || a.createdAt.localeCompare(b.createdAt);
     }
 
-    return a.internoUbicacion - b.internoUbicacion || a.createdAt.localeCompare(b.createdAt);
+    return compareInternalLocations(a.internoUbicacion, b.internoUbicacion) || a.createdAt.localeCompare(b.createdAt);
   });
 }

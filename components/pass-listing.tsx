@@ -68,12 +68,11 @@ function renderMainPass(pass: ListingRecord) {
   const { listedVisitors, hiddenVisitorsCount, underTwelveCount } = getCompactVisibleVisitors(pass);
   const { basic, special } = splitMentions(pass.menciones);
   const extraSpecials = splitMentions(pass.especiales);
-  const deviceSummary = formatDeviceSummary(pass);
   const specialLines = [
     ...extraSpecials.basic,
     ...extraSpecials.special,
     ...special,
-    ...(deviceSummary ? [deviceSummary] : [])
+    ...(!pass.especiales?.trim() && formatDeviceSummary(pass) ? [formatDeviceSummary(pass) as string] : [])
   ];
 
   return (
@@ -200,12 +199,11 @@ function renderSeparatedPasses(pass: ListingRecord) {
 function renderMentionPass(pass: ListingRecord) {
   const { basic, special } = splitMentions(pass.menciones);
   const extraSpecials = splitMentions(pass.especiales);
-  const deviceSummary = formatDeviceSummary(pass);
   const mergedSpecialLines = [
     ...special,
     ...extraSpecials.basic,
     ...extraSpecials.special,
-    ...(deviceSummary ? [deviceSummary] : [])
+    ...(!pass.especiales?.trim() && formatDeviceSummary(pass) ? [formatDeviceSummary(pass) as string] : [])
   ];
 
   return (

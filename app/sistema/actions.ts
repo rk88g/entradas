@@ -13,7 +13,9 @@ import {
 import { MutationState } from "@/lib/types";
 import {
   canManageMentions,
+  compareInternalLocations,
   getDateOffset,
+  isValidInternalLocation,
   getWeekRangeFromCutoff,
   nextPassNumber
 } from "@/lib/utils";
@@ -60,6 +62,24 @@ async function getPassArticlePayload(formData: FormData) {
     .filter((item) => Number.isFinite(item.quantity) && item.quantity > 0);
 
   return articlePairs;
+}
+
+function appendDeviceSummaryToSpecials(
+  specialsText: string,
+  deviceSummary: string | null
+) {
+  const normalizedText = specialsText.trim();
+  const normalizedSummary = deviceSummary?.trim() ?? "";
+
+  if (!normalizedSummary) {
+    return normalizedText || null;
+  }
+
+  if (!normalizedText) {
+    return normalizedSummary;
+  }
+
+  return `${normalizedText}\n${normalizedSummary}`;
 }
 
 async function requireProfile() {
@@ -181,7 +201,7 @@ export async function closeDateAction(
     const passes = await getListado({ fechaVisita: dateValue });
     const activePasses = passes
       .filter((item) => item.status !== "cancelado")
-      .sort((a, b) => a.internoUbicacion - b.internoUbicacion || a.createdAt.localeCompare(b.createdAt));
+      .sort((a, b) => compareInternalLocations(a.internoUbicacion, b.internoUbicacion) || a.createdAt.localeCompare(b.createdAt));
 
     const numberedPasses = activePasses
       .filter((item) => item.numeroPase)
@@ -192,7 +212,7 @@ export async function closeDateAction(
       numberedPasses.length > 0
         ? pendingPasses.sort((a, b) => a.createdAt.localeCompare(b.createdAt))
         : pendingPasses.sort(
-            (a, b) => a.internoUbicacion - b.internoUbicacion || a.createdAt.localeCompare(b.createdAt)
+            (a, b) => compareInternalLocations(a.internoUbicacion, b.internoUbicacion) || a.createdAt.localeCompare(b.createdAt)
           );
 
     let currentNumber = numberedPasses[numberedPasses.length - 1]?.numeroPase ?? 0;
@@ -251,7 +271,7 @@ export async function createInternalAction(
       nacimiento: String(formData.get("nacimiento") ?? "").trim() || buildBirthDateFromAge(age),
       llego: String(formData.get("llego") ?? "").trim() || new Date().toISOString().slice(0, 10),
       libre: String(formData.get("libre") ?? "").trim() || null,
-      ubicacion: Number(formData.get("ubicacion") ?? 0),
+      ubicacion: String(formData.get("ubicacion") ?? "").trim(),
       telefono: null,
       ubi_filiacion: String(formData.get("ubi_filiacion") ?? "").trim() || "Sin dato",
       apartado: "618",
@@ -270,6 +290,10 @@ export async function createInternalAction(
 
     if (!Number.isFinite(age) || age <= 0) {
       return failure("La edad del interno debe ser mayor a cero.");
+    }
+
+    if (!isValidInternalLocation(payload.ubicacion)) {
+      return failure("La ubicacion debe tener formato numero-numero, por ejemplo 1-101 o 15-8.");
     }
 
     const { error } = await supabase.from("internos").insert(payload);
@@ -332,7 +356,7 @@ export async function createVisitorAction(
       fecha_nacimiento: String(formData.get("fecha_nacimiento") ?? "").trim(),
       sexo: String(formData.get("sexo") ?? "sin-definir").trim(),
       parentesco: String(formData.get("parentesco") ?? "").trim(),
-      telefono: String(formData.get("telefono") ?? "").trim() || null,
+      telefono: String(formData.get("telefono") ?? "").trim() || "No aplica",
       betada:
         ["super-admin", "control"].includes(profile.roleKey) &&
         String(formData.get("betada") ?? "false") === "true",
@@ -720,6 +744,34 @@ export async function createPassAction(
       return failure("Debes incluir al menos un adulto en el pase.");
     }
 
+    let articleSummary: string | null = null;
+    if (articlePayload.length > 0) {
+      const { data: articleTypes, error: articleTypeError } = await supabase
+        .from("module_device_types")
+        .select("id, name")
+        .in(
+          "id",
+          articlePayload.map((item) => item.deviceTypeId)
+        );
+
+      if (articleTypeError) {
+        return failure(articleTypeError.message || "No se pudieron validar los articulos del pase.");
+      }
+
+      const articleNameMap = new Map((articleTypes ?? []).map((item) => [item.id, item.name]));
+      articleSummary = articlePayload
+        .map((item) => {
+          const name = articleNameMap.get(item.deviceTypeId);
+          if (!name || item.quantity < 1) {
+            return null;
+          }
+
+          return `${name} [${item.quantity}]`;
+        })
+        .filter((item): item is string => Boolean(item))
+        .join(", ");
+    }
+
     let nextNumber: number | null = null;
     if (targetDate.cierre && canOperateClosedDate) {
       const existingPasses = await getListado({ fechaVisita: targetDate.fechaCompleta });
@@ -741,7 +793,10 @@ export async function createPassAction(
         numero_pase: nextNumber,
         cierre_aplicado: false,
         menciones: canManageMentions(profile.roleKey) && mentions ? mentions : null,
-        especiales: canManageMentions(profile.roleKey) && specials ? specials : null,
+        especiales:
+          canManageMentions(profile.roleKey)
+            ? appendDeviceSummaryToSpecials(specials, articleSummary)
+            : null,
         created_by: profile.id
       })
       .select("id")

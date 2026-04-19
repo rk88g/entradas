@@ -46,7 +46,7 @@ create table if not exists public.internos (
   nacimiento date not null,
   llego date not null,
   libre date,
-  ubicacion integer not null,
+  ubicacion text not null,
   telefono text,
   ubi_filiacion text not null,
   apartado text not null check (apartado in ('618', 'INTIMA')),
@@ -59,6 +59,9 @@ create table if not exists public.internos (
 
 alter table public.internos
   add column if not exists telefono text;
+
+alter table public.internos
+  alter column ubicacion type text using ubicacion::text;
 
 create table if not exists public.visitas (
   id uuid primary key default gen_random_uuid(),

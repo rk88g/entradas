@@ -20,7 +20,7 @@ import {
   MutationState,
   RoleKey
 } from "@/lib/types";
-import { canManageModuleFunction } from "@/lib/utils";
+import { canManageModuleFunction, compareInternalLocations } from "@/lib/utils";
 
 const mutationInitialState: MutationState = {
   success: null,
@@ -65,13 +65,13 @@ function getZonePrefix(zoneName?: string) {
   return match?.[1] ?? null;
 }
 
-function matchesZoneByLocation(zoneName: string | undefined, internalLocation: number) {
+function matchesZoneByLocation(zoneName: string | undefined, internalLocation: string) {
   const prefix = getZonePrefix(zoneName);
   if (!prefix) {
     return true;
   }
 
-  return String(internalLocation).startsWith(prefix);
+  return String(internalLocation).split("-")[0] === prefix;
 }
 
 function getDeviceWeeklyCharge(device: InternalDeviceRecord, priceMap: Map<string, { weeklyPrice: number; discountAmount: number }>) {
@@ -91,7 +91,7 @@ export function IntegratedModulePanel({
   accesses
 }: {
   data: ModulePanelData;
-  internals: Array<{ id: string; fullName: string; ubicacion: number }>;
+  internals: Array<{ id: string; fullName: string; ubicacion: string }>;
   roleKey: RoleKey;
   accesses: ModuleAccess[];
 }) {
@@ -130,7 +130,7 @@ export function IntegratedModulePanel({
       {
         internalId: string;
         internalName: string;
-        internalLocation: number;
+        internalLocation: string;
         devices: InternalDeviceRecord[];
         totalDue: number;
         paidCount: number;
@@ -158,7 +158,7 @@ export function IntegratedModulePanel({
       map.set(device.internalId, current);
     });
 
-    return [...map.values()].sort((a, b) => a.internalLocation - b.internalLocation);
+    return [...map.values()].sort((a, b) => compareInternalLocations(a.internalLocation, b.internalLocation));
   }, [data.devices, data.paidDevices, priceMap]);
 
   const filteredInternalsForZone = groupedInternals.filter((item) => {

@@ -48,7 +48,7 @@ export interface InternalRecord {
   edad: number;
   llego: string;
   libre: string;
-  ubicacion: number;
+  ubicacion: string;
   telefono: string;
   estatus: string;
   ubiFiliacion: string;
@@ -130,7 +130,7 @@ export interface ListingRecord {
   id: string;
   internoId: string;
   internoNombre: string;
-  internoUbicacion: number;
+  internoUbicacion: string;
   fechaId?: string;
   fechaVisita: string;
   area: AccessArea;
@@ -219,7 +219,7 @@ export interface InternalDeviceRecord {
   id: string;
   internalId: string;
   internalName: string;
-  internalLocation: number;
+  internalLocation: string;
   moduleKey: ModuleKey;
   deviceTypeId: string;
   deviceTypeName: string;

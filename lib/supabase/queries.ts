@@ -28,6 +28,7 @@ import {
   VisitorSex
 } from "@/lib/types";
 import {
+  compareInternalLocations,
   fullNameFromParts,
   getAgeFromDate,
   getModuleDisplayName,
@@ -77,7 +78,7 @@ function mapInternalRecord(item: {
   nacimiento: string;
   llego: string;
   libre: string | null;
-  ubicacion: number;
+  ubicacion: string | number;
   telefono: string | null;
   ubi_filiacion: string;
   apartado: "618" | "INTIMA";
@@ -96,7 +97,7 @@ function mapInternalRecord(item: {
     edad: getAgeFromDate(item.nacimiento),
     llego: item.llego,
     libre: item.libre ?? "",
-    ubicacion: item.ubicacion,
+    ubicacion: String(item.ubicacion),
     telefono: item.telefono ?? "",
     estatus: item.estatus ?? "activo",
     ubiFiliacion: item.ubi_filiacion,
@@ -141,7 +142,7 @@ function mapVisitorRecord(
     betada: Boolean(item.betada),
     historialInterno,
     historial,
-    telefono: item.telefono ?? undefined,
+    telefono: item.telefono ?? "No aplica",
     createdAt: item.created_at,
     updatedAt: item.updated_at
   };
@@ -364,7 +365,7 @@ async function buildListingsForRows(
       id: item.id,
       internoId: item.interno_id,
       internoNombre: interno?.fullName ?? "Interno sin nombre",
-      internoUbicacion: interno?.ubicacion ?? 0,
+      internoUbicacion: interno?.ubicacion ?? "",
       fechaId: item.fecha_id,
       fechaVisita: item.fecha_visita,
       area: item.apartado,
@@ -467,7 +468,7 @@ export async function getInternos(includeAll = false): Promise<InternalRecord[]>
     .select(
       "id, expediente, nombres, apellido_pat, apellido_mat, nacimiento, llego, libre, ubicacion, telefono, ubi_filiacion, apartado, estatus, observaciones, created_at, updated_at"
     )
-    .order("ubicacion", { ascending: true });
+    .order("created_at", { ascending: false });
 
   if (!includeAll) {
     query = query.neq("estatus", "150");
@@ -479,7 +480,7 @@ export async function getInternos(includeAll = false): Promise<InternalRecord[]>
     return [];
   }
 
-  return data.map(mapInternalRecord);
+  return data.map(mapInternalRecord).sort((a, b) => compareInternalLocations(a.ubicacion, b.ubicacion));
 }
 
 export async function getVisitas(): Promise<VisitorRecord[]> {
@@ -917,7 +918,7 @@ export async function getModulePanelData(moduleKey: ModuleKey, includeInactiveIn
       id: item.id,
       internalId: item.internal_id,
       internalName: internal?.fullName ?? "Interno sin nombre",
-      internalLocation: internal?.ubicacion ?? 0,
+      internalLocation: internal?.ubicacion ?? "",
       moduleKey: ensureModuleKey(item.module_key),
       deviceTypeId: item.device_type_id,
       deviceTypeName: item.module_device_types?.[0]?.name ?? "Aparato",
