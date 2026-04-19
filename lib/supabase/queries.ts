@@ -81,7 +81,7 @@ function mapInternalRecord(item: {
   ubicacion: string | number;
   telefono: string | null;
   ubi_filiacion: string;
-  apartado: "618" | "INTIMA";
+  laborando: boolean | null;
   estatus: string;
   observaciones: string | null;
   created_at: string;
@@ -100,8 +100,8 @@ function mapInternalRecord(item: {
     ubicacion: String(item.ubicacion),
     telefono: item.telefono ?? "",
     estatus: item.estatus ?? "activo",
+    laborando: Boolean(item.laborando),
     ubiFiliacion: item.ubi_filiacion,
-    clasificacion: item.apartado,
     createdAt: item.created_at,
     updatedAt: item.updated_at,
     expediente: item.expediente,
@@ -227,7 +227,7 @@ async function getInternosMap(
   const { data, error } = await supabase
     .from("internos")
     .select(
-      "id, expediente, nombres, apellido_pat, apellido_mat, nacimiento, llego, libre, ubicacion, telefono, ubi_filiacion, apartado, estatus, observaciones, created_at, updated_at"
+      "id, expediente, nombres, apellido_pat, apellido_mat, nacimiento, llego, libre, ubicacion, telefono, ubi_filiacion, laborando, estatus, observaciones, created_at, updated_at"
     )
     .in("id", internalIds);
 
@@ -466,7 +466,7 @@ export async function getInternos(includeAll = false): Promise<InternalRecord[]>
   let query = supabase
     .from("internos")
     .select(
-      "id, expediente, nombres, apellido_pat, apellido_mat, nacimiento, llego, libre, ubicacion, telefono, ubi_filiacion, apartado, estatus, observaciones, created_at, updated_at"
+      "id, expediente, nombres, apellido_pat, apellido_mat, nacimiento, llego, libre, ubicacion, telefono, ubi_filiacion, laborando, estatus, observaciones, created_at, updated_at"
     )
     .order("created_at", { ascending: false });
 

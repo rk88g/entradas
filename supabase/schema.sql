@@ -49,7 +49,7 @@ create table if not exists public.internos (
   ubicacion text not null,
   telefono text,
   ubi_filiacion text not null,
-  apartado text not null check (apartado in ('618', 'INTIMA')),
+  laborando boolean not null default false,
   estatus text not null default 'activo',
   observaciones text,
   created_by uuid references public.user_profiles (id),
@@ -62,6 +62,29 @@ alter table public.internos
 
 alter table public.internos
   alter column ubicacion type text using ubicacion::text;
+
+do $$
+begin
+  if exists (
+    select 1
+    from information_schema.columns
+    where table_schema = 'public'
+      and table_name = 'internos'
+      and column_name = 'apartado'
+  ) then
+    alter table public.internos rename column apartado to laborando;
+  end if;
+end $$;
+
+alter table public.internos
+  alter column laborando type boolean
+  using case
+    when laborando::text in ('true', 't', '1') then true
+    else false
+  end;
+
+alter table public.internos
+  alter column laborando set default false;
 
 create table if not exists public.visitas (
   id uuid primary key default gen_random_uuid(),
@@ -389,7 +412,8 @@ create table if not exists public.module_internal_staff (
   unique (module_key, internal_id, user_profile_id)
 );
 
-create index if not exists idx_internos_apartado on public.internos (apartado);
+drop index if exists public.idx_internos_apartado;
+create index if not exists idx_internos_laborando on public.internos (laborando);
 create index if not exists idx_visitas_betada on public.visitas (betada);
 create index if not exists idx_fechas_fecha_completa on public.fechas (fecha_completa);
 create index if not exists idx_listado_fecha_visita on public.listado (fecha_visita, apartado);

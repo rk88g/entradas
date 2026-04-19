@@ -274,7 +274,7 @@ export async function createInternalAction(
       ubicacion: String(formData.get("ubicacion") ?? "").trim(),
       telefono: null,
       ubi_filiacion: String(formData.get("ubi_filiacion") ?? "").trim() || "Sin dato",
-      apartado: "618",
+      laborando: false,
       observaciones: String(formData.get("observaciones") ?? "").trim() || null,
       created_by: profile.id
     };

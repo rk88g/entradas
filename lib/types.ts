@@ -15,7 +15,6 @@ export type ModuleWorkerFunctionKey =
   | "mantenimiento"
   | "configuracion";
 
-export type AccessArea = "618" | "INTIMA";
 export type AccessStatus = "abierto" | "proximo" | "cerrado";
 export type PassStatus = "capturado" | "autorizado" | "impreso" | "cancelado";
 export type VisitorSex = "hombre" | "mujer" | "sin-definir";
@@ -51,8 +50,8 @@ export interface InternalRecord {
   ubicacion: string;
   telefono: string;
   estatus: string;
+  laborando: boolean;
   ubiFiliacion: string;
-  clasificacion: AccessArea;
   createdAt: string;
   updatedAt: string;
   expediente: string;
@@ -133,7 +132,7 @@ export interface ListingRecord {
   internoUbicacion: string;
   fechaId?: string;
   fechaVisita: string;
-  area: AccessArea;
+  area: string;
   createdByRole: RoleKey;
   status: PassStatus;
   numeroPase?: number | null;
