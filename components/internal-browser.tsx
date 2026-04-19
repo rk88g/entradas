@@ -9,35 +9,63 @@ import {
 } from "@/app/sistema/actions";
 import { MutationBanner } from "@/components/mutation-banner";
 import { StatusBadge } from "@/components/status-badge";
-import { InternalProfile, MutationState, RoleKey } from "@/lib/types";
-import { canChoosePassType, canManageMentions, formatLongDate } from "@/lib/utils";
+import { DateRecord, InternalProfile, MutationState, RoleKey } from "@/lib/types";
+import {
+  canManageMentions,
+  formatLongDate,
+  getDefaultDateStatusForRole,
+  getStatusDisplayLabel
+} from "@/lib/utils";
 
 const mutationInitialState: MutationState = {
   success: null,
   error: null
 };
 
-function getPassForArea(profile: InternalProfile, area: "618" | "INTIMA") {
-  return area === "618" ? profile.nextDatePass : profile.openDatePass;
+function getDateOptions(openDate?: DateRecord | null, nextDate?: DateRecord | null) {
+  return [openDate, nextDate].filter((item): item is DateRecord => Boolean(item));
 }
 
-function getTargetDate(area: "618" | "INTIMA", nextDate?: string | null, openDate?: string | null) {
-  return area === "618" ? nextDate : openDate;
+function getDefaultDateValue(roleKey: RoleKey, openDate?: DateRecord | null, nextDate?: DateRecord | null) {
+  const preferredStatus = getDefaultDateStatusForRole(roleKey);
+  if (preferredStatus === "proximo") {
+    return nextDate?.fechaCompleta ?? openDate?.fechaCompleta ?? "";
+  }
+
+  return openDate?.fechaCompleta ?? nextDate?.fechaCompleta ?? "";
 }
 
-function getPassLock(
+function getPassForDate(
   profile: InternalProfile,
-  area: "618" | "INTIMA",
-  _roleKey: RoleKey,
-  nextDate?: string | null,
-  openDate?: string | null
+  dateValue: string,
+  openDate?: DateRecord | null,
+  nextDate?: DateRecord | null
 ) {
-  const currentPass = getPassForArea(profile, area);
-  return {
-    currentPass,
-    blocked: Boolean(currentPass),
-    targetDate: getTargetDate(area, nextDate, openDate)
-  };
+  if (openDate?.fechaCompleta === dateValue) {
+    return profile.openDatePass ?? null;
+  }
+
+  if (nextDate?.fechaCompleta === dateValue) {
+    return profile.nextDatePass ?? null;
+  }
+
+  return profile.recentPasses.find((item) => item.fechaVisita === dateValue) ?? null;
+}
+
+function getDateMeta(
+  dateValue: string,
+  openDate?: DateRecord | null,
+  nextDate?: DateRecord | null
+) {
+  if (openDate?.fechaCompleta === dateValue) {
+    return openDate;
+  }
+
+  if (nextDate?.fechaCompleta === dateValue) {
+    return nextDate;
+  }
+
+  return null;
 }
 
 export function InternalBrowser({
@@ -47,8 +75,8 @@ export function InternalBrowser({
   roleKey
 }: {
   profiles: InternalProfile[];
-  nextDate?: string | null;
-  openDate?: string | null;
+  nextDate?: DateRecord | null;
+  openDate?: DateRecord | null;
   roleKey: RoleKey;
 }) {
   const pageSize = 20;
@@ -57,7 +85,7 @@ export function InternalBrowser({
   const [page, setPage] = useState(1);
   const [modalInternalId, setModalInternalId] = useState<string | null>(null);
   const [selectedVisitorIds, setSelectedVisitorIds] = useState<string[]>([]);
-  const [selectedArea, setSelectedArea] = useState<"618" | "INTIMA">("618");
+  const [selectedDateValue, setSelectedDateValue] = useState("");
   const [createState, createAction, createPending] = useActionState(
     createInternalAction,
     mutationInitialState
@@ -68,6 +96,8 @@ export function InternalBrowser({
     mutationInitialState
   );
   const visitorFormRef = useRef<HTMLFormElement>(null);
+
+  const availableDates = useMemo(() => getDateOptions(openDate, nextDate), [openDate, nextDate]);
 
   const filtered = useMemo(() => {
     const normalized = query.trim().toLowerCase();
@@ -85,11 +115,12 @@ export function InternalBrowser({
 
   const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
   const paginated = filtered.slice((page - 1) * pageSize, page * pageSize);
-
   const selected = profiles.find((item) => item.id === modalInternalId) ?? null;
-  const selectedLock = selected
-    ? getPassLock(selected, selectedArea, roleKey, nextDate, openDate)
-    : null;
+  const selectedPass =
+    selected && selectedDateValue
+      ? getPassForDate(selected, selectedDateValue, openDate, nextDate)
+      : null;
+  const selectedDateMeta = getDateMeta(selectedDateValue, openDate, nextDate);
 
   useEffect(() => {
     if (passState.success) {
@@ -136,16 +167,14 @@ export function InternalBrowser({
   const selectedAdults = selectedVisitors.filter((item) => item.visitor.edad >= 18);
   const canSubmitPass =
     Boolean(selected) &&
+    Boolean(selectedDateValue) &&
     selectedVisitors.length > 0 &&
     selectedAdults.length > 0 &&
-    !selectedLock?.blocked &&
-    Boolean(selectedLock?.targetDate);
+    !selectedPass;
 
   function openPassModal(profile: InternalProfile) {
-    const defaultArea: "618" | "INTIMA" =
-      profile.nextDatePass ? "618" : profile.openDatePass ? "INTIMA" : "618";
     setSelectedVisitorIds([]);
-    setSelectedArea(defaultArea);
+    setSelectedDateValue(getDefaultDateValue(roleKey, openDate, nextDate));
     setModalInternalId(profile.id);
   }
 
@@ -203,7 +232,7 @@ export function InternalBrowser({
                         <div className="record-title">
                           <strong>{profile.fullName}</strong>
                           <span>
-                            {profile.nextDatePass || profile.openDatePass
+                            {profile.openDatePass || profile.nextDatePass
                               ? "Con pase registrado"
                               : "Sin pase"}
                           </span>
@@ -341,11 +370,13 @@ export function InternalBrowser({
                         gap: "0.35rem"
                       }}
                     >
-                      {selectedLock?.currentPass ? (
+                      {selectedPass ? (
                         <>
                           <StatusBadge variant="warn">Pase registrado</StatusBadge>
                           <span className="muted" style={{ fontSize: "0.88rem" }}>
-                            {formatLongDate(selectedLock.currentPass.fechaVisita)}
+                            {selectedDateMeta ? getStatusDisplayLabel(selectedDateMeta.estado) : "FECHA"}
+                            {" - "}
+                            {formatLongDate(selectedPass.fechaVisita)}
                           </span>
                         </>
                       ) : (
@@ -357,15 +388,12 @@ export function InternalBrowser({
               </div>
             </div>
 
-            {selectedLock?.blocked ? (
+            {selectedPass ? (
               <div style={{ marginTop: "1rem" }}>
                 <MutationBanner
                   state={{
                     success: null,
-                    error:
-                      selectedArea === "618"
-                        ? "Ese interno ya tiene pase 618 para la fecha proximo."
-                        : "Ese interno ya tiene pase suelto para la fecha abierta."
+                    error: `Ese interno ya tiene pase para ${formatLongDate(selectedPass.fechaVisita)}.`
                   }}
                 />
               </div>
@@ -514,50 +542,44 @@ export function InternalBrowser({
                   autoComplete="off"
                 >
                   <input type="hidden" name="interno_id" value={selected.id} />
+                  <input type="hidden" name="fecha_visita" value={selectedDateValue} />
                   {selectedVisitorIds.map((visitorId) => (
                     <input key={visitorId} type="hidden" name="visitor_ids" value={visitorId} />
                   ))}
 
-                  {canChoosePassType(roleKey) ? (
-                    <div className="field">
-                      <label htmlFor="apartado">Tipo de pase</label>
-                      <select
-                        id="apartado"
-                        name="apartado"
-                        value={selectedArea}
-                        onChange={(event) => setSelectedArea(event.target.value as "618" | "INTIMA")}
-                      >
-                      <option value="618">618</option>
-                      <option value="INTIMA">Suelto</option>
-                      </select>
-                      <span className="field-hint" style={{ color: "var(--muted)" }}>
-                        Se creara para {selectedLock?.targetDate ? formatLongDate(selectedLock.targetDate) : "la fecha configurada"}
-                      </span>
-                    </div>
-                  ) : (
-                    <input type="hidden" name="apartado" value="618" />
-                  )}
+                  <div className="field">
+                    <label htmlFor="fecha_visita_modal">Fecha del pase</label>
+                    <select
+                      id="fecha_visita_modal"
+                      value={selectedDateValue}
+                      onChange={(event) => setSelectedDateValue(event.target.value)}
+                    >
+                      {availableDates.map((date) => (
+                        <option key={date.id} value={date.fechaCompleta}>
+                          {getStatusDisplayLabel(date.estado)} - {formatLongDate(date.fechaCompleta)}
+                        </option>
+                      ))}
+                    </select>
+                    <span className="field-hint" style={{ color: "var(--muted)" }}>
+                      Se creara para{" "}
+                      {selectedDateMeta
+                        ? `${getStatusDisplayLabel(selectedDateMeta.estado)} - ${formatLongDate(selectedDateMeta.fechaCompleta)}`
+                        : "la fecha configurada"}
+                    </span>
+                  </div>
 
-                  {!canChoosePassType(roleKey) ? (
-                    <div className="field" style={{ gridColumn: "1 / -1" }}>
-                      <span className="field-hint" style={{ color: "var(--muted)" }}>
-                        Se creara para {selectedLock?.targetDate ? formatLongDate(selectedLock.targetDate) : "la fecha configurada"}
-                      </span>
-                    </div>
-                  ) : null}
-
-                  {canManageMentions(roleKey) && selectedArea === "INTIMA" ? (
+                  {canManageMentions(roleKey) ? (
                     <div className="field" style={{ gridColumn: "1 / -1" }}>
                       <textarea
                         name="menciones"
                         placeholder="Menciones"
-                        defaultValue={selected.openDatePass?.menciones ?? ""}
+                        defaultValue={selectedPass?.menciones ?? ""}
                         autoComplete="off"
                       />
                     </div>
                   ) : null}
 
-                  {!selectedLock?.currentPass ? (
+                  {!selectedPass ? (
                     <div className="actions-row">
                       <button
                         type="submit"
@@ -567,19 +589,7 @@ export function InternalBrowser({
                         CREAR PASE
                       </button>
                     </div>
-                  ) : (
-                    <div style={{ gridColumn: "1 / -1" }}>
-                      <MutationBanner
-                        state={{
-                          success: null,
-                          error:
-                            selectedArea === "618"
-                              ? "Ese interno ya tiene pase 618 creado para la fecha proximo."
-                              : "Ese interno ya tiene pase suelto creado para la fecha abierta."
-                        }}
-                      />
-                    </div>
-                  )}
+                  ) : null}
                 </form>
               </div>
             </div>

@@ -1,4 +1,4 @@
-import { ListingRecord, PassVisitor, RoleKey, VisitorRecord } from "@/lib/types";
+import { AccessStatus, ListingRecord, PassVisitor, RoleKey, VisitorRecord } from "@/lib/types";
 
 function parseLocalDate(input: string) {
   const match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(input);
@@ -58,6 +58,18 @@ export function formatShortDate(input: string) {
   } catch {
     return input || "-";
   }
+}
+
+export function getStatusDisplayLabel(status: AccessStatus) {
+  if (status === "abierto") {
+    return "PROXIMOS";
+  }
+
+  if (status === "proximo") {
+    return "EN ESPERA";
+  }
+
+  return "CERRADA";
 }
 
 export function formatDateInput(input: Date) {
@@ -122,8 +134,8 @@ export function canManageMentions(role: RoleKey) {
   return role === "super-admin" || role === "control";
 }
 
-export function canChoosePassType(role: RoleKey) {
-  return role === "super-admin" || role === "control";
+export function getDefaultDateStatusForRole(role: RoleKey): AccessStatus {
+  return role === "capturador" ? "proximo" : "abierto";
 }
 
 export function nextPassNumber(seed: number) {
@@ -135,33 +147,30 @@ export function nextPassNumber(seed: number) {
 }
 
 export function sortListingsForPrint(listings: ListingRecord[]) {
-  const sueltos = listings
-    .filter((item) => item.area === "INTIMA")
-    .sort((a, b) => a.internoUbicacion - b.internoUbicacion || a.createdAt.localeCompare(b.createdAt));
+  return [...listings].sort((a, b) => {
+    const numberA = a.numeroPase ?? Number.MAX_SAFE_INTEGER;
+    const numberB = b.numeroPase ?? Number.MAX_SAFE_INTEGER;
 
-  const byLocation = listings
-    .filter((item) => item.area === "618")
-    .sort((a, b) => {
-      const numberA = a.numeroPase ?? Number.MAX_SAFE_INTEGER;
-      const numberB = b.numeroPase ?? Number.MAX_SAFE_INTEGER;
+    if (numberA !== numberB) {
+      return numberA - numberB;
+    }
 
-      if (numberA !== numberB) {
-        return numberA - numberB;
-      }
+    if (a.numeroPase && b.numeroPase) {
+      return a.internoUbicacion - b.internoUbicacion || a.createdAt.localeCompare(b.createdAt);
+    }
 
-      if (a.cierreAplicado && b.cierreAplicado) {
-        return a.internoUbicacion - b.internoUbicacion;
-      }
+    if (a.numeroPase !== b.numeroPase) {
+      return a.numeroPase ? -1 : 1;
+    }
 
-      if (a.cierreAplicado !== b.cierreAplicado) {
-        return a.cierreAplicado ? -1 : 1;
-      }
+    if (a.cierreAplicado !== b.cierreAplicado) {
+      return a.cierreAplicado ? -1 : 1;
+    }
 
-      return a.createdAt.localeCompare(b.createdAt);
-    });
+    if (a.cierreAplicado && b.cierreAplicado) {
+      return a.internoUbicacion - b.internoUbicacion || a.createdAt.localeCompare(b.createdAt);
+    }
 
-  return {
-    byLocation,
-    sueltos
-  };
+    return a.internoUbicacion - b.internoUbicacion || a.createdAt.localeCompare(b.createdAt);
+  });
 }

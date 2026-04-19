@@ -4,13 +4,7 @@ import { useActionState, useState } from "react";
 import { closeDateAction, createDateAction, updateClosePasswordAction } from "@/app/sistema/actions";
 import { MutationBanner } from "@/components/mutation-banner";
 import { DateRecord, MutationState, RoleKey } from "@/lib/types";
-import { formatLongDate, getDateOffset } from "@/lib/utils";
-
-const statusLabels = {
-  abierto: "Pases sueltos",
-  proximo: "Fecha 618",
-  cerrado: "Fecha cerrada"
-} as const;
+import { formatLongDate, getDateOffset, getStatusDisplayLabel } from "@/lib/utils";
 
 const mutationInitialState: MutationState = {
   success: null,
@@ -40,38 +34,27 @@ export function DateOperations({
     updateClosePasswordAction,
     mutationInitialState
   );
+  const activeDates = dates.filter((date) => date.estado === "abierto" || date.estado === "proximo");
 
   return (
     <section className="module-grid">
       <article className="data-card">
-        <div className="actions-row" style={{ justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}>
+        <div
+          className="actions-row"
+          style={{ justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}
+        >
           <strong className="section-title">Fechas</strong>
         </div>
 
-        <div className="mini-list" style={{ marginBottom: "1rem" }}>
-          <div className="mini-row">
-            <span>Proximo</span>
-            <strong>Fecha de visita para la oficina 618</strong>
-          </div>
-          <div className="mini-row">
-            <span>Abierto</span>
-            <strong>Fecha de visita para pases sueltos</strong>
-          </div>
-          <div className="mini-row">
-            <span>Cerrado</span>
-            <strong>Fecha 618 ya numerada y cerrada</strong>
-          </div>
-        </div>
-
         <div className="calendar-grid" style={{ marginTop: "1rem" }}>
-          {dates.map((date) => (
+          {activeDates.map((date) => (
             <article key={date.id} className="calendar-card">
               <div className="record-title">
                 <strong>{formatLongDate(date.fechaCompleta)}</strong>
               </div>
               <div className="chips-row">
-                <span className="chip">{statusLabels[date.estado]}</span>
-                <span className="chip">{date.cierre ? "Cerrada" : "Abierta"}</span>
+                <span className="chip">{getStatusDisplayLabel(date.estado)}</span>
+                <span className="chip">{date.cierre ? "Cerrada" : "Disponible"}</span>
               </div>
             </article>
           ))}
@@ -99,15 +82,15 @@ export function DateOperations({
             />
           </div>
           <div className="field">
-            <label htmlFor="estado">Uso de la fecha</label>
+            <label htmlFor="estado">Apartado</label>
             <select
               id="estado"
               name="estado"
               value={selectedStatus}
               onChange={(event) => setSelectedStatus(event.target.value as "abierto" | "proximo")}
             >
-              <option value="abierto">Abierto</option>
-              <option value="proximo">Proximo</option>
+              <option value="abierto">PROXIMOS</option>
+              <option value="proximo">EN ESPERA</option>
             </select>
           </div>
           <div className="actions-row">
@@ -120,11 +103,11 @@ export function DateOperations({
         {roleKey === "super-admin" || roleKey === "control" ? (
           <>
             <div style={{ height: "1rem" }} />
-            <strong className="section-title">Cierre</strong>
+            <strong className="section-title">Cerrar fecha</strong>
             <MutationBanner state={closeState} />
-            {!nextDate ? (
+            {!openDate ? (
               <MutationBanner
-                state={{ success: null, error: "No hay fecha proximo para cerrar." }}
+                state={{ success: null, error: "No hay fecha activa en PROXIMOS para cerrar." }}
               />
             ) : null}
             <form
@@ -133,7 +116,7 @@ export function DateOperations({
               style={{ marginTop: "1rem" }}
               autoComplete="off"
             >
-              <input type="hidden" name="fecha_completa" value={nextDate?.fechaCompleta ?? ""} />
+              <input type="hidden" name="fecha_completa" value={openDate?.fechaCompleta ?? ""} />
               <div className="field">
                 <label htmlFor="close_password">Contrasena de cierre</label>
                 <input
@@ -148,9 +131,9 @@ export function DateOperations({
                 <button
                   className="button-secondary"
                   type="submit"
-                  disabled={closePending || !nextDate}
+                  disabled={closePending || !openDate}
                 >
-                  Cerrar fecha 618
+                  Cerrar PROXIMOS
                 </button>
               </div>
             </form>

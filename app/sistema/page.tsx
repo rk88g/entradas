@@ -18,12 +18,12 @@ export default async function SistemaPage() {
         <strong>{visitas.length}</strong>
       </article>
       <article className="stat-card">
-        <small>618</small>
-        <strong>{summary.listingStats.areas["618"] ?? 0}</strong>
+        <small>Proximos</small>
+        <strong>{summary.openPassCount}</strong>
       </article>
       <article className="stat-card">
-        <small>Sueltos</small>
-        <strong>{summary.listingStats.areas.INTIMA ?? 0}</strong>
+        <small>En espera</small>
+        <strong>{summary.waitingPassCount}</strong>
       </article>
     </section>
   );

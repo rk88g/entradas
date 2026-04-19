@@ -139,6 +139,7 @@ export interface DashboardStat {
 export interface ListingBuilderData {
   openDate: DateRecord | null;
   nextDate: DateRecord | null;
+  printDate: DateRecord | null;
   internalProfiles: InternalProfile[];
   todaysPasses: ListingRecord[];
   closePasswordConfigured: boolean;

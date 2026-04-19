@@ -20,8 +20,8 @@ export default async function InternosPage() {
   return (
     <InternalBrowser
       profiles={profiles}
-      nextDate={nextDate?.fechaCompleta ?? null}
-      openDate={openDate?.fechaCompleta ?? null}
+      nextDate={nextDate}
+      openDate={openDate}
       roleKey={profile?.roleKey ?? "capturador"}
     />
   );

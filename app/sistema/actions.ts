@@ -5,13 +5,13 @@ import { createServerSupabaseClient } from "@/lib/supabase/server";
 import {
   getCurrentUserProfile,
   getDateByValue,
+  getFechas,
   getListado,
   getNextDate,
   getOpenDate
 } from "@/lib/supabase/queries";
 import { MutationState } from "@/lib/types";
 import {
-  canChoosePassType,
   canManageMentions,
   getDateOffset,
   nextPassNumber
@@ -83,9 +83,11 @@ export async function createDateAction(
       return failure("Esa fecha ya esta registrada.");
     }
 
-    const [openDate, nextDate] = await Promise.all([getOpenDate(), getNextDate()]);
+    const dates = await getFechas();
     const allowedOpenDate = getDateOffset(1);
     const allowedNextDate = getDateOffset(2);
+    const activeOpenDate = dates.find((item) => item.estado === "abierto" && !item.cierre);
+    const waitingDate = dates.find((item) => item.estado === "proximo" && !item.cierre);
 
     if (status === "abierto" && dateValue !== allowedOpenDate) {
       return failure("La fecha abierta solo puede ser para manana.");
@@ -95,12 +97,12 @@ export async function createDateAction(
       return failure("La fecha proximo solo puede ser para pasado manana.");
     }
 
-    if (status === "abierto" && openDate) {
-      return failure("Ya existe una fecha abierta para pases sueltos.");
+    if (status === "abierto" && activeOpenDate) {
+      return failure("Ya existe una fecha activa para PROXIMOS.");
     }
 
-    if (status === "proximo" && nextDate) {
-      return failure("Ya existe una fecha proximo para la oficina 618.");
+    if (status === "proximo" && waitingDate) {
+      return failure("Ya existe una fecha activa para EN ESPERA.");
     }
 
     const { error } = await supabase.from("fechas").insert({
@@ -136,10 +138,10 @@ export async function closeDateAction(
       return failure("Tu rol no puede cerrar la fecha.");
     }
 
-    const nextDate = await getNextDate();
-    const dateValue = String(formData.get("fecha_completa") ?? "").trim() || nextDate?.fechaCompleta || "";
+    const openDate = await getOpenDate();
+    const dateValue = String(formData.get("fecha_completa") ?? "").trim() || openDate?.fechaCompleta || "";
     if (!dateValue) {
-      return failure("No se encontro la fecha proximo de la oficina 618.");
+      return failure("No se encontro la fecha activa de PROXIMOS.");
     }
 
     const supabase = await createServerSupabaseClient();
@@ -163,22 +165,33 @@ export async function closeDateAction(
       return failure("La fecha ya no existe.");
     }
 
-    const passes = await getListado({ fechaVisita: dateValue, area: "618" });
+    const passes = await getListado({ fechaVisita: dateValue });
     const activePasses = passes
       .filter((item) => item.status !== "cancelado")
-      .sort(
-        (a, b) =>
-          a.internoUbicacion - b.internoUbicacion || a.createdAt.localeCompare(b.createdAt)
-      );
+      .sort((a, b) => a.internoUbicacion - b.internoUbicacion || a.createdAt.localeCompare(b.createdAt));
 
-    let currentNumber = 0;
-    for (const pass of activePasses) {
+    const numberedPasses = activePasses
+      .filter((item) => item.numeroPase)
+      .sort((a, b) => (a.numeroPase ?? 0) - (b.numeroPase ?? 0));
+    const pendingPasses = activePasses.filter((item) => !item.numeroPase);
+
+    const orderedPendingPasses =
+      numberedPasses.length > 0
+        ? pendingPasses.sort((a, b) => a.createdAt.localeCompare(b.createdAt))
+        : pendingPasses.sort(
+            (a, b) => a.internoUbicacion - b.internoUbicacion || a.createdAt.localeCompare(b.createdAt)
+          );
+
+    let currentNumber = numberedPasses[numberedPasses.length - 1]?.numeroPase ?? 0;
+    const isInitialClosure = numberedPasses.length === 0;
+
+    for (const pass of orderedPendingPasses) {
       currentNumber = nextPassNumber(currentNumber);
       const { error } = await supabase
         .from("listado")
         .update({
           numero_pase: currentNumber,
-          cierre_aplicado: true
+          cierre_aplicado: isInitialClosure
         })
         .eq("id", pass.id);
 
@@ -190,8 +203,7 @@ export async function closeDateAction(
     const { error: closeError } = await supabase
       .from("fechas")
       .update({
-        cierre: true,
-        estado: "cerrado"
+        cierre: true
       })
       .eq("id", selectedDate.id);
 
@@ -567,42 +579,26 @@ export async function createPassAction(
     const supabase = await createServerSupabaseClient();
     const internoId = String(formData.get("interno_id") ?? "").trim();
     const visitorIds = formData.getAll("visitor_ids").map((item) => String(item));
-    const requestedArea = String(formData.get("apartado") ?? "618").trim();
+    const targetDateValue = String(formData.get("fecha_visita") ?? "").trim();
     const mentions = String(formData.get("menciones") ?? "").trim();
-    const area =
-      canChoosePassType(profile.roleKey) && (requestedArea === "INTIMA" || requestedArea === "618")
-        ? requestedArea
-        : "618";
-    const targetDate = area === "618" ? await getNextDate() : await getOpenDate();
+    const targetDate = await getDateByValue(targetDateValue);
 
     if (!internoId) {
       return failure("Debes seleccionar un interno.");
     }
 
     if (!targetDate) {
-      return failure(
-        area === "618"
-          ? "No hay una fecha proximo disponible para la oficina 618."
-          : "No hay una fecha abierta disponible para pases sueltos."
-      );
+      return failure("No se encontro la fecha seleccionada para el pase.");
     }
 
     const canOperateClosedDate = ["super-admin", "control"].includes(profile.roleKey);
 
-    if (area === "618" && targetDate.estado !== "proximo") {
-      return failure("La fecha proximo del 618 no esta disponible.");
+    if (!["abierto", "proximo"].includes(targetDate.estado)) {
+      return failure("La fecha seleccionada no esta disponible para captura.");
     }
 
-    if (area === "618" && targetDate.cierre && !canOperateClosedDate) {
-      return failure("La fecha proximo del 618 ya esta cerrada o no esta disponible.");
-    }
-
-    if (area === "INTIMA" && targetDate.estado !== "abierto") {
-      return failure("La fecha abierta para pases sueltos no esta disponible.");
-    }
-
-    if (area === "INTIMA" && targetDate.cierre && !canOperateClosedDate) {
-      return failure("La fecha abierta para pases sueltos ya esta cerrada.");
+    if (targetDate.cierre && !canOperateClosedDate) {
+      return failure("La fecha seleccionada ya fue cerrada.");
     }
 
     if (visitorIds.length === 0) {
@@ -613,27 +609,16 @@ export async function createPassAction(
       return failure("Tu rol no puede capturar menciones.");
     }
 
-    if (mentions && area !== "INTIMA") {
-      return failure("Las menciones solo aplican para pases sueltos.");
-    }
-
     const { data: existingPass } = await supabase
       .from("listado")
       .select("id, status")
       .eq("interno_id", internoId)
       .eq("fecha_id", targetDate.id)
-      .eq("apartado", area)
       .neq("status", "cancelado")
       .maybeSingle();
 
-    const canEditExisting =
-      existingPass &&
-      ["super-admin", "control"].includes(profile.roleKey) &&
-      !targetDate.cierre &&
-      existingPass.status !== "impreso";
-
-    if (existingPass && !canEditExisting) {
-      return failure("Ese interno ya tiene pase para la fecha abierta.");
+    if (existingPass) {
+      return failure("Ese interno ya tiene pase para la fecha seleccionada.");
     }
 
     const { data: relationRows, error: relationError } = await supabase
@@ -682,62 +667,37 @@ export async function createPassAction(
       return failure("Debes incluir al menos un adulto en el pase.");
     }
 
-    const listedVisitorCountFor618 = selectedVisitors.filter((item) => (item.edad ?? 0) >= 12).length;
-    if (area === "618" && listedVisitorCountFor618 > 8) {
-      return failure("El pase 618 solo permite 8 visitas visibles por pase.");
+    let nextNumber: number | null = null;
+    if (targetDate.cierre && canOperateClosedDate) {
+      const existingPasses = await getListado({ fechaVisita: targetDate.fechaCompleta });
+      const maxNumber = existingPasses.reduce(
+        (current, item) => Math.max(current, item.numeroPase ?? 0),
+        0
+      );
+      nextNumber = nextPassNumber(maxNumber);
     }
 
-    let passId = existingPass?.id ?? "";
+    const { data: insertedPass, error: insertError } = await supabase
+      .from("listado")
+      .insert({
+        interno_id: internoId,
+        fecha_id: targetDate.id,
+        fecha_visita: targetDate.fechaCompleta,
+        apartado: "618",
+        status: "capturado",
+        numero_pase: nextNumber,
+        cierre_aplicado: false,
+        menciones: canManageMentions(profile.roleKey) && mentions ? mentions : null,
+        created_by: profile.id
+      })
+      .select("id")
+      .single();
 
-    if (canEditExisting && existingPass) {
-      const { error: resetError } = await supabase
-        .from("listado_visitas")
-        .delete()
-        .eq("listado_id", existingPass.id);
-
-      if (resetError) {
-        return failure(resetError.message || "No se pudo limpiar el pase actual.");
-      }
-
-      const { error: updateError } = await supabase
-        .from("listado")
-        .update({
-          apartado: area,
-          menciones:
-            area === "INTIMA" && canManageMentions(profile.roleKey) && mentions ? mentions : null,
-          updated_at: new Date().toISOString()
-        })
-        .eq("id", existingPass.id);
-
-      if (updateError) {
-        return failure(updateError.message || "No se pudo actualizar el pase.");
-      }
-
-      passId = existingPass.id;
-    } else {
-      const { data: insertedPass, error: insertError } = await supabase
-        .from("listado")
-        .insert({
-          interno_id: internoId,
-          fecha_id: targetDate.id,
-          fecha_visita: targetDate.fechaCompleta,
-          apartado: area,
-          status: "capturado",
-          numero_pase: null,
-          cierre_aplicado: false,
-          menciones:
-            area === "INTIMA" && canManageMentions(profile.roleKey) && mentions ? mentions : null,
-          created_by: profile.id
-        })
-        .select("id")
-        .single();
-
-      if (insertError || !insertedPass) {
-        return failure(insertError?.message || "No se pudo crear el pase.");
-      }
-
-      passId = insertedPass.id;
+    if (insertError || !insertedPass) {
+      return failure(insertError?.message || "No se pudo crear el pase.");
     }
+
+    const passId = insertedPass.id;
 
     const orderedVisitors = [...selectedVisitors].sort((a, b) => (b.edad ?? 0) - (a.edad ?? 0));
     const payload = orderedVisitors.map((visitor, index) => ({
@@ -757,7 +717,7 @@ export async function createPassAction(
     revalidatePath("/sistema");
     revalidatePath("/sistema/internos");
     revalidatePath("/sistema/listado");
-    return success(canEditExisting ? "Pase actualizado." : "Pase creado.");
+    return success("Pase creado.");
   } catch (error) {
     return failure(error instanceof Error ? error.message : "No se pudo crear el pase.");
   }

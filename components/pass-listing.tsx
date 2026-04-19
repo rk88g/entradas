@@ -1,22 +1,27 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { AccessArea, ListingRecord } from "@/lib/types";
-import { formatLongDate, formatShortDate, sortListingsForPrint } from "@/lib/utils";
+import { ListingRecord } from "@/lib/types";
+import { formatLongDate, sortListingsForPrint } from "@/lib/utils";
 
-type PrintMode = "agrupado" | "separado" | "entrega";
+type PrintMode = "listado" | "sexos" | "numeros" | "menciones";
 
-function get618VisibleVisitors(pass: ListingRecord) {
-  const listedVisitors = pass.visitantes.filter((visitor) => visitor.edad >= 12);
+function getVisibleVisitors(pass: ListingRecord) {
+  const visibleVisitors = pass.visitantes.filter((visitor) => visitor.edad >= 12);
   const underTwelveCount = pass.visitantes.filter((visitor) => visitor.edad < 12).length;
+  return { visibleVisitors, underTwelveCount };
+}
 
+function getCompactVisibleVisitors(pass: ListingRecord) {
+  const { visibleVisitors, underTwelveCount } = getVisibleVisitors(pass);
   return {
-    listedVisitors,
+    listedVisitors: visibleVisitors.slice(0, 8),
+    hiddenVisitorsCount: Math.max(0, visibleVisitors.length - 8),
     underTwelveCount
   };
 }
 
-function formatCompactVisitorName(visitor: ListingRecord["visitantes"][number]) {
+function formatVisitorLine(visitor: ListingRecord["visitantes"][number]) {
   if (visitor.edad >= 12 && visitor.edad <= 17) {
     return `${visitor.nombre} ${visitor.edad} años`;
   }
@@ -24,195 +29,225 @@ function formatCompactVisitorName(visitor: ListingRecord["visitantes"][number]) 
   return visitor.nombre;
 }
 
-function renderCompactPass(pass: ListingRecord) {
-  const { listedVisitors, underTwelveCount } = get618VisibleVisitors(pass);
+function splitMentions(menciones?: string) {
+  const lines = (menciones ?? "")
+    .split(/\r?\n/)
+    .map((item) => item.trim())
+    .filter(Boolean);
+
+  const basic: string[] = [];
+  const special: string[] = [];
+
+  lines.forEach((line) => {
+    if (/^(especial|esp|!|#)\s*[:\-]/i.test(line)) {
+      special.push(line.replace(/^(especial|esp|!|#)\s*[:\-]\s*/i, "").trim() || line);
+      return;
+    }
+
+    basic.push(line);
+  });
+
+  return { basic, special };
+}
+
+function renderMainPass(pass: ListingRecord) {
+  const { listedVisitors, hiddenVisitorsCount, underTwelveCount } = getCompactVisibleVisitors(pass);
+  const { basic, special } = splitMentions(pass.menciones);
 
   return (
-    <article key={pass.id} className="pass-card pass-card-618">
-      <div className="compact-pass-head">
-        <div className="compact-pass-title">
-          <strong>
-            {pass.internoUbicacion} {pass.internoNombre}
-          </strong>
-          <span>{formatShortDate(pass.fechaVisita)}</span>
+    <article key={pass.id} className="pass-card apoyo-pass-card">
+      <div className="apoyo-pass-header">
+        <div>
+          <div className="apoyo-pass-kicker">Registro pase para terraza</div>
+          <div className="apoyo-pass-date">{formatLongDate(pass.fechaVisita)}</div>
         </div>
-        <div className="compact-pass-number">{pass.area === "618" ? pass.numeroPase ?? "-" : ""}</div>
+        <div className="apoyo-pass-number">{pass.numeroPase ?? "-"}</div>
       </div>
 
-      <div className="compact-pass-visitors">
-        {listedVisitors.map((visitor) => (
-          <div
-            key={`${pass.id}-${visitor.visitorId}`}
-            className={`compact-pass-visitor ${visitor.edad < 18 ? "minor" : ""}`}
-          >
-            <span>{formatCompactVisitorName(visitor)}</span>
+      <div className="apoyo-pass-meta">
+        <div>
+          <strong>PPL:</strong> {pass.internoNombre}
+        </div>
+        <div>
+          <strong>Ubicacion:</strong> {pass.internoUbicacion}
+        </div>
+      </div>
+
+      <div className="apoyo-pass-section">
+        <strong>Visitas:</strong>
+        <div className="apoyo-pass-list">
+          {listedVisitors.map((visitor) => (
+            <div
+              key={`${pass.id}-${visitor.visitorId}`}
+              className={`apoyo-pass-line ${visitor.edad < 18 ? "minor" : ""}`}
+            >
+              {formatVisitorLine(visitor)}
+            </div>
+          ))}
+          {underTwelveCount > 0 ? (
+            <div className="apoyo-pass-line minor">
+              + {underTwelveCount} {underTwelveCount === 1 ? "menor" : "menores"}
+            </div>
+          ) : null}
+          {hiddenVisitorsCount > 0 ? (
+            <div className="apoyo-pass-line warning">
+              + {hiddenVisitorsCount} visitas en Hombres / Mujeres
+            </div>
+          ) : null}
+        </div>
+      </div>
+
+      {basic.length > 0 ? (
+        <div className="apoyo-pass-section">
+          <strong>Peticion:</strong>
+          <div className="apoyo-pass-list">
+            {basic.map((item, index) => (
+              <div key={`${pass.id}-basic-${index}`} className="apoyo-pass-line warning">
+                {item}
+              </div>
+            ))}
           </div>
-        ))}
+        </div>
+      ) : null}
 
-        {underTwelveCount > 0 ? (
-          <div className="compact-pass-children">+ {underTwelveCount} menores</div>
-        ) : null}
+      {special.length > 0 ? (
+        <div className="apoyo-pass-section">
+          <strong>Peticion especial:</strong>
+          <div className="apoyo-pass-list">
+            {special.map((item, index) => (
+              <div key={`${pass.id}-special-${index}`} className="apoyo-pass-line minor">
+                {item}
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
 
-        {pass.area === "INTIMA" && pass.menciones ? (
-          <div className="compact-pass-note">{pass.menciones}</div>
-        ) : null}
+      <div className="apoyo-pass-footer">
+        <div>#70-TODO LO NO AGREGADO EN LA PETICION DE SU PASE NO TENDRA AUTORIZACION PARA ENTRAR.</div>
+        <div>#70-TODO LO QUE VENGA EN PETICION ESPECIAL / ENTREGAR A ADUANA PARA SU REVISION.</div>
       </div>
     </article>
   );
 }
 
-function renderLoosePass(pass: ListingRecord) {
-  const { listedVisitors, underTwelveCount } = get618VisibleVisitors(pass);
-  const minorTextStyle = {
-    color: "#b91c1c",
-    background: "transparent",
-    border: "none",
-    padding: 0
-  } as const;
+function renderSeparatedPasses(pass: ListingRecord) {
+  const { visibleVisitors, underTwelveCount } = getVisibleVisitors(pass);
+  const men = visibleVisitors.filter((visitor) => visitor.sexo === "hombre");
+  const womenAndTeens = visibleVisitors.filter((visitor) => visitor.sexo !== "hombre");
+  const sections = [
+    { key: "men", label: "Hombres", visitors: men, childrenCount: 0 },
+    { key: "women", label: "Mujeres y menores", visitors: womenAndTeens, childrenCount: underTwelveCount }
+  ].filter((section) => section.visitors.length > 0 || section.childrenCount > 0);
 
-  return (
-    <article key={pass.id} className="pass-card">
-      <div className="pass-head">
+  return sections.map((section) => (
+    <article key={`${pass.id}-${section.key}`} className="pass-card apoyo-pass-card">
+      <div className="apoyo-pass-header">
         <div>
-          <span className="eyebrow">Pases sueltos</span>
-          <h3 className="pass-title" style={{ marginTop: "0.75rem" }}>
-            {pass.internoUbicacion} {pass.internoNombre}
-          </h3>
-          <div className="muted" style={{ color: "var(--muted)", marginTop: "0.3rem" }}>
-            {formatLongDate(pass.fechaVisita)}
-          </div>
+          <div className="apoyo-pass-kicker">{section.label}</div>
+          <div className="apoyo-pass-date">{formatLongDate(pass.fechaVisita)}</div>
+        </div>
+        <div className="apoyo-pass-number">{pass.numeroPase ?? "-"}</div>
+      </div>
+
+      <div className="apoyo-pass-meta">
+        <div>
+          <strong>PPL:</strong> {pass.internoNombre}
+        </div>
+        <div>
+          <strong>Ubicacion:</strong> {pass.internoUbicacion}
         </div>
       </div>
 
-      <div className="visitor-list">
-        {listedVisitors.map((visitor) => (
-          <div
-            key={`${pass.id}-${visitor.visitorId}`}
-            className={`visitor-row ${visitor.edad < 18 ? "minor" : ""}`}
-            style={{
-              gridTemplateColumns: "1fr",
-              ...(visitor.edad < 18 ? minorTextStyle : {})
-            }}
-          >
-            {formatCompactVisitorName(visitor)}
-          </div>
-        ))}
+      <div className="apoyo-pass-section">
+        <div className="apoyo-pass-list">
+          {section.visitors.map((visitor) => (
+            <div
+              key={`${pass.id}-${section.key}-${visitor.visitorId}`}
+              className={`apoyo-pass-line ${visitor.edad < 18 ? "minor" : ""}`}
+            >
+              {formatVisitorLine(visitor)}
+            </div>
+          ))}
+          {section.childrenCount > 0 ? (
+            <div className="apoyo-pass-line minor">
+              + {section.childrenCount} {section.childrenCount === 1 ? "menor" : "menores"}
+            </div>
+          ) : null}
+        </div>
+      </div>
+    </article>
+  ));
+}
 
-        {underTwelveCount > 0 ? (
-          <div
-            className="visitor-row minor"
-            style={{ gridTemplateColumns: "1fr", ...minorTextStyle }}
-          >
-            + {underTwelveCount} menores
-          </div>
-        ) : null}
+function renderMentionPass(pass: ListingRecord) {
+  const { basic, special } = splitMentions(pass.menciones);
+  return (
+    <article key={pass.id} className="pass-card apoyo-pass-card mention-pass-card">
+      <div className="apoyo-pass-header">
+        <div>
+          <div className="apoyo-pass-kicker">Menciones</div>
+          <div className="apoyo-pass-date">{formatLongDate(pass.fechaVisita)}</div>
+        </div>
+        <div className="apoyo-pass-number">{pass.numeroPase ?? "-"}</div>
       </div>
 
-      {pass.menciones ? (
-        <div
-          style={{
-            marginTop: "1rem",
-            paddingTop: "0.8rem",
-            borderTop: "1px dashed #c9b48b"
-          }}
-        >
-          <strong style={{ display: "block", marginBottom: "0.45rem" }}>Mencion</strong>
-          <div>{pass.menciones}</div>
+      <div className="apoyo-pass-meta">
+        <div>
+          <strong>PPL:</strong> {pass.internoNombre}
+        </div>
+        <div>
+          <strong>Ubicacion:</strong> {pass.internoUbicacion}
+        </div>
+      </div>
+
+      {basic.length > 0 ? (
+        <div className="apoyo-pass-section">
+          <strong>Mencion</strong>
+          <div className="apoyo-pass-list support-note-list">
+            {basic.map((item, index) => (
+              <div key={`${pass.id}-mention-basic-${index}`} className="apoyo-pass-line warning">
+                {item}
+              </div>
+            ))}
+          </div>
+        </div>
+      ) : null}
+
+      {special.length > 0 ? (
+        <div className="apoyo-pass-section">
+          <strong>Mencion especial</strong>
+          <div className="apoyo-pass-list support-note-list">
+            {special.map((item, index) => (
+              <div key={`${pass.id}-mention-special-${index}`} className="apoyo-pass-line minor">
+                {item}
+              </div>
+            ))}
+          </div>
         </div>
       ) : null}
     </article>
   );
 }
 
-function renderSeparatedCompactPass(pass: ListingRecord) {
-  const { listedVisitors, underTwelveCount } = get618VisibleVisitors(pass);
-  const men = listedVisitors.filter((visitor) => visitor.sexo === "hombre");
-  const womenAndMinors = listedVisitors.filter((visitor) => visitor.sexo !== "hombre");
-  const sections = [
-    { key: "men", items: men, includeChildren: false },
-    { key: "women", items: womenAndMinors, includeChildren: underTwelveCount > 0 }
-  ].filter((section) => section.items.length > 0 || section.includeChildren);
-
-  return (
-    <>
-      {sections.map((section) => (
-        <article key={`${pass.id}-${section.key}`} className="pass-card pass-card-618">
-          <div className="compact-pass-head">
-            <div className="compact-pass-title">
-              <strong>
-                {pass.internoUbicacion} {pass.internoNombre}
-              </strong>
-              <span>{formatShortDate(pass.fechaVisita)}</span>
-            </div>
-            <div className="compact-pass-number">
-              {pass.area === "618" ? pass.numeroPase ?? "-" : ""}
-            </div>
-          </div>
-
-          <div className="compact-pass-visitors">
-            {section.items.map((visitor) => (
-              <div
-                key={`${pass.id}-${section.key}-${visitor.visitorId}`}
-                className={`compact-pass-visitor ${visitor.edad < 18 ? "minor" : ""}`}
-              >
-                <span>{formatCompactVisitorName(visitor)}</span>
-              </div>
-            ))}
-
-            {section.includeChildren ? (
-              <div className="compact-pass-children">+ {underTwelveCount} menores</div>
-            ) : null}
-          </div>
-        </article>
-      ))}
-    </>
-  );
-}
-
 export function PassListing({
   listings,
-  nextDate,
-  openDate
+  printDate
 }: {
   listings: ListingRecord[];
-  nextDate: string;
-  openDate: string;
+  printDate: string;
 }) {
-  const [activeArea, setActiveArea] = useState<AccessArea>("618");
-  const [printMode, setPrintMode] = useState<PrintMode>("agrupado");
+  const [printMode, setPrintMode] = useState<PrintMode>("listado");
 
   const filtered = useMemo(() => {
-    const targetDate = printMode === "entrega" || activeArea === "618" ? nextDate : openDate;
-    const byDate = listings.filter((item) => item.fechaVisita === targetDate);
+    const byDate = listings.filter((item) => item.fechaVisita === printDate);
     const sorted = sortListingsForPrint(byDate);
-    if (printMode === "entrega") {
-      return sorted.byLocation.filter((item) => item.area === "618");
+    if (printMode === "menciones") {
+      return sorted.filter((item) => item.menciones?.trim());
     }
 
-    return activeArea === "618"
-      ? sorted.byLocation.filter((item) => item.area === "618")
-      : sorted.sueltos.filter((item) => item.area === "INTIMA");
-  }, [activeArea, listings, nextDate, openDate, printMode]);
-
-  function selectDeliveryNumbers() {
-    setActiveArea("618");
-    setPrintMode("entrega");
-  }
-
-  function select618() {
-    setActiveArea("618");
-    setPrintMode("agrupado");
-  }
-
-  function selectSeparated618() {
-    setActiveArea("618");
-    setPrintMode("separado");
-  }
-
-  function selectSueltos() {
-    setActiveArea("INTIMA");
-    setPrintMode("agrupado");
-  }
+    return sorted;
+  }, [listings, printDate, printMode]);
 
   return (
     <section className="module-panel">
@@ -220,36 +255,32 @@ export function PassListing({
         <div className="toolbar">
           <button
             type="button"
-            className={`button-secondary listing-toggle ${activeArea === "618" && printMode === "agrupado" ? "active" : ""}`}
-            onClick={select618}
+            className={`button-secondary listing-toggle ${printMode === "listado" ? "active" : ""}`}
+            onClick={() => setPrintMode("listado")}
           >
-            618
+            Listado
           </button>
-
           <button
             type="button"
-            className={`button-secondary listing-toggle ${activeArea === "618" && printMode === "separado" ? "active" : ""}`}
-            onClick={selectSeparated618}
+            className={`button-secondary listing-toggle ${printMode === "sexos" ? "active" : ""}`}
+            onClick={() => setPrintMode("sexos")}
           >
             Hombres / Mujeres
           </button>
-
           <button
             type="button"
-            className={`button-secondary listing-toggle ${activeArea === "INTIMA" && printMode === "agrupado" ? "active" : ""}`}
-            onClick={selectSueltos}
+            className={`button-secondary listing-toggle ${printMode === "numeros" ? "active" : ""}`}
+            onClick={() => setPrintMode("numeros")}
           >
-            Pases sueltos
+            Numero de Pase
           </button>
-
           <button
             type="button"
-            className={`button-secondary listing-toggle ${printMode === "entrega" ? "active" : ""}`}
-            onClick={selectDeliveryNumbers}
+            className={`button-secondary listing-toggle ${printMode === "menciones" ? "active" : ""}`}
+            onClick={() => setPrintMode("menciones")}
           >
-            Numeros de pase
+            Menciones
           </button>
-
           <button
             type="button"
             className="button-secondary listing-toggle"
@@ -261,70 +292,36 @@ export function PassListing({
       </div>
 
       <div
-        className={`print-zone passes-grid ${printMode !== "entrega" ? "compact-pass-grid" : ""}`}
+        className={`print-zone ${
+          printMode === "listado"
+            ? "apoyo-print-grid"
+            : printMode === "numeros"
+              ? "apoyo-numbers-grid"
+              : "apoyo-secondary-grid"
+        }`}
       >
         {filtered.length === 0 ? (
           <div className="data-card">
             <h3>Sin pases</h3>
           </div>
-        ) : printMode === "entrega" ? (
+        ) : printMode === "listado" ? (
+          filtered.map((pass) => renderMainPass(pass))
+        ) : printMode === "sexos" ? (
+          filtered.flatMap((pass) => renderSeparatedPasses(pass))
+        ) : printMode === "menciones" ? (
+          filtered.map((pass) => renderMentionPass(pass))
+        ) : (
           <article className="pass-card delivery-print">
-            <div className="pass-head">
-              <div>
-                <span className="eyebrow" style={{ color: "#7c2d12", background: "#fef3c7" }}>
-                  Lista de entrega
-                </span>
-                <h3 className="pass-title" style={{ marginTop: "0.7rem" }}>
-                  Pases del dia siguiente
-                </h3>
-                <div className="muted" style={{ color: "var(--muted)", marginTop: "0.4rem" }}>
-                  Fecha: {formatLongDate(nextDate)}
+            <div className="numbers-print-list">
+              {filtered.map((pass) => (
+                <div key={pass.id} className="numbers-print-row">
+                  <span>{pass.numeroPase ?? "-"}</span>
+                  <span>{pass.internoUbicacion}</span>
+                  <span>{pass.internoNombre}</span>
                 </div>
-              </div>
-            </div>
-
-            <div className="table-wrap hide-print" style={{ marginTop: "1rem" }}>
-              <table>
-                <thead>
-                  <tr>
-                    <th>No.</th>
-                    <th>Ubicacion</th>
-                    <th>Interno</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {filtered.map((pass) => (
-                    <tr key={pass.id}>
-                      <td>{pass.numeroPase ?? "-"}</td>
-                      <td>{pass.internoUbicacion}</td>
-                      <td>{pass.internoNombre}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-
-            <div className="delivery-print-list">
-              <div className="delivery-print-head">
-                <span>No.</span>
-                <span>Ubicacion</span>
-                <span>Interno</span>
-              </div>
-              <div className="delivery-print-body">
-                {filtered.map((pass) => (
-                  <div key={pass.id} className="delivery-print-row">
-                    <span>{pass.numeroPase ?? "-"}</span>
-                    <span>{pass.internoUbicacion}</span>
-                    <span>{pass.internoNombre}</span>
-                  </div>
-                ))}
-              </div>
+              ))}
             </div>
           </article>
-        ) : printMode === "agrupado" ? (
-          filtered.map((pass) => (pass.area === "INTIMA" ? renderLoosePass(pass) : renderCompactPass(pass)))
-        ) : (
-          filtered.map((pass) => renderSeparatedCompactPass(pass))
         )}
       </div>
     </section>

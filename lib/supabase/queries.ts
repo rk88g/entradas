@@ -3,6 +3,7 @@ import "server-only";
 import { SupabaseClient } from "@supabase/supabase-js";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import {
+  AccessStatus,
   BetadaRecord,
   DateRecord,
   InternalProfile,
@@ -571,8 +572,8 @@ export async function getInternalProfiles(options?: {
 
   const internalIds = internos.map((item) => item.id);
   const [nextDatePasses, openDatePasses] = await Promise.all([
-    nextDate ? getListado({ fechaVisita: nextDate.fechaCompleta, area: "618" }) : Promise.resolve([]),
-    openDate ? getListado({ fechaVisita: openDate.fechaCompleta, area: "INTIMA" }) : Promise.resolve([])
+    nextDate ? getListado({ fechaVisita: nextDate.fechaCompleta }) : Promise.resolve([]),
+    openDate ? getListado({ fechaVisita: openDate.fechaCompleta }) : Promise.resolve([])
   ]);
 
   const [{ data: relationRows, error: relationError }, allListingsForRecent] =
@@ -655,6 +656,7 @@ export async function getListingBuilderData(): Promise<ListingBuilderData> {
   return {
     openDate,
     nextDate,
+    printDate: openDate,
     internalProfiles,
     todaysPasses,
     closePasswordConfigured
@@ -682,26 +684,24 @@ export async function getDashboardSummary() {
     getNextDate()
   ]);
 
-  const relevantListings = listado.filter((item) => {
-    if (nextDate && item.area === "618" && item.fechaVisita === nextDate.fechaCompleta) {
-      return true;
-    }
-
-    if (openDate && item.area === "INTIMA" && item.fechaVisita === openDate.fechaCompleta) {
-      return true;
-    }
-
-    return false;
-  });
+  const openListings = openDate
+    ? listado.filter((item) => item.fechaVisita === openDate.fechaCompleta)
+    : [];
+  const waitingListings = nextDate
+    ? listado.filter((item) => item.fechaVisita === nextDate.fechaCompleta)
+    : [];
+  const relevantListings = [...openListings, ...waitingListings];
   const listingStats = getStatsFromListings(relevantListings);
 
   return {
     openDate,
     nextDate,
+    openPassCount: openListings.length,
+    waitingPassCount: waitingListings.length,
     totalTomorrowPasses: relevantListings.length,
     totalTomorrowVisitors: relevantListings.reduce((sum, item) => sum + item.visitantes.length, 0),
     totalBetadas: betadas.filter((item) => item.activo).length,
-    nextOpenDate: fechas.find((item) => item.estado === "abierto") ?? null,
+    nextOpenDate: fechas.find((item) => item.estado === "abierto" && !item.cierre) ?? null,
     listingStats,
     activeVisitors: visitas.filter((item) => !item.betada).length
   };
