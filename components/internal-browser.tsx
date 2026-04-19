@@ -79,6 +79,7 @@ export function InternalBrowser({
   const [selectedVisitorIds, setSelectedVisitorIds] = useState<string[]>([]);
   const [selectedDateValue, setSelectedDateValue] = useState("");
   const [historyOpen, setHistoryOpen] = useState(false);
+  const [historySections, setHistorySections] = useState<Record<string, boolean>>({});
   const [formSeed, setFormSeed] = useState(0);
   const [createState, createAction, createPending] = useActionState(createInternalAction, mutationInitialState);
   const [passState, passAction, passPending] = useActionState(createPassAction, mutationInitialState);
@@ -173,6 +174,7 @@ export function InternalBrowser({
     setSelectedVisitorIds([]);
     setSelectedDateValue(getDefaultDateValue(roleKey, openDate, nextDate));
     setHistoryOpen(false);
+    setHistorySections({});
     setFormSeed((current) => current + 1);
   }
 
@@ -182,6 +184,13 @@ export function InternalBrowser({
         ? current.filter((item) => item !== visitaId)
         : [...current, visitaId]
     );
+  }
+
+  function toggleHistorySection(sectionKey: string) {
+    setHistorySections((current) => ({
+      ...current,
+      [sectionKey]: !current[sectionKey]
+    }));
   }
 
   return (
@@ -358,116 +367,141 @@ export function InternalBrowser({
 
             {historyOpen ? (
               <section className="profile-history-grid">
-                <article className="data-card">
-                  <strong>Visitas</strong>
-                  <div className="record-stack" style={{ marginTop: "0.7rem" }}>
-                    {selected.visitors.length === 0 ? <span className="muted">Sin visitas.</span> : selected.visitors.map((item) => (
+                {[
+                  {
+                    key: "visitas",
+                    title: "Visitas",
+                    count: selected.visitors.length,
+                    content: selected.visitors.length === 0 ? <span className="muted">Sin visitas.</span> : selected.visitors.map((item) => (
                       <div key={item.id} className="record-pill">
                         <strong>{item.visitor.fullName}</strong>
                         <span>{item.parentesco}</span>
                       </div>
-                    ))}
-                  </div>
-                </article>
-                <article className="data-card">
-                  <strong>Aparatos registrados</strong>
-                  <div className="record-stack" style={{ marginTop: "0.7rem" }}>
-                    {selected.devices.length === 0 ? <span className="muted">Sin aparatos.</span> : selected.devices.map((item) => (
+                    ))
+                  },
+                  {
+                    key: "aparatos",
+                    title: "Aparatos registrados",
+                    count: selected.devices.length,
+                    content: selected.devices.length === 0 ? <span className="muted">Sin aparatos.</span> : selected.devices.map((item) => (
                       <div key={item.id} className="record-pill">
                         <strong>{item.deviceTypeName}</strong>
                         <span>{item.moduleKey} · {item.quantity}</span>
                         <small>{[item.brand, item.model].filter(Boolean).join(" / ") || "Sin detalle"}</small>
                       </div>
-                    ))}
-                  </div>
-                </article>
-                <article className="data-card">
-                  <strong>Negocios y oficinas</strong>
-                  <div className="record-stack" style={{ marginTop: "0.7rem" }}>
-                    {selected.workplaceAssignments.length === 0 ? <span className="muted">Sin asignaciones.</span> : selected.workplaceAssignments.map((item) => (
+                    ))
+                  },
+                  {
+                    key: "trabajo",
+                    title: "Negocios y oficinas",
+                    count: selected.workplaceAssignments.length,
+                    content: selected.workplaceAssignments.length === 0 ? <span className="muted">Sin asignaciones.</span> : selected.workplaceAssignments.map((item) => (
                       <div key={item.id} className="record-pill">
                         <strong>{item.workplaceName}</strong>
                         <span>{item.title}</span>
                         <small>{item.workplaceType} · ${item.salary.toFixed(2)}</small>
                       </div>
-                    ))}
-                  </div>
-                </article>
-                <article className="data-card">
-                  <strong>Historico de visitas y pases</strong>
-                  <div className="record-stack" style={{ marginTop: "0.7rem" }}>
-                    {selected.recentPasses.length === 0 ? <span className="muted">Sin historial.</span> : selected.recentPasses.map((item) => (
+                    ))
+                  },
+                  {
+                    key: "pases",
+                    title: "Historico de visitas y pases",
+                    count: selected.recentPasses.length,
+                    content: selected.recentPasses.length === 0 ? <span className="muted">Sin historial.</span> : selected.recentPasses.map((item) => (
                       <div key={item.id} className="record-pill">
                         <strong>{formatLongDate(item.fechaVisita)}</strong>
                         <span>{item.visitantes.length} visitas</span>
                       </div>
-                    ))}
-                  </div>
-                </article>
-                <article className="data-card">
-                  <strong>Pagos semanales</strong>
-                  <div className="record-stack" style={{ marginTop: "0.7rem" }}>
-                    {selected.weeklyPayments.length === 0 ? <span className="muted">Sin pagos.</span> : selected.weeklyPayments.map((item) => (
+                    ))
+                  },
+                  {
+                    key: "pagos",
+                    title: "Pagos semanales",
+                    count: selected.weeklyPayments.length,
+                    content: selected.weeklyPayments.length === 0 ? <span className="muted">Sin pagos.</span> : selected.weeklyPayments.map((item) => (
                       <div key={item.id} className="record-pill">
                         <strong>{item.deviceTypeName}</strong>
                         <span>{compactMoney(item.amount)} · {item.status}</span>
                       </div>
-                    ))}
-                  </div>
-                </article>
-                <article className="data-card">
-                  <strong>Escaleras</strong>
-                  <div className="record-stack" style={{ marginTop: "0.7rem" }}>
-                    {selected.escalerasHistory.length === 0 ? <span className="muted">Sin registros.</span> : selected.escalerasHistory.map((item) => (
+                    ))
+                  },
+                  {
+                    key: "escaleras",
+                    title: "Escaleras",
+                    count: selected.escalerasHistory.length,
+                    content: selected.escalerasHistory.length === 0 ? <span className="muted">Sin registros.</span> : selected.escalerasHistory.map((item) => (
                       <div key={item.id} className="record-pill">
                         <strong>{formatLongDate(item.fechaVisita)}</strong>
                         <span>{item.status}</span>
                       </div>
-                    ))}
-                  </div>
-                </article>
-                <article className="data-card">
-                  <strong>Multas y decomisos</strong>
-                  <div className="record-stack" style={{ marginTop: "0.7rem" }}>
-                    {selected.fines.map((item) => (
-                      <div key={item.id} className="record-pill">
-                        <strong>{item.concept}</strong>
-                        <span>{compactMoney(item.amount)} · {item.status}</span>
-                      </div>
-                    ))}
-                    {selected.seizures.map((item) => (
-                      <div key={item.id} className="record-pill">
-                        <strong>{item.concept}</strong>
-                        <span>{item.status}</span>
-                      </div>
-                    ))}
-                    {selected.fines.length === 0 && selected.seizures.length === 0 ? <span className="muted">Sin registros.</span> : null}
-                  </div>
-                </article>
-                <article className="data-card">
-                  <strong>Cambios, venta, renta y compra</strong>
-                  <div className="record-stack" style={{ marginTop: "0.7rem" }}>
-                    {selected.equipmentMovements.length === 0 ? <span className="muted">Sin movimientos.</span> : selected.equipmentMovements.map((item) => (
+                    ))
+                  },
+                  {
+                    key: "multas",
+                    title: "Multas y decomisos",
+                    count: selected.fines.length + selected.seizures.length,
+                    content: selected.fines.length === 0 && selected.seizures.length === 0 ? <span className="muted">Sin registros.</span> : (
+                      <>
+                        {selected.fines.map((item) => (
+                          <div key={item.id} className="record-pill">
+                            <strong>{item.concept}</strong>
+                            <span>{compactMoney(item.amount)} · {item.status}</span>
+                          </div>
+                        ))}
+                        {selected.seizures.map((item) => (
+                          <div key={item.id} className="record-pill">
+                            <strong>{item.concept}</strong>
+                            <span>{item.status}</span>
+                          </div>
+                        ))}
+                      </>
+                    )
+                  },
+                  {
+                    key: "movimientos",
+                    title: "Cambios, venta, renta y compra",
+                    count: selected.equipmentMovements.length,
+                    content: selected.equipmentMovements.length === 0 ? <span className="muted">Sin movimientos.</span> : selected.equipmentMovements.map((item) => (
                       <div key={item.id} className="record-pill">
                         <strong>{item.movementType}</strong>
                         <span>{item.description}</span>
                         <small>{item.amount ? compactMoney(item.amount) : "Sin monto"}</small>
                       </div>
-                    ))}
-                  </div>
-                </article>
-                <article className="data-card">
-                  <strong>Notas y temporalidad</strong>
-                  <div className="record-stack" style={{ marginTop: "0.7rem" }}>
-                    {selected.notes.length === 0 ? <span className="muted">Sin notas.</span> : selected.notes.map((item) => (
+                    ))
+                  },
+                  {
+                    key: "notas",
+                    title: "Notas y temporalidad",
+                    count: selected.notes.length,
+                    content: selected.notes.length === 0 ? <span className="muted">Sin notas.</span> : selected.notes.map((item) => (
                       <div key={item.id} className="record-pill">
                         <strong>{item.title}</strong>
                         <span>{item.sourceModule}</span>
                         <small>{item.notes}</small>
                       </div>
-                    ))}
-                  </div>
-                </article>
+                    ))
+                  }
+                ].map((section) => {
+                  const isOpen = Boolean(historySections[section.key]);
+                  return (
+                    <article key={section.key} className="data-card">
+                      <button
+                        type="button"
+                        className="button-soft"
+                        style={{ width: "100%", display: "flex", justifyContent: "space-between", alignItems: "center" }}
+                        onClick={() => toggleHistorySection(section.key)}
+                      >
+                        <span>{section.title}</span>
+                        <span>{section.count} {isOpen ? "−" : "+"}</span>
+                      </button>
+                      {isOpen ? (
+                        <div className="record-stack" style={{ marginTop: "0.7rem" }}>
+                          {section.content}
+                        </div>
+                      ) : null}
+                    </article>
+                  );
+                })}
               </section>
             ) : null}
 
