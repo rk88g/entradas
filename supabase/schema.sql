@@ -211,6 +211,10 @@ create table if not exists public.app_settings (
   updated_at timestamptz not null default timezone('utc', now())
 );
 
+insert into public.app_settings (key, value)
+values ('global_cutoff_weekday', '1')
+on conflict (key) do nothing;
+
 create table if not exists public.connection_logs (
   id uuid primary key default gen_random_uuid(),
   user_profile_id uuid references public.user_profiles (id) on delete set null,
@@ -366,6 +370,10 @@ create table if not exists public.module_prices (
   module_key text not null references public.block_modules (key) on delete cascade,
   device_type_id uuid not null references public.module_device_types (id) on delete cascade,
   weekly_price numeric(10,2) not null default 0,
+  activation_price numeric(10,2) not null default 0,
+  fine_price numeric(10,2) not null default 0,
+  maintenance_price numeric(10,2) not null default 0,
+  retention_price numeric(10,2) not null default 0,
   discount_amount numeric(10,2) not null default 0,
   active boolean not null default true,
   created_by uuid references public.user_profiles (id),
@@ -373,6 +381,18 @@ create table if not exists public.module_prices (
   updated_at timestamptz not null default timezone('utc', now()),
   unique (module_key, device_type_id)
 );
+
+alter table public.module_prices
+  add column if not exists activation_price numeric(10,2) not null default 0;
+
+alter table public.module_prices
+  add column if not exists fine_price numeric(10,2) not null default 0;
+
+alter table public.module_prices
+  add column if not exists maintenance_price numeric(10,2) not null default 0;
+
+alter table public.module_prices
+  add column if not exists retention_price numeric(10,2) not null default 0;
 
 create table if not exists public.internal_devices (
   id uuid primary key default gen_random_uuid(),
@@ -389,7 +409,8 @@ create table if not exists public.internal_devices (
   serial_number text,
   cameras_allowed boolean not null default false,
   quantity integer not null default 1,
-  status text not null default 'activo' check (status in ('activo', 'retenido', 'reparacion', 'baja')),
+  status text not null default 'pendiente' check (status in ('pendiente', 'activo', 'retenido', 'reparacion', 'baja')),
+  activated_at timestamptz,
   paid_through date,
   weekly_price_override numeric(10,2),
   discount_override numeric(10,2),
@@ -398,6 +419,39 @@ create table if not exists public.internal_devices (
   created_by uuid references public.user_profiles (id),
   created_at timestamptz not null default timezone('utc', now()),
   updated_at timestamptz not null default timezone('utc', now())
+);
+
+alter table public.internal_devices
+  add column if not exists activated_at timestamptz;
+
+alter table public.internal_devices
+  drop constraint if exists internal_devices_status_check;
+
+alter table public.internal_devices
+  add constraint internal_devices_status_check
+  check (status in ('pendiente', 'activo', 'retenido', 'reparacion', 'baja'));
+
+create table if not exists public.workplaces (
+  id uuid primary key default gen_random_uuid(),
+  name text not null unique,
+  type text not null check (type in ('negocio', 'oficina')),
+  active boolean not null default true,
+  created_by uuid references public.user_profiles (id),
+  created_at timestamptz not null default timezone('utc', now()),
+  updated_at timestamptz not null default timezone('utc', now())
+);
+
+create table if not exists public.workplace_positions (
+  id uuid primary key default gen_random_uuid(),
+  workplace_id uuid not null references public.workplaces (id) on delete cascade,
+  title text not null,
+  salary numeric(10,2) not null default 0,
+  assigned_internal_id uuid references public.internos (id) on delete set null,
+  active boolean not null default true,
+  created_by uuid references public.user_profiles (id),
+  created_at timestamptz not null default timezone('utc', now()),
+  updated_at timestamptz not null default timezone('utc', now()),
+  unique (workplace_id, title)
 );
 
 create table if not exists public.listing_device_items (
@@ -493,6 +547,39 @@ create table if not exists public.internal_log_notes (
   unique (source_module, source_ref_id)
 );
 
+create table if not exists public.internal_equipment_movements (
+  id uuid primary key default gen_random_uuid(),
+  internal_id uuid not null references public.internos (id) on delete cascade,
+  movement_type text not null check (movement_type in ('venta', 'renta', 'compra', 'cambio')),
+  description text not null,
+  amount numeric(10,2),
+  created_by uuid references public.user_profiles (id),
+  created_at timestamptz not null default timezone('utc', now()),
+  updated_at timestamptz not null default timezone('utc', now())
+);
+
+create table if not exists public.internal_fines (
+  id uuid primary key default gen_random_uuid(),
+  internal_id uuid not null references public.internos (id) on delete cascade,
+  concept text not null,
+  amount numeric(10,2) not null default 0,
+  status text not null default 'pendiente' check (status in ('pendiente', 'pagada')),
+  created_by uuid references public.user_profiles (id),
+  created_at timestamptz not null default timezone('utc', now()),
+  updated_at timestamptz not null default timezone('utc', now())
+);
+
+create table if not exists public.internal_seizures (
+  id uuid primary key default gen_random_uuid(),
+  internal_id uuid not null references public.internos (id) on delete cascade,
+  concept text not null,
+  status text not null default 'retenido' check (status in ('retenido', 'entregado', 'cancelado')),
+  notes text,
+  created_by uuid references public.user_profiles (id),
+  created_at timestamptz not null default timezone('utc', now()),
+  updated_at timestamptz not null default timezone('utc', now())
+);
+
 drop index if exists public.idx_internos_apartado;
 create index if not exists idx_internos_laborando on public.internos (laborando);
 create index if not exists idx_visitas_betada on public.visitas (betada);
@@ -504,8 +591,12 @@ create index if not exists idx_visita_interno_historial_visita on public.visita_
 create index if not exists idx_internal_devices_module on public.internal_devices (module_key, internal_id);
 create index if not exists idx_device_payments_cycle on public.device_payments (module_key, cycle_id);
 create index if not exists idx_module_internal_staff_module on public.module_internal_staff (module_key, internal_id);
+create index if not exists idx_workplace_positions_internal on public.workplace_positions (assigned_internal_id);
 create index if not exists idx_escalera_entries_fecha on public.escalera_entries (fecha_visita, status);
 create index if not exists idx_internal_log_notes_internal on public.internal_log_notes (internal_id, created_at desc);
+create index if not exists idx_internal_equipment_movements_internal on public.internal_equipment_movements (internal_id, created_at desc);
+create index if not exists idx_internal_fines_internal on public.internal_fines (internal_id, created_at desc);
+create index if not exists idx_internal_seizures_internal on public.internal_seizures (internal_id, created_at desc);
 create index if not exists idx_connection_logs_created_at on public.connection_logs (created_at desc);
 create index if not exists idx_action_audit_logs_created_at on public.action_audit_logs (created_at desc);
 
@@ -646,6 +737,18 @@ before update on public.module_internal_staff
 for each row
 execute function public.set_updated_at();
 
+drop trigger if exists workplaces_set_updated_at on public.workplaces;
+create trigger workplaces_set_updated_at
+before update on public.workplaces
+for each row
+execute function public.set_updated_at();
+
+drop trigger if exists workplace_positions_set_updated_at on public.workplace_positions;
+create trigger workplace_positions_set_updated_at
+before update on public.workplace_positions
+for each row
+execute function public.set_updated_at();
+
 drop trigger if exists escalera_entries_set_updated_at on public.escalera_entries;
 create trigger escalera_entries_set_updated_at
 before update on public.escalera_entries
@@ -661,6 +764,24 @@ execute function public.set_updated_at();
 drop trigger if exists internal_log_notes_set_updated_at on public.internal_log_notes;
 create trigger internal_log_notes_set_updated_at
 before update on public.internal_log_notes
+for each row
+execute function public.set_updated_at();
+
+drop trigger if exists internal_equipment_movements_set_updated_at on public.internal_equipment_movements;
+create trigger internal_equipment_movements_set_updated_at
+before update on public.internal_equipment_movements
+for each row
+execute function public.set_updated_at();
+
+drop trigger if exists internal_fines_set_updated_at on public.internal_fines;
+create trigger internal_fines_set_updated_at
+before update on public.internal_fines
+for each row
+execute function public.set_updated_at();
+
+drop trigger if exists internal_seizures_set_updated_at on public.internal_seizures;
+create trigger internal_seizures_set_updated_at
+before update on public.internal_seizures
 for each row
 execute function public.set_updated_at();
 
@@ -689,9 +810,14 @@ alter table public.listing_device_items enable row level security;
 alter table public.device_payment_cycles enable row level security;
 alter table public.device_payments enable row level security;
 alter table public.module_internal_staff enable row level security;
+alter table public.workplaces enable row level security;
+alter table public.workplace_positions enable row level security;
 alter table public.escalera_entries enable row level security;
 alter table public.escalera_entry_items enable row level security;
 alter table public.internal_log_notes enable row level security;
+alter table public.internal_equipment_movements enable row level security;
+alter table public.internal_fines enable row level security;
+alter table public.internal_seizures enable row level security;
 
 grant usage on schema public to anon, authenticated, service_role;
 grant select on all tables in schema public to anon;
@@ -1005,6 +1131,41 @@ for select
 to authenticated
 using (true);
 
+drop policy if exists "read access internal equipment movements" on public.internal_equipment_movements;
+create policy "read access internal equipment movements"
+on public.internal_equipment_movements
+for select
+to authenticated
+using (true);
+
+drop policy if exists "read access internal fines" on public.internal_fines;
+create policy "read access internal fines"
+on public.internal_fines
+for select
+to authenticated
+using (true);
+
+drop policy if exists "read access internal seizures" on public.internal_seizures;
+create policy "read access internal seizures"
+on public.internal_seizures
+for select
+to authenticated
+using (true);
+
+drop policy if exists "read access workplaces" on public.workplaces;
+create policy "read access workplaces"
+on public.workplaces
+for select
+to authenticated
+using (true);
+
+drop policy if exists "read access workplace positions" on public.workplace_positions;
+create policy "read access workplace positions"
+on public.workplace_positions
+for select
+to authenticated
+using (true);
+
 drop policy if exists "manage modules by authenticated users" on public.module_workers;
 create policy "manage modules by authenticated users"
 on public.module_workers
@@ -1085,6 +1246,22 @@ to authenticated
 using (true)
 with check (true);
 
+drop policy if exists "manage workplaces by authenticated users" on public.workplaces;
+create policy "manage workplaces by authenticated users"
+on public.workplaces
+for all
+to authenticated
+using (true)
+with check (true);
+
+drop policy if exists "manage workplace positions by authenticated users" on public.workplace_positions;
+create policy "manage workplace positions by authenticated users"
+on public.workplace_positions
+for all
+to authenticated
+using (true)
+with check (true);
+
 drop policy if exists "manage escalera entries by authenticated users" on public.escalera_entries;
 create policy "manage escalera entries by authenticated users"
 on public.escalera_entries
@@ -1104,6 +1281,30 @@ with check (true);
 drop policy if exists "manage internal log notes by authenticated users" on public.internal_log_notes;
 create policy "manage internal log notes by authenticated users"
 on public.internal_log_notes
+for all
+to authenticated
+using (true)
+with check (true);
+
+drop policy if exists "manage internal equipment movements by authenticated users" on public.internal_equipment_movements;
+create policy "manage internal equipment movements by authenticated users"
+on public.internal_equipment_movements
+for all
+to authenticated
+using (true)
+with check (true);
+
+drop policy if exists "manage internal fines by authenticated users" on public.internal_fines;
+create policy "manage internal fines by authenticated users"
+on public.internal_fines
+for all
+to authenticated
+using (true)
+with check (true);
+
+drop policy if exists "manage internal seizures by authenticated users" on public.internal_seizures;
+create policy "manage internal seizures by authenticated users"
+on public.internal_seizures
 for all
 to authenticated
 using (true)

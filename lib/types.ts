@@ -19,7 +19,8 @@ export type ModuleWorkerFunctionKey =
 export type AccessStatus = "abierto" | "proximo" | "cerrado";
 export type PassStatus = "capturado" | "autorizado" | "impreso" | "cancelado";
 export type VisitorSex = "hombre" | "mujer" | "sin-definir";
-export type DeviceStatus = "activo" | "retenido" | "reparacion" | "baja";
+export type DeviceStatus = "pendiente" | "activo" | "retenido" | "reparacion" | "baja";
+export type WorkplaceType = "negocio" | "oficina";
 
 export interface UserProfile {
   id: string;
@@ -73,6 +74,15 @@ export interface InternalProfile extends InternalRecord {
   nextDatePass?: ListingRecord | null;
   openDatePass?: ListingRecord | null;
   recentPasses: ListingRecord[];
+  devices: InternalDeviceRecord[];
+  weeklyPayments: InternalWeeklyPaymentRecord[];
+  escalerasHistory: EscaleraRecord[];
+  notes: InternalNoteRecord[];
+  staffAssignments: ModuleStaffAssignment[];
+  workplaceAssignments: WorkplacePositionRecord[];
+  equipmentMovements: InternalEquipmentMovementRecord[];
+  fines: InternalFineRecord[];
+  seizures: InternalSeizureRecord[];
 }
 
 export interface VisitorRecord {
@@ -211,6 +221,10 @@ export interface ModulePriceRecord {
   deviceTypeId: string;
   deviceTypeName: string;
   weeklyPrice: number;
+  activationPrice: number;
+  finePrice: number;
+  maintenancePrice: number;
+  retentionPrice: number;
   discountAmount: number;
   active: boolean;
 }
@@ -238,6 +252,25 @@ export interface InternalDeviceRecord {
   discountOverride?: number | null;
   assignedManually: boolean;
   notes?: string;
+}
+
+export interface WorkplaceRecord {
+  id: string;
+  name: string;
+  type: WorkplaceType;
+  active: boolean;
+}
+
+export interface WorkplacePositionRecord {
+  id: string;
+  workplaceId: string;
+  workplaceName: string;
+  workplaceType: WorkplaceType;
+  title: string;
+  salary: number;
+  assignedInternalId?: string | null;
+  assignedInternalName?: string | null;
+  active: boolean;
 }
 
 export interface ModuleWorkerRecord {
@@ -268,6 +301,7 @@ export interface ModulePanelData {
   workers: ModuleWorkerRecord[];
   unpaidDevices: InternalDeviceRecord[];
   paidDevices: InternalDeviceRecord[];
+  pendingDevices: InternalDeviceRecord[];
   totalsByZone: ModuleFinanceSummary[];
   totalIncome: number;
   currentWeekLabel: string;
@@ -286,6 +320,48 @@ export interface ModuleStaffAssignment {
   userId: string;
   userName: string;
   positionKey: ModuleWorkerFunctionKey;
+}
+
+export interface InternalWeeklyPaymentRecord {
+  id: string;
+  moduleKey: ModuleKey;
+  amount: number;
+  status: string;
+  paidAt?: string | null;
+  notes?: string | null;
+  deviceTypeName: string;
+}
+
+export interface InternalNoteRecord {
+  id: string;
+  sourceModule: string;
+  title: string;
+  notes: string;
+  createdAt: string;
+}
+
+export interface InternalEquipmentMovementRecord {
+  id: string;
+  movementType: "venta" | "renta" | "compra" | "cambio";
+  description: string;
+  amount?: number | null;
+  createdAt: string;
+}
+
+export interface InternalFineRecord {
+  id: string;
+  concept: string;
+  amount: number;
+  status: "pendiente" | "pagada";
+  createdAt: string;
+}
+
+export interface InternalSeizureRecord {
+  id: string;
+  concept: string;
+  status: "retenido" | "entregado" | "cancelado";
+  createdAt: string;
+  notes?: string;
 }
 
 export type EscaleraEntryStatus = "pendiente" | "entregado" | "retenido" | "rechazado";
@@ -357,4 +433,22 @@ export interface ActionAuditRecord {
   beforeData?: string | null;
   afterData?: string | null;
   createdAt: string;
+}
+
+export interface AdminUserRecord {
+  id: string;
+  fullName: string;
+  roleKey: string;
+  email: string;
+  active: boolean;
+  hasProfile: boolean;
+}
+
+export interface DangerZoneConfigData {
+  cutoffWeekday: number;
+  zones: ModuleZone[];
+  prices: ModulePriceRecord[];
+  deviceTypes: ModuleDeviceType[];
+  workplaces: WorkplaceRecord[];
+  workplacePositions: WorkplacePositionRecord[];
 }

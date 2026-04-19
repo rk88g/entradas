@@ -53,8 +53,8 @@ export function formatLongDate(input: string) {
     }
 
     return new Intl.DateTimeFormat("es-MX", {
-      day: "numeric",
-      month: "long",
+      day: "2-digit",
+      month: "2-digit",
       year: "numeric"
     }).format(value);
   } catch {

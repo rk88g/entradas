@@ -78,7 +78,7 @@ function renderMainPass(pass: ListingRecord) {
   return (
     <article key={pass.id} className="pass-card apoyo-pass-card">
       <div className="apoyo-pass-header">
-        <div>
+        <div className="apoyo-pass-headline">
           <div className="apoyo-pass-kicker">Registro pase para terraza</div>
           <div className="apoyo-pass-date">{formatLongDate(pass.fechaVisita)}</div>
         </div>
@@ -100,18 +100,18 @@ function renderMainPass(pass: ListingRecord) {
           {listedVisitors.map((visitor) => (
             <div
               key={`${pass.id}-${visitor.visitorId}`}
-              className={`apoyo-pass-line truncatable ${visitor.edad < 18 ? "minor" : ""}`}
+              className={`apoyo-pass-line ${visitor.edad < 18 ? "minor" : ""}`}
             >
               {formatVisitorLine(visitor)}
             </div>
           ))}
           {underTwelveCount > 0 ? (
-            <div className="apoyo-pass-line truncatable minor">
+            <div className="apoyo-pass-line minor">
               + {underTwelveCount} {underTwelveCount === 1 ? "menor" : "menores"}
             </div>
           ) : null}
           {hiddenVisitorsCount > 0 ? (
-            <div className="apoyo-pass-line truncatable warning">
+            <div className="apoyo-pass-line warning">
               + {hiddenVisitorsCount} visitas en Hombres / Mujeres
             </div>
           ) : null}
@@ -123,7 +123,7 @@ function renderMainPass(pass: ListingRecord) {
           <strong>Peticion:</strong>
           <div className="apoyo-pass-list">
             {basic.map((item, index) => (
-              <div key={`${pass.id}-basic-${index}`} className="apoyo-pass-line truncatable warning">
+              <div key={`${pass.id}-basic-${index}`} className="apoyo-pass-line warning ellipsis-block">
                 {item}
               </div>
             ))}
@@ -136,7 +136,7 @@ function renderMainPass(pass: ListingRecord) {
           <strong>Peticion especial:</strong>
           <div className="apoyo-pass-list">
             {specialLines.map((item, index) => (
-              <div key={`${pass.id}-special-${index}`} className="apoyo-pass-line truncatable minor">
+              <div key={`${pass.id}-special-${index}`} className="apoyo-pass-line minor ellipsis-block">
                 {item}
               </div>
             ))}
@@ -180,13 +180,13 @@ function renderSeparatedPasses(pass: ListingRecord) {
           {section.visitors.map((visitor) => (
             <div
               key={`${pass.id}-${section.key}-${visitor.visitorId}`}
-              className={`apoyo-pass-line truncatable ${visitor.edad < 18 ? "minor" : ""}`}
+              className={`apoyo-pass-line ${visitor.edad < 18 ? "minor" : ""}`}
             >
               {formatVisitorLine(visitor)}
             </div>
           ))}
           {section.childrenCount > 0 ? (
-            <div className="apoyo-pass-line truncatable minor">
+            <div className="apoyo-pass-line minor">
               + {section.childrenCount} {section.childrenCount === 1 ? "menor" : "menores"}
             </div>
           ) : null}
@@ -230,7 +230,7 @@ function renderMentionPass(pass: ListingRecord) {
           <strong>Mencion</strong>
           <div className="apoyo-pass-list support-note-list">
             {basic.map((item, index) => (
-              <div key={`${pass.id}-mention-basic-${index}`} className="apoyo-pass-line truncatable warning">
+              <div key={`${pass.id}-mention-basic-${index}`} className="apoyo-pass-line warning">
                 {item}
               </div>
             ))}
@@ -238,7 +238,7 @@ function renderMentionPass(pass: ListingRecord) {
               <div className="support-note-block">
                 <strong>Mencion especial</strong>
                 {mergedSpecialLines.map((item, index) => (
-                  <div key={`${pass.id}-mention-special-${index}`} className="apoyo-pass-line truncatable minor">
+                  <div key={`${pass.id}-mention-special-${index}`} className="apoyo-pass-line minor">
                     {item}
                   </div>
                 ))}

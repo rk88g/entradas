@@ -1,8 +1,11 @@
 import "server-only";
 
 import { SupabaseClient } from "@supabase/supabase-js";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { isSupabaseAdminConfigured } from "@/lib/supabase/env";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import {
+  AdminUserRecord,
   AccessStatus,
   ActionAuditRecord,
   BetadaRecord,
@@ -25,12 +28,20 @@ import {
   ModuleStaffAssignment,
   ModuleZone,
   ModuleWorkerRecord,
+  DangerZoneConfigData,
+  InternalEquipmentMovementRecord,
+  InternalFineRecord,
+  InternalNoteRecord,
+  InternalSeizureRecord,
+  InternalWeeklyPaymentRecord,
   PassVisitor,
   RoleKey,
   UserProfile,
   VisitorHistoryEntry,
   VisitorRecord,
-  VisitorSex
+  VisitorSex,
+  WorkplacePositionRecord,
+  WorkplaceRecord
 } from "@/lib/types";
 import {
   compareInternalLocations,
@@ -40,10 +51,17 @@ import {
   getModuleDisplayName,
   getStatsFromListings,
   getTodayDate,
-  getWeekRange,
   getWeekRangeFromCutoff,
   sortVisitorsByAge
 } from "@/lib/utils";
+
+function getFirstRelation<T>(value: T | T[] | null | undefined): T | null {
+  if (!value) {
+    return null;
+  }
+
+  return Array.isArray(value) ? value[0] ?? null : value;
+}
 
 function ensureRoleKey(value?: string | null): RoleKey {
   if (
@@ -490,11 +508,10 @@ export async function getInternos(includeAll = false): Promise<InternalRecord[]>
     .from("internos")
     .select(
       "id, expediente, nombres, apellido_pat, apellido_mat, nacimiento, llego, libre, ubicacion, telefono, ubi_filiacion, laborando, estatus, observaciones, created_at, updated_at"
-    )
-    .order("created_at", { ascending: false });
+    );
 
   if (!includeAll) {
-    query = query.neq("estatus", "150");
+    query = query.eq("estatus", "activo");
   }
 
   const { data, error } = await query;
@@ -695,16 +712,87 @@ export async function getInternalProfiles(options?: {
     openDate ? getListado({ fechaVisita: openDate.fechaCompleta }) : Promise.resolve([])
   ]);
 
-  const [{ data: relationRows, error: relationError }, allListingsForRecent] =
-    await Promise.all([
-      internalIds.length
-        ? supabase
-            .from("interno_visitas")
-            .select("id, interno_id, visita_id, parentesco, titular")
-            .in("interno_id", internalIds)
-        : Promise.resolve({ data: [], error: null }),
-      getListado()
-    ]);
+  const [
+    { data: relationRows, error: relationError },
+    allListingsForRecent,
+    { data: deviceRows },
+    { data: paymentRows },
+    { data: staffRows },
+    { data: workplaceRows },
+    { data: noteRows },
+    { data: fineRows },
+    { data: seizureRows },
+    { data: movementRows },
+    escaleraHistory
+  ] =
+      await Promise.all([
+        internalIds.length
+          ? supabase
+              .from("interno_visitas")
+              .select("id, interno_id, visita_id, parentesco, titular")
+              .in("interno_id", internalIds)
+          : Promise.resolve({ data: [], error: null }),
+        getListado()
+        ,
+        internalIds.length
+          ? supabase
+              .from("internal_devices")
+              .select(
+                "id, internal_id, module_key, device_type_id, zone_id, brand, model, characteristics, imei, chip_number, cameras_allowed, quantity, status, paid_through, weekly_price_override, discount_override, assigned_manually, notes, module_device_types!inner(name), module_zones(name)"
+              )
+              .in("internal_id", internalIds)
+              .neq("status", "baja")
+          : Promise.resolve({ data: [] }),
+        internalIds.length
+          ? supabase
+              .from("device_payments")
+              .select(
+                "id, amount, status, paid_at, notes, internal_devices!inner(internal_id, module_key, module_device_types!inner(name))"
+              )
+              .in("internal_devices.internal_id", internalIds)
+          : Promise.resolve({ data: [] }),
+        internalIds.length
+          ? supabase
+              .from("module_internal_staff")
+              .select("id, module_key, internal_id, user_profile_id, position_key, user_profiles!inner(full_name)")
+              .in("internal_id", internalIds)
+          : Promise.resolve({ data: [] }),
+        internalIds.length
+          ? supabase
+              .from("workplace_positions")
+              .select("id, title, salary, assigned_internal_id, active, workplaces!inner(id, name, type)")
+              .in("assigned_internal_id", internalIds)
+          : Promise.resolve({ data: [] }),
+        internalIds.length
+          ? supabase
+              .from("internal_log_notes")
+              .select("id, internal_id, source_module, title, notes, created_at")
+              .in("internal_id", internalIds)
+              .order("created_at", { ascending: false })
+          : Promise.resolve({ data: [] }),
+        internalIds.length
+          ? supabase
+              .from("internal_fines")
+              .select("id, internal_id, concept, amount, status, created_at")
+              .in("internal_id", internalIds)
+              .order("created_at", { ascending: false })
+          : Promise.resolve({ data: [] }),
+        internalIds.length
+          ? supabase
+              .from("internal_seizures")
+              .select("id, internal_id, concept, status, notes, created_at")
+              .in("internal_id", internalIds)
+              .order("created_at", { ascending: false })
+          : Promise.resolve({ data: [] }),
+        internalIds.length
+          ? supabase
+              .from("internal_equipment_movements")
+              .select("id, internal_id, movement_type, description, amount, created_at")
+              .in("internal_id", internalIds)
+              .order("created_at", { ascending: false })
+          : Promise.resolve({ data: [] }),
+        getEscalerasPanelData(options?.includeInactive ?? false)
+      ]);
 
   if (relationError) {
     return internos.map((interno) => ({
@@ -712,7 +800,16 @@ export async function getInternalProfiles(options?: {
       visitors: [],
       nextDatePass: null,
       openDatePass: null,
-      recentPasses: []
+      recentPasses: [],
+      devices: [],
+      weeklyPayments: [],
+      escalerasHistory: [],
+      notes: [],
+      staffAssignments: [],
+      workplaceAssignments: [],
+      equipmentMovements: [],
+      fines: [],
+      seizures: []
     }));
   }
 
@@ -741,6 +838,15 @@ export async function getInternalProfiles(options?: {
   const nextPassMap = new Map(nextDatePasses.map((item) => [item.internoId, item]));
   const openPassMap = new Map(openDatePasses.map((item) => [item.internoId, item]));
   const recentPassMap = new Map<string, ListingRecord[]>();
+  const deviceMap = new Map<string, InternalProfile["devices"]>();
+  const paymentMap = new Map<string, InternalWeeklyPaymentRecord[]>();
+  const staffMap = new Map<string, ModuleStaffAssignment[]>();
+  const noteMap = new Map<string, InternalNoteRecord[]>();
+  const fineMap = new Map<string, InternalFineRecord[]>();
+  const seizureMap = new Map<string, InternalSeizureRecord[]>();
+  const movementMap = new Map<string, InternalEquipmentMovementRecord[]>();
+  const escaleraMap = new Map<string, InternalProfile["escalerasHistory"]>();
+  const workplaceMap = new Map<string, WorkplacePositionRecord[]>();
 
   allListingsForRecent.forEach((item) => {
     const current = recentPassMap.get(item.internoId) ?? [];
@@ -750,15 +856,162 @@ export async function getInternalProfiles(options?: {
     }
   });
 
+  (deviceRows ?? []).forEach((item) => {
+    const current = deviceMap.get(item.internal_id) ?? [];
+    current.push({
+      id: item.id,
+      internalId: item.internal_id,
+      internalName: internos.find((interno) => interno.id === item.internal_id)?.fullName ?? "Interno",
+      internalLocation: internos.find((interno) => interno.id === item.internal_id)?.ubicacion ?? "",
+      moduleKey: ensureModuleKey(item.module_key),
+      deviceTypeId: item.device_type_id,
+      deviceTypeName: getFirstRelation(item.module_device_types)?.name ?? "Aparato",
+      zoneId: item.zone_id ?? undefined,
+      zoneName: getFirstRelation(item.module_zones)?.name ?? undefined,
+      brand: item.brand ?? undefined,
+      model: item.model ?? undefined,
+      characteristics: item.characteristics ?? undefined,
+      imei: item.imei ?? undefined,
+      chipNumber: item.chip_number ?? undefined,
+      camerasAllowed: Boolean(item.cameras_allowed),
+      quantity: item.quantity ?? 1,
+      status: item.status,
+      paidThrough: item.paid_through ?? undefined,
+      weeklyPriceOverride: item.weekly_price_override ?? undefined,
+      discountOverride: item.discount_override ?? undefined,
+      assignedManually: Boolean(item.assigned_manually),
+      notes: item.notes ?? undefined
+    });
+    deviceMap.set(item.internal_id, current);
+  });
+
+  (paymentRows ?? []).forEach((item) => {
+    const internalDevice = getFirstRelation(item.internal_devices);
+    const internalId = internalDevice?.internal_id;
+    if (!internalId) {
+      return;
+    }
+    const current = paymentMap.get(internalId) ?? [];
+    current.push({
+      id: item.id,
+      moduleKey: ensureModuleKey(internalDevice?.module_key),
+      amount: Number(item.amount ?? 0),
+      status: item.status,
+      paidAt: item.paid_at ?? null,
+      notes: item.notes ?? null,
+      deviceTypeName: getFirstRelation(internalDevice?.module_device_types)?.name ?? "Aparato"
+    });
+    paymentMap.set(internalId, current);
+  });
+
+  (staffRows ?? []).forEach((item) => {
+    const current = staffMap.get(item.internal_id) ?? [];
+    current.push({
+      id: item.id,
+      moduleKey: ensureModuleKey(item.module_key),
+      internalId: item.internal_id,
+      internalName: internos.find((interno) => interno.id === item.internal_id)?.fullName ?? "Interno",
+      userId: item.user_profile_id,
+      userName: getFirstRelation(item.user_profiles)?.full_name ?? "Usuario",
+      positionKey: item.position_key as ModuleStaffAssignment["positionKey"]
+    });
+    staffMap.set(item.internal_id, current);
+  });
+
+  (workplaceRows ?? []).forEach((item) => {
+    const assignedInternalId = item.assigned_internal_id;
+    const workplace = getFirstRelation(item.workplaces);
+    if (!assignedInternalId || !workplace) {
+      return;
+    }
+
+    const current = workplaceMap.get(assignedInternalId) ?? [];
+    current.push({
+      id: item.id,
+      workplaceId: workplace.id,
+      workplaceName: workplace.name,
+      workplaceType: workplace.type,
+      title: item.title,
+      salary: Number(item.salary ?? 0),
+      assignedInternalId,
+      assignedInternalName: internos.find((interno) => interno.id === assignedInternalId)?.fullName ?? "Interno",
+      active: Boolean(item.active)
+    });
+    workplaceMap.set(assignedInternalId, current);
+  });
+
+  (noteRows ?? []).forEach((item) => {
+    const current = noteMap.get(item.internal_id) ?? [];
+    current.push({
+      id: item.id,
+      sourceModule: item.source_module,
+      title: item.title,
+      notes: item.notes,
+      createdAt: item.created_at
+    });
+    noteMap.set(item.internal_id, current);
+  });
+
+  (fineRows ?? []).forEach((item) => {
+    const current = fineMap.get(item.internal_id) ?? [];
+    current.push({
+      id: item.id,
+      concept: item.concept,
+      amount: Number(item.amount ?? 0),
+      status: item.status,
+      createdAt: item.created_at
+    });
+    fineMap.set(item.internal_id, current);
+  });
+
+  (seizureRows ?? []).forEach((item) => {
+    const current = seizureMap.get(item.internal_id) ?? [];
+    current.push({
+      id: item.id,
+      concept: item.concept,
+      status: item.status,
+      notes: item.notes ?? undefined,
+      createdAt: item.created_at
+    });
+    seizureMap.set(item.internal_id, current);
+  });
+
+  (movementRows ?? []).forEach((item) => {
+    const current = movementMap.get(item.internal_id) ?? [];
+    current.push({
+      id: item.id,
+      movementType: item.movement_type,
+      description: item.description,
+      amount: item.amount ?? null,
+      createdAt: item.created_at
+    });
+    movementMap.set(item.internal_id, current);
+  });
+
+  escaleraHistory.forEach((item) => {
+    const current = escaleraMap.get(item.internalId) ?? [];
+    current.push(item);
+    escaleraMap.set(item.internalId, current);
+  });
+
   return internos.map((interno) => ({
-    ...interno,
-    visitors: [...(relationMap.get(interno.id) ?? [])].sort(
-      (a, b) => b.visitor.edad - a.visitor.edad
-    ) as InternalVisitorLink[],
-    nextDatePass: nextPassMap.get(interno.id) ?? null,
-    openDatePass: openPassMap.get(interno.id) ?? null,
-    recentPasses: recentPassMap.get(interno.id) ?? []
-  }));
+      ...interno,
+      visitors: [...(relationMap.get(interno.id) ?? [])].sort(
+        (a, b) => b.visitor.edad - a.visitor.edad
+      ) as InternalVisitorLink[],
+      nextDatePass: nextPassMap.get(interno.id) ?? null,
+      openDatePass: openPassMap.get(interno.id) ?? null,
+      recentPasses: recentPassMap.get(interno.id) ?? [],
+      devices: (deviceMap.get(interno.id) ?? []).sort((a, b) => a.deviceTypeName.localeCompare(b.deviceTypeName)),
+      weeklyPayments: paymentMap.get(interno.id) ?? [],
+      escalerasHistory: escaleraMap.get(interno.id) ?? [],
+      notes: noteMap.get(interno.id) ?? [],
+      staffAssignments: staffMap.get(interno.id) ?? [],
+      workplaceAssignments: workplaceMap.get(interno.id) ?? [],
+      equipmentMovements: movementMap.get(interno.id) ?? [],
+      fines: fineMap.get(interno.id) ?? [],
+      seizures: seizureMap.get(interno.id) ?? []
+    }));
 }
 
 export async function getListingBuilderData(includeInactive = false): Promise<ListingBuilderData> {
@@ -823,12 +1076,11 @@ export async function getPassDeviceTypes(): Promise<ModuleDeviceType[]> {
 export async function getModulePanelData(moduleKey: ModuleKey, includeInactiveInternals = false): Promise<ModulePanelData> {
   const supabase = await createServerSupabaseClient();
   const moduleName = getModuleDisplayName(moduleKey);
-  const { data: settingsSeed } = await supabase
-    .from("module_settings")
-    .select("cutoff_weekday")
-    .eq("module_key", moduleKey)
-    .maybeSingle();
-  const cutoffWeekday = settingsSeed?.cutoff_weekday ?? 1;
+  const [{ data: globalCutoff }, { data: settingsSeed }] = await Promise.all([
+    supabase.from("app_settings").select("value").eq("key", "global_cutoff_weekday").maybeSingle(),
+    supabase.from("module_settings").select("cutoff_weekday").eq("module_key", moduleKey).maybeSingle()
+  ]);
+  const cutoffWeekday = Number(globalCutoff?.value ?? settingsSeed?.cutoff_weekday ?? 1);
   const { start, end } = getWeekRangeFromCutoff(cutoffWeekday);
 
   const [
@@ -842,6 +1094,7 @@ export async function getModulePanelData(moduleKey: ModuleKey, includeInactiveIn
     cyclesResponse,
     paymentsResponse,
     userProfilesResponse,
+    rolesResponse,
     staffAssignmentsResponse
   ] = await Promise.all([
     getInternos(includeInactiveInternals),
@@ -858,7 +1111,7 @@ export async function getModulePanelData(moduleKey: ModuleKey, includeInactiveIn
       .order("name", { ascending: true }),
     supabase
       .from("module_prices")
-      .select("id, module_key, device_type_id, weekly_price, discount_amount, active, module_device_types!inner(name)")
+      .select("id, module_key, device_type_id, weekly_price, activation_price, fine_price, maintenance_price, retention_price, discount_amount, active, module_device_types!inner(name)")
       .eq("module_key", moduleKey),
     supabase
       .from("internal_devices")
@@ -888,8 +1141,11 @@ export async function getModulePanelData(moduleKey: ModuleKey, includeInactiveIn
       .eq("module_key", moduleKey),
     supabase
       .from("user_profiles")
-      .select("id, full_name, roles!inner(key)")
+      .select("id, full_name, role_id")
       .eq("active", true),
+    supabase
+      .from("roles")
+      .select("id, key"),
     supabase
       .from("module_internal_staff")
       .select("id, module_key, internal_id, user_profile_id, position_key")
@@ -924,8 +1180,12 @@ export async function getModulePanelData(moduleKey: ModuleKey, includeInactiveIn
     id: item.id,
     moduleKey: ensureModuleKey(item.module_key),
     deviceTypeId: item.device_type_id,
-    deviceTypeName: item.module_device_types?.[0]?.name ?? "Aparato",
+    deviceTypeName: getFirstRelation(item.module_device_types)?.name ?? "Aparato",
     weeklyPrice: Number(item.weekly_price ?? 0),
+    activationPrice: Number(item.activation_price ?? 0),
+    finePrice: Number(item.fine_price ?? 0),
+    maintenancePrice: Number(item.maintenance_price ?? 0),
+    retentionPrice: Number(item.retention_price ?? 0),
     discountAmount: Number(item.discount_amount ?? 0),
     active: Boolean(item.active)
   }));
@@ -950,9 +1210,9 @@ export async function getModulePanelData(moduleKey: ModuleKey, includeInactiveIn
         internalLocation: internal?.ubicacion ?? "",
         moduleKey: ensureModuleKey(item.module_key),
         deviceTypeId: item.device_type_id,
-        deviceTypeName: item.module_device_types?.[0]?.name ?? "Aparato",
+        deviceTypeName: getFirstRelation(item.module_device_types)?.name ?? "Aparato",
         zoneId: item.zone_id ?? undefined,
-        zoneName: zone?.name ?? item.module_zones?.[0]?.name ?? undefined,
+        zoneName: zone?.name ?? getFirstRelation(item.module_zones)?.name ?? undefined,
         brand: item.brand ?? undefined,
         model: item.model ?? undefined,
         characteristics: item.characteristics ?? undefined,
@@ -973,6 +1233,7 @@ export async function getModulePanelData(moduleKey: ModuleKey, includeInactiveIn
   const userMap = new Map(
     (userProfilesResponse.data ?? []).map((item) => [item.id, item.full_name ?? "Usuario"])
   );
+  const roleMap = new Map((rolesResponse.data ?? []).map((item) => [item.id, item.key]));
   const staffAssignments: ModuleStaffAssignment[] = (staffAssignmentsResponse.data ?? []).map((item) => ({
     id: item.id,
     moduleKey: ensureModuleKey(item.module_key),
@@ -1008,6 +1269,7 @@ export async function getModulePanelData(moduleKey: ModuleKey, includeInactiveIn
     const payment = paymentMap.get(device.id);
     return Boolean(payment && payment.status === "pagado");
   });
+  const pendingDevices = devices.filter((device) => device.status === "pendiente");
 
   const totalsByZoneMap = new Map<string, ModuleFinanceSummary>();
   devices.forEach((device) => {
@@ -1049,12 +1311,13 @@ export async function getModulePanelData(moduleKey: ModuleKey, includeInactiveIn
     currentCycleId: cyclesResponse.data?.id,
     cutoffWeekday,
     assignableUsers: (userProfilesResponse.data ?? [])
-      .filter((item) => item.roles?.[0]?.key === moduleKey)
+      .filter((item) => roleMap.get(item.role_id) === moduleKey)
       .map((item) => ({
         id: item.id,
         fullName: item.full_name ?? "Usuario"
       })),
-    staffAssignments
+    staffAssignments,
+    pendingDevices
   };
 }
 
@@ -1217,7 +1480,7 @@ export async function getIntegratedModuleCounts() {
     (acc, item) => {
       const moduleKey = ensureModuleKey(item.module_key);
       const allowedNames = getAllowedModuleDeviceNames(moduleKey);
-      const typeName = item.module_device_types?.[0]?.name;
+      const typeName = getFirstRelation(item.module_device_types)?.name;
       if (
         (moduleKey === "visual" || moduleKey === "comunicacion") &&
         (!allowedNames || (typeName ? allowedNames.has(typeName) : false))
@@ -1232,7 +1495,19 @@ export async function getIntegratedModuleCounts() {
 
 export async function getAdminPanelData() {
   const supabase = await createServerSupabaseClient();
-  const [connectionLogsResponse, auditLogsResponse, usersResponse] = await Promise.all([
+  const [
+    connectionLogsResponse,
+    auditLogsResponse,
+    profilesResponse,
+    rolesResponse,
+    settingsResponse,
+    zonesResponse,
+    pricesResponse,
+    deviceTypesResponse,
+    workplacesResponse,
+    workplacePositionsResponse,
+    internals
+  ] = await Promise.all([
     supabase
       .from("connection_logs")
       .select("id, user_profile_id, email, success, failure_reason, ip_address, user_agent, created_at")
@@ -1245,19 +1520,58 @@ export async function getAdminPanelData() {
       .limit(200),
     supabase
       .from("user_profiles")
-      .select("id, full_name, roles!inner(key)")
+      .select("id, full_name, active, role_id")
+      .order("full_name", { ascending: true }),
+    supabase.from("roles").select("id, key"),
+    supabase.from("app_settings").select("key, value"),
+    supabase
+      .from("module_zones")
+      .select("id, module_key, name, charge_weekday, active")
+      .order("module_key", { ascending: true })
+      .order("name", { ascending: true }),
+    supabase
+      .from("module_prices")
+      .select(
+        "id, module_key, device_type_id, weekly_price, activation_price, fine_price, maintenance_price, retention_price, discount_amount, active, module_device_types!inner(name)"
+      )
+      .order("module_key", { ascending: true }),
+    supabase
+      .from("module_device_types")
+      .select("id, module_key, key, name, sort_order, requires_imei, requires_chip, allow_cameras_flag")
       .eq("active", true)
-      .order("full_name", { ascending: true })
+      .order("module_key", { ascending: true })
+      .order("sort_order", { ascending: true }),
+    supabase
+      .from("workplaces")
+      .select("id, name, type, active")
+      .order("type", { ascending: true })
+      .order("name", { ascending: true }),
+    supabase
+      .from("workplace_positions")
+      .select("id, title, salary, assigned_internal_id, active, workplaces!inner(id, name, type)")
+      .order("title", { ascending: true }),
+    getInternos(true)
   ]);
 
+  const roleMap = new Map((rolesResponse.data ?? []).map((item) => [item.id, item.key]));
   const profileIds = [
     ...new Set([
       ...(connectionLogsResponse.data ?? []).map((item) => item.user_profile_id).filter(Boolean),
       ...(auditLogsResponse.data ?? []).map((item) => item.user_profile_id).filter(Boolean)
     ])
   ] as string[];
+  const profilesMap = new Map(
+    (profilesResponse.data ?? []).map((item) => [
+      item.id,
+      {
+        fullName: item.full_name ?? "Usuario",
+        roleKey: roleMap.get(item.role_id) ?? "capturador",
+        active: Boolean(item.active)
+      }
+    ])
+  );
   const namesMap = new Map(
-    (usersResponse.data ?? []).map((item) => [item.id, item.full_name ?? "Usuario"])
+    (profilesResponse.data ?? []).map((item) => [item.id, item.full_name ?? "Usuario"])
   );
 
   if (profileIds.length > 0) {
@@ -1296,15 +1610,106 @@ export async function getAdminPanelData() {
     createdAt: item.created_at
   }));
 
-  const assignableUsers = (usersResponse.data ?? []).map((item) => ({
+  let assignableUsers: AdminUserRecord[] = (profilesResponse.data ?? []).map((item) => ({
     id: item.id,
     fullName: item.full_name ?? "Usuario",
-    roleKey: item.roles?.[0]?.key ?? "capturador"
+    roleKey: roleMap.get(item.role_id) ?? "capturador",
+    email: "",
+    active: Boolean(item.active),
+    hasProfile: true
   }));
+
+  if (isSupabaseAdminConfigured()) {
+    const admin = createSupabaseAdminClient();
+    const { data: authUsersResponse } = await admin.auth.admin.listUsers();
+    const authUsers = authUsersResponse?.users ?? [];
+    assignableUsers = authUsers.map((user) => {
+      const profile = profilesMap.get(user.id);
+      return {
+        id: user.id,
+        fullName:
+          profile?.fullName ??
+          user.user_metadata?.full_name ??
+          user.email ??
+          "Usuario",
+        roleKey: profile?.roleKey ?? "sin perfil",
+        email: user.email ?? "",
+        active: profile?.active ?? true,
+        hasProfile: Boolean(profile)
+      };
+    });
+  }
+
+  const cutoffWeekday = Number(
+    (settingsResponse.data ?? []).find((item) => item.key === "global_cutoff_weekday")?.value ?? "1"
+  );
+  const workplaces: WorkplaceRecord[] = (workplacesResponse.data ?? []).map((item) => ({
+    id: item.id,
+    name: item.name,
+    type: item.type,
+    active: Boolean(item.active)
+  }));
+  const internalMap = new Map(internals.map((item) => [item.id, item]));
+  const workplacePositions: WorkplacePositionRecord[] = (workplacePositionsResponse.data ?? []).map((item) => {
+    const workplace = getFirstRelation(item.workplaces);
+    const assignedInternal = item.assigned_internal_id ? internalMap.get(item.assigned_internal_id) : null;
+    return {
+      id: item.id,
+      workplaceId: workplace?.id ?? "",
+      workplaceName: workplace?.name ?? "Sin centro",
+      workplaceType: workplace?.type ?? "oficina",
+      title: item.title,
+      salary: Number(item.salary ?? 0),
+      assignedInternalId: item.assigned_internal_id ?? null,
+      assignedInternalName: assignedInternal?.fullName ?? null,
+      active: Boolean(item.active)
+    };
+  });
+  const config: DangerZoneConfigData = {
+    cutoffWeekday,
+    zones: (zonesResponse.data ?? []).map((item) => ({
+      id: item.id,
+      moduleKey: ensureModuleKey(item.module_key),
+      name: item.name,
+      chargeWeekday: item.charge_weekday,
+      active: Boolean(item.active)
+    })),
+    prices: (pricesResponse.data ?? []).map((item) => ({
+      id: item.id,
+      moduleKey: ensureModuleKey(item.module_key),
+      deviceTypeId: item.device_type_id,
+      deviceTypeName: getFirstRelation(item.module_device_types)?.name ?? "Aparato",
+      weeklyPrice: Number(item.weekly_price ?? 0),
+      activationPrice: Number(item.activation_price ?? 0),
+      finePrice: Number(item.fine_price ?? 0),
+      maintenancePrice: Number(item.maintenance_price ?? 0),
+      retentionPrice: Number(item.retention_price ?? 0),
+      discountAmount: Number(item.discount_amount ?? 0),
+      active: Boolean(item.active)
+    })),
+    deviceTypes: (deviceTypesResponse.data ?? []).map((item) => ({
+      id: item.id,
+      moduleKey: ensureModuleKey(item.module_key),
+      key: item.key,
+      name: item.name,
+      sortOrder: item.sort_order,
+      requiresImei: Boolean(item.requires_imei),
+      requiresChip: Boolean(item.requires_chip),
+      allowCamerasFlag: Boolean(item.allow_cameras_flag)
+    })),
+    workplaces,
+    workplacePositions
+  };
 
   return {
     connectionLogs,
     actionLogs,
-    users: assignableUsers
+    users: assignableUsers,
+    config,
+    internals: internals.map((item) => ({
+      id: item.id,
+      fullName: item.fullName,
+      ubicacion: item.ubicacion
+    }))
   };
 }

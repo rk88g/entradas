@@ -89,14 +89,19 @@ button {
 
 .theme-toggle {
   position: fixed;
-  right: 1rem;
-  top: 1rem;
+  right: 1.25rem;
+  top: 1.15rem;
   z-index: 150;
   border: 1px solid var(--line-strong);
   background: var(--surface);
   color: var(--text);
   border-radius: 999px;
-  padding: 0.7rem 1rem;
+  min-width: 112px;
+  min-height: 52px;
+  padding: 0.7rem 1.1rem;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   box-shadow: var(--shadow);
 }
 
@@ -633,6 +638,11 @@ html[data-theme="dark"] .role-badge {
   border-radius: 18px;
 }
 
+.compact-table th,
+.compact-table td {
+  padding: 0.72rem 0.8rem;
+}
+
 table {
   width: 100%;
   border-collapse: collapse;
@@ -679,6 +689,100 @@ tr:last-child td {
 .split-grid {
   display: grid;
   gap: 1rem;
+}
+
+.profile-shell {
+  display: grid;
+  gap: 0.9rem;
+}
+
+.profile-shell.compact {
+  gap: 0.75rem;
+}
+
+.profile-top {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 0.8rem;
+}
+
+.profile-top .section-title {
+  font-size: 1.6rem;
+}
+
+.profile-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 0.75rem;
+}
+
+.profile-summary .data-card,
+.profile-history-grid .data-card {
+  padding: 0.9rem;
+}
+
+.profile-history-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+  gap: 0.75rem;
+}
+
+.collapsible-panel {
+  overflow: hidden;
+}
+
+.collapsible-panel summary {
+  list-style: none;
+  cursor: pointer;
+}
+
+.collapsible-panel summary::-webkit-details-marker {
+  display: none;
+}
+
+.record-stack {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.record-pill {
+  padding: 0.65rem 0.8rem;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface-strong);
+}
+
+.record-pill strong,
+.record-pill span,
+.record-pill small {
+  display: block;
+}
+
+.inline-search-list {
+  max-height: 260px;
+  overflow: auto;
+  border: 1px solid var(--line);
+  border-radius: 16px;
+  background: var(--surface-strong);
+}
+
+.inline-search-item {
+  width: 100%;
+  border: 0;
+  border-bottom: 1px solid var(--line);
+  background: transparent;
+  color: var(--text);
+  padding: 0.75rem 0.85rem;
+  text-align: left;
+}
+
+.inline-search-item:last-child {
+  border-bottom: 0;
+}
+
+.inline-search-item.active {
+  background: color-mix(in srgb, var(--brand-soft) 65%, transparent);
 }
 
 .alert-box,
@@ -988,10 +1092,16 @@ html[data-theme="dark"] .note-box {
 }
 
 .apoyo-pass-header {
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: start;
   gap: 1rem;
+}
+
+.apoyo-pass-headline {
+  display: grid;
+  gap: 0.12rem;
+  align-content: start;
 }
 
 .apoyo-pass-kicker {
@@ -999,11 +1109,13 @@ html[data-theme="dark"] .note-box {
   font-weight: 700;
   letter-spacing: 0.04em;
   text-transform: uppercase;
+  text-align: center;
 }
 
 .apoyo-pass-date {
   font-size: 0.92rem;
   color: var(--muted);
+  text-align: center;
 }
 
 .apoyo-pass-number {
@@ -1066,6 +1178,13 @@ html[data-theme="dark"] .note-box {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.ellipsis-block {
+  overflow: hidden;
+  display: -webkit-box;
+  -webkit-box-orient: vertical;
+  -webkit-line-clamp: 2;
 }
 
 .numbers-print-value {
@@ -1348,9 +1467,9 @@ html[data-theme="dark"] .note-box {
   .apoyo-print-grid .apoyo-pass-card {
     display: flex;
     flex-direction: column;
-    min-height: 5.45cm;
-    height: 5.45cm;
-    padding: 0.24cm 0.28cm;
+    min-height: 6.25cm;
+    height: 6.25cm;
+    padding: 0.22cm 0.28cm;
     overflow: hidden;
     break-inside: avoid;
     page-break-inside: avoid;
@@ -1361,8 +1480,8 @@ html[data-theme="dark"] .note-box {
   }
 
   .apoyo-secondary-grid .apoyo-pass-card {
-    min-height: 4.45cm;
-    height: 4.45cm;
+    min-height: 4.75cm;
+    height: 4.75cm;
     padding: 0.24cm 0.28cm;
     border-radius: 0;
     box-shadow: none;
@@ -1373,6 +1492,13 @@ html[data-theme="dark"] .note-box {
   .apoyo-secondary-grid .apoyo-pass-list {
     column-count: 2;
     column-gap: 0.18cm;
+  }
+
+  .apoyo-secondary-grid .apoyo-pass-line {
+    white-space: normal;
+    overflow: visible;
+    text-overflow: clip;
+    break-inside: avoid;
   }
 
   .apoyo-pass-header {
@@ -1409,6 +1535,12 @@ html[data-theme="dark"] .note-box {
 
   .apoyo-print-grid .visits-section .apoyo-pass-list {
     overflow: hidden;
+  }
+
+  .apoyo-print-grid .apoyo-pass-line {
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   .apoyo-print-grid .basic-section,
@@ -1451,4 +1583,19 @@ html[data-theme="dark"] .note-box {
     size: legal portrait;
     margin: 0.55cm;
   }
+}
+
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.45);
+  display: grid;
+  place-items: center;
+  padding: 0.8rem;
+  z-index: 100;
+}
+
+.date-slot-card,
+.date-section-card {
+  border: 2px solid var(--line-strong);
 }

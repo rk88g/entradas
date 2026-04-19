@@ -27,36 +27,38 @@ export default async function SistemaPage() {
     redirect("/sistema/escaleras");
   }
 
+  const canSeeCore = canAccessCoreSystem(profile?.roleKey ?? "capturador", profile?.moduleOnly ?? false);
+  const visibleStats = [
+    ...(profile?.roleKey === "super-admin" || canSeeCore
+      ? [
+          { label: "Internos", value: internos.length },
+          { label: "Visitas", value: visitas.length },
+          { label: "Mañana", value: summary.openPassCount },
+          { label: "En espera", value: summary.waitingPassCount }
+        ]
+      : []),
+    ...(profile?.roleKey === "super-admin" ||
+    profile?.accessibleModules.some((item) => item.moduleKey === "visual")
+      ? [{ label: "Visual", value: moduleCounts.visual }]
+      : []),
+    ...(profile?.roleKey === "super-admin" ||
+    profile?.accessibleModules.some((item) => item.moduleKey === "comunicacion")
+      ? [{ label: "Comunicacion", value: moduleCounts.comunicacion }]
+      : []),
+    ...(profile?.roleKey === "super-admin" ||
+    profile?.accessibleModules.some((item) => item.moduleKey === "escaleras")
+      ? [{ label: "Escaleras", value: escaleras.length }]
+      : [])
+  ];
+
   return (
     <section className="stats-grid">
-      <article className="stat-card">
-        <small>Internos</small>
-        <strong>{internos.length}</strong>
-      </article>
-      <article className="stat-card">
-        <small>Visitas</small>
-        <strong>{visitas.length}</strong>
-      </article>
-      <article className="stat-card">
-        <small>Mañana</small>
-        <strong>{summary.openPassCount}</strong>
-      </article>
-      <article className="stat-card">
-        <small>618</small>
-        <strong>{summary.waitingPassCount}</strong>
-      </article>
-      <article className="stat-card">
-        <small>Visual</small>
-        <strong>{moduleCounts.visual}</strong>
-      </article>
-      <article className="stat-card">
-        <small>Comunicacion</small>
-        <strong>{moduleCounts.comunicacion}</strong>
-      </article>
-      <article className="stat-card">
-        <small>Escaleras</small>
-        <strong>{escaleras.length}</strong>
-      </article>
+      {visibleStats.map((item) => (
+        <article key={item.label} className="stat-card">
+          <small>{item.label}</small>
+          <strong>{item.value}</strong>
+        </article>
+      ))}
     </section>
   );
 }

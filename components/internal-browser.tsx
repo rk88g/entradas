@@ -16,7 +16,6 @@ import {
   canManageMentions,
   formatLongDate,
   getDefaultDateStatusForRole,
-  getStatusDisplayLabel,
   maskValue
 } from "@/lib/utils";
 
@@ -55,20 +54,8 @@ function getPassForDate(
   return profile.recentPasses.find((item) => item.fechaVisita === dateValue) ?? null;
 }
 
-function getDateMeta(
-  dateValue: string,
-  openDate?: DateRecord | null,
-  nextDate?: DateRecord | null
-) {
-  if (openDate?.fechaCompleta === dateValue) {
-    return openDate;
-  }
-
-  if (nextDate?.fechaCompleta === dateValue) {
-    return nextDate;
-  }
-
-  return null;
+function compactMoney(value?: number | null) {
+  return `$${Number(value ?? 0).toFixed(2)}`;
 }
 
 export function InternalBrowser({
@@ -91,26 +78,18 @@ export function InternalBrowser({
   const [modalInternalId, setModalInternalId] = useState<string | null>(null);
   const [selectedVisitorIds, setSelectedVisitorIds] = useState<string[]>([]);
   const [selectedDateValue, setSelectedDateValue] = useState("");
-  const [createState, createAction, createPending] = useActionState(
-    createInternalAction,
-    mutationInitialState
-  );
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [formSeed, setFormSeed] = useState(0);
+  const [createState, createAction, createPending] = useActionState(createInternalAction, mutationInitialState);
   const [passState, passAction, passPending] = useActionState(createPassAction, mutationInitialState);
-  const [visitorState, visitorAction, visitorPending] = useActionState(
-    createVisitorAction,
-    mutationInitialState
-  );
-  const [statusState, statusAction, statusPending] = useActionState(
-    updateInternalStatusAction,
-    mutationInitialState
-  );
+  const [visitorState, visitorAction, visitorPending] = useActionState(createVisitorAction, mutationInitialState);
+  const [statusState, statusAction, statusPending] = useActionState(updateInternalStatusAction, mutationInitialState);
   const visitorFormRef = useRef<HTMLFormElement>(null);
   const internalFormRef = useRef<HTMLFormElement>(null);
   const canViewSensitiveData = roleKey === "super-admin";
   const canManageVisitorAvailability = roleKey === "super-admin" || roleKey === "control";
 
   const availableDates = useMemo(() => getDateOptions(openDate, nextDate), [openDate, nextDate]);
-
   const filtered = useMemo(() => {
     const normalized = query.trim().toLowerCase();
     if (!normalized) {
@@ -120,7 +99,7 @@ export function InternalBrowser({
     return profiles.filter((profile) => {
       return (
         profile.fullName.toLowerCase().includes(normalized) ||
-        String(profile.ubicacion).includes(normalized)
+        profile.ubicacion.toLowerCase().includes(normalized)
       );
     });
   }, [profiles, query]);
@@ -132,7 +111,17 @@ export function InternalBrowser({
     selected && selectedDateValue
       ? getPassForDate(selected, selectedDateValue, openDate, nextDate)
       : null;
-  const selectedDateMeta = getDateMeta(selectedDateValue, openDate, nextDate);
+  const selectedVisitors =
+    selected?.visitors.filter((item) => selectedVisitorIds.includes(item.visitaId)) ?? [];
+  const availableVisitors =
+    selected?.visitors.filter((item) => !selectedVisitorIds.includes(item.visitaId)) ?? [];
+  const selectedAdults = selectedVisitors.filter((item) => item.visitor.edad >= 18);
+  const canSubmitPass =
+    Boolean(selected) &&
+    Boolean(selectedDateValue) &&
+    selectedVisitors.length > 0 &&
+    selectedAdults.length > 0 &&
+    !selectedPass;
 
   useEffect(() => {
     if (passState.success) {
@@ -143,6 +132,7 @@ export function InternalBrowser({
   useEffect(() => {
     if (visitorState.success) {
       visitorFormRef.current?.reset();
+      setFormSeed((current) => current + 1);
       router.refresh();
     }
   }, [router, visitorState.success]);
@@ -178,28 +168,12 @@ export function InternalBrowser({
     setPage(1);
   }, [query]);
 
-  useEffect(() => {
-    if (page > totalPages) {
-      setPage(totalPages);
-    }
-  }, [page, totalPages]);
-
-  const selectedVisitors =
-    selected?.visitors.filter((item) => selectedVisitorIds.includes(item.visitaId)) ?? [];
-  const availableVisitors =
-    selected?.visitors.filter((item) => !selectedVisitorIds.includes(item.visitaId)) ?? [];
-  const selectedAdults = selectedVisitors.filter((item) => item.visitor.edad >= 18);
-  const canSubmitPass =
-    Boolean(selected) &&
-    Boolean(selectedDateValue) &&
-    selectedVisitors.length > 0 &&
-    selectedAdults.length > 0 &&
-    !selectedPass;
-
-  function openPassModal(profile: InternalProfile) {
+  function openInternalModal(profile: InternalProfile) {
+    setModalInternalId(profile.id);
     setSelectedVisitorIds([]);
     setSelectedDateValue(getDefaultDateValue(roleKey, openDate, nextDate));
-    setModalInternalId(profile.id);
+    setHistoryOpen(false);
+    setFormSeed((current) => current + 1);
   }
 
   function toggleVisitor(visitaId: string) {
@@ -214,14 +188,11 @@ export function InternalBrowser({
     <>
       <section className="module-grid">
         <article className="data-card">
-          <div
-            className="actions-row"
-            style={{ justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}
-          >
+          <div className="actions-row" style={{ justifyContent: "space-between", alignItems: "center", marginBottom: "0.8rem" }}>
             <strong className="section-title">Internos</strong>
           </div>
 
-          <div className="field" style={{ marginBottom: "1rem" }}>
+          <div className="field" style={{ marginBottom: "0.8rem" }}>
             <input
               id="internal-search"
               value={query}
@@ -231,7 +202,7 @@ export function InternalBrowser({
             />
           </div>
 
-          <div className="table-wrap">
+          <div className="table-wrap compact-table">
             <table>
               <thead>
                 <tr>
@@ -247,11 +218,7 @@ export function InternalBrowser({
                   </tr>
                 ) : (
                   paginated.map((profile) => (
-                    <tr
-                      key={profile.id}
-                      onClick={() => openPassModal(profile)}
-                      style={{ cursor: "pointer" }}
-                    >
+                    <tr key={profile.id} onClick={() => openInternalModal(profile)} style={{ cursor: "pointer" }}>
                       <td>
                         <div className="record-title">
                           <strong>{profile.fullName}</strong>
@@ -267,25 +234,13 @@ export function InternalBrowser({
             </table>
           </div>
 
-          <div className="actions-row" style={{ marginTop: "1rem", justifyContent: "space-between" }}>
-            <span className="muted">
-              Pagina {page} de {totalPages}
-            </span>
+          <div className="actions-row" style={{ marginTop: "0.8rem", justifyContent: "space-between" }}>
+            <span className="muted">Pagina {page} de {totalPages}</span>
             <div className="actions-row">
-              <button
-                type="button"
-                className="button-soft"
-                onClick={() => setPage((current) => Math.max(1, current - 1))}
-                disabled={page === 1}
-              >
+              <button type="button" className="button-soft" onClick={() => setPage((current) => Math.max(1, current - 1))} disabled={page === 1}>
                 Anterior
               </button>
-              <button
-                type="button"
-                className="button-soft"
-                onClick={() => setPage((current) => Math.min(totalPages, current + 1))}
-                disabled={page === totalPages}
-              >
+              <button type="button" className="button-soft" onClick={() => setPage((current) => Math.min(totalPages, current + 1))} disabled={page === totalPages}>
                 Siguiente
               </button>
             </div>
@@ -295,13 +250,7 @@ export function InternalBrowser({
         <article className="form-card">
           <strong className="section-title">Nuevo interno</strong>
           <MutationBanner state={createState} />
-          <form
-            ref={internalFormRef}
-            action={createAction}
-            className="field-grid"
-            style={{ marginTop: "1rem" }}
-            autoComplete="off"
-          >
+          <form ref={internalFormRef} action={createAction} className="field-grid" style={{ marginTop: "0.8rem" }} autoComplete="off">
             <div className="field">
               <input name="nombres" placeholder="Nombres" autoComplete="off" />
             </div>
@@ -335,80 +284,62 @@ export function InternalBrowser({
             background: "rgba(15, 23, 42, 0.45)",
             display: "grid",
             placeItems: "center",
-            padding: "1rem",
+            padding: "0.8rem",
             zIndex: 100
           }}
           onClick={() => setModalInternalId(null)}
         >
           <div
-            className="form-card"
-            style={{ width: "min(100%, 1100px)", maxHeight: "90vh", overflow: "auto" }}
+            className="form-card profile-shell compact"
+            style={{ width: "min(100%, 1180px)", maxHeight: "92vh", overflow: "auto" }}
             onClick={(event) => event.stopPropagation()}
           >
-            <div
-              className="actions-row"
-              style={{ justifyContent: "space-between", alignItems: "center", marginBottom: "1rem" }}
-            >
+            <div className="profile-top">
               <div className="record-title">
                 <strong className="section-title">{selected.fullName}</strong>
                 <span>
-                  Ubicacion {selected.ubicacion} - {maskValue(selected.edad, canViewSensitiveData)} anos
+                  Ubicacion {selected.ubicacion} · {maskValue(selected.edad, canViewSensitiveData)} años
                 </span>
               </div>
-              <button
-                type="button"
-                className="button-soft"
-                onClick={() => setModalInternalId(null)}
-              >
-                Cerrar
-              </button>
+              <div className="actions-row">
+                <button type="button" className="button-soft" onClick={() => setHistoryOpen((current) => !current)}>
+                  Historial
+                </button>
+                <button type="button" className="button-soft" onClick={() => setModalInternalId(null)}>
+                  Cerrar
+                </button>
+              </div>
             </div>
 
-            <div className="split-grid">
-              <div className="data-card" style={{ padding: "1rem" }}>
+            <div className="profile-summary">
+              <article className="data-card">
                 <div className="mini-list">
-                  <div className="mini-row">
-                    <span>Telefono</span>
-                    <strong>{maskValue(selected.telefono || "-", canViewSensitiveData)}</strong>
-                  </div>
-                  <div className="mini-row">
-                    <span>Estatus</span>
-                    <strong>{selected.estatus}</strong>
-                  </div>
+                  <div className="mini-row"><span>Estatus</span><strong>{selected.estatus}</strong></div>
+                  <div className="mini-row"><span>Laborando</span><strong>{selected.laborando ? "Si" : "No"}</strong></div>
+                  <div className="mini-row"><span>Telefono</span><strong>{maskValue(selected.telefono || "No aplica", canViewSensitiveData)}</strong></div>
                 </div>
-              </div>
-
-              <div className="data-card" style={{ padding: "1rem" }}>
+              </article>
+              <article className="data-card">
+                <div className="mini-list">
+                  <div className="mini-row"><span>Visitas</span><strong>{selected.visitors.length}</strong></div>
+                  <div className="mini-row"><span>Aparatos</span><strong>{selected.devices.length}</strong></div>
+                  <div className="mini-row"><span>Pagos semanales</span><strong>{selected.weeklyPayments.length}</strong></div>
+                </div>
+              </article>
+              <article className="data-card">
                 <div className="mini-list">
                   <div className="mini-row">
                     <span>Pase</span>
-                    <div
-                      style={{
-                        display: "flex",
-                        flexDirection: "column",
-                        alignItems: "flex-end",
-                        gap: "0.35rem"
-                      }}
-                    >
-                      {selectedPass ? (
-                        <>
-                          <StatusBadge variant="warn">Pase registrado</StatusBadge>
-                          <span className="muted" style={{ fontSize: "0.88rem" }}>
-                            {formatLongDate(selectedPass.fechaVisita)}
-                          </span>
-                        </>
-                      ) : (
-                        <StatusBadge variant="ok">Sin pase</StatusBadge>
-                      )}
-                    </div>
+                    {selectedPass ? <StatusBadge variant="warn">Registrado</StatusBadge> : <StatusBadge variant="ok">Sin pase</StatusBadge>}
                   </div>
+                  <div className="mini-row"><span>Fecha elegida</span><strong>{selectedDateValue ? formatLongDate(selectedDateValue) : "Sin fecha"}</strong></div>
                 </div>
-              </div>
+              </article>
             </div>
 
             {roleKey === "super-admin" ? (
-              <div className="data-card" style={{ padding: "1rem", marginTop: "1rem" }}>
-                <strong style={{ display: "block", marginBottom: "0.75rem" }}>Cambiar estatus</strong>
+              <article className="data-card">
+                <strong style={{ display: "block", marginBottom: "0.7rem" }}>Cambiar estatus</strong>
                 <MutationBanner state={statusState} />
                 <form action={statusAction} className="actions-row" autoComplete="off">
                   <input type="hidden" name="interno_id" value={selected.id} />
@@ -420,131 +351,177 @@ export function InternalBrowser({
                       <option value="baja">Baja</option>
                     </select>
                   </div>
-                  <LoadingButton
-                    pending={statusPending}
-                    label="Guardar estatus"
-                    loadingLabel="Loading..."
-                    className="button-soft"
-                  />
+                  <LoadingButton pending={statusPending} label="Guardar estatus" loadingLabel="Loading..." className="button-soft" />
                 </form>
-              </div>
+              </article>
+            ) : null}
+
+            {historyOpen ? (
+              <section className="profile-history-grid">
+                <article className="data-card">
+                  <strong>Visitas</strong>
+                  <div className="record-stack" style={{ marginTop: "0.7rem" }}>
+                    {selected.visitors.length === 0 ? <span className="muted">Sin visitas.</span> : selected.visitors.map((item) => (
+                      <div key={item.id} className="record-pill">
+                        <strong>{item.visitor.fullName}</strong>
+                        <span>{item.parentesco}</span>
+                      </div>
+                    ))}
+                  </div>
+                </article>
+                <article className="data-card">
+                  <strong>Aparatos registrados</strong>
+                  <div className="record-stack" style={{ marginTop: "0.7rem" }}>
+                    {selected.devices.length === 0 ? <span className="muted">Sin aparatos.</span> : selected.devices.map((item) => (
+                      <div key={item.id} className="record-pill">
+                        <strong>{item.deviceTypeName}</strong>
+                        <span>{item.moduleKey} · {item.quantity}</span>
+                        <small>{[item.brand, item.model].filter(Boolean).join(" / ") || "Sin detalle"}</small>
+                      </div>
+                    ))}
+                  </div>
+                </article>
+                <article className="data-card">
+                  <strong>Negocios y oficinas</strong>
+                  <div className="record-stack" style={{ marginTop: "0.7rem" }}>
+                    {selected.workplaceAssignments.length === 0 ? <span className="muted">Sin asignaciones.</span> : selected.workplaceAssignments.map((item) => (
+                      <div key={item.id} className="record-pill">
+                        <strong>{item.workplaceName}</strong>
+                        <span>{item.title}</span>
+                        <small>{item.workplaceType} · ${item.salary.toFixed(2)}</small>
+                      </div>
+                    ))}
+                  </div>
+                </article>
+                <article className="data-card">
+                  <strong>Historico de visitas y pases</strong>
+                  <div className="record-stack" style={{ marginTop: "0.7rem" }}>
+                    {selected.recentPasses.length === 0 ? <span className="muted">Sin historial.</span> : selected.recentPasses.map((item) => (
+                      <div key={item.id} className="record-pill">
+                        <strong>{formatLongDate(item.fechaVisita)}</strong>
+                        <span>{item.visitantes.length} visitas</span>
+                      </div>
+                    ))}
+                  </div>
+                </article>
+                <article className="data-card">
+                  <strong>Pagos semanales</strong>
+                  <div className="record-stack" style={{ marginTop: "0.7rem" }}>
+                    {selected.weeklyPayments.length === 0 ? <span className="muted">Sin pagos.</span> : selected.weeklyPayments.map((item) => (
+                      <div key={item.id} className="record-pill">
+                        <strong>{item.deviceTypeName}</strong>
+                        <span>{compactMoney(item.amount)} · {item.status}</span>
+                      </div>
+                    ))}
+                  </div>
+                </article>
+                <article className="data-card">
+                  <strong>Escaleras</strong>
+                  <div className="record-stack" style={{ marginTop: "0.7rem" }}>
+                    {selected.escalerasHistory.length === 0 ? <span className="muted">Sin registros.</span> : selected.escalerasHistory.map((item) => (
+                      <div key={item.id} className="record-pill">
+                        <strong>{formatLongDate(item.fechaVisita)}</strong>
+                        <span>{item.status}</span>
+                      </div>
+                    ))}
+                  </div>
+                </article>
+                <article className="data-card">
+                  <strong>Multas y decomisos</strong>
+                  <div className="record-stack" style={{ marginTop: "0.7rem" }}>
+                    {selected.fines.map((item) => (
+                      <div key={item.id} className="record-pill">
+                        <strong>{item.concept}</strong>
+                        <span>{compactMoney(item.amount)} · {item.status}</span>
+                      </div>
+                    ))}
+                    {selected.seizures.map((item) => (
+                      <div key={item.id} className="record-pill">
+                        <strong>{item.concept}</strong>
+                        <span>{item.status}</span>
+                      </div>
+                    ))}
+                    {selected.fines.length === 0 && selected.seizures.length === 0 ? <span className="muted">Sin registros.</span> : null}
+                  </div>
+                </article>
+                <article className="data-card">
+                  <strong>Cambios, venta, renta y compra</strong>
+                  <div className="record-stack" style={{ marginTop: "0.7rem" }}>
+                    {selected.equipmentMovements.length === 0 ? <span className="muted">Sin movimientos.</span> : selected.equipmentMovements.map((item) => (
+                      <div key={item.id} className="record-pill">
+                        <strong>{item.movementType}</strong>
+                        <span>{item.description}</span>
+                        <small>{item.amount ? compactMoney(item.amount) : "Sin monto"}</small>
+                      </div>
+                    ))}
+                  </div>
+                </article>
+                <article className="data-card">
+                  <strong>Notas y temporalidad</strong>
+                  <div className="record-stack" style={{ marginTop: "0.7rem" }}>
+                    {selected.notes.length === 0 ? <span className="muted">Sin notas.</span> : selected.notes.map((item) => (
+                      <div key={item.id} className="record-pill">
+                        <strong>{item.title}</strong>
+                        <span>{item.sourceModule}</span>
+                        <small>{item.notes}</small>
+                      </div>
+                    ))}
+                  </div>
+                </article>
+              </section>
             ) : null}
 
             {selectedPass ? (
-              <div style={{ marginTop: "1rem" }}>
-                <MutationBanner
-                  state={{
-                    success: null,
-                    error: `Ese interno ya tiene pase para ${formatLongDate(selectedPass.fechaVisita)}.`
-                  }}
-                />
-              </div>
+              <MutationBanner state={{ success: null, error: `Ese interno ya tiene pase para ${formatLongDate(selectedPass.fechaVisita)}.` }} />
             ) : null}
 
             {!canSubmitPass && selectedVisitors.length > 0 && selectedAdults.length === 0 ? (
-              <div style={{ marginTop: "1rem" }}>
-                <MutationBanner
-                  state={{ success: null, error: "Debes incluir al menos un adulto en el pase." }}
-                />
-              </div>
+              <MutationBanner state={{ success: null, error: "Debes incluir al menos un adulto en el pase." }} />
             ) : null}
 
-            <div className="split-grid" style={{ marginTop: "1rem" }}>
-              <div className="data-card" style={{ padding: "1rem" }}>
-                <strong style={{ display: "block", marginBottom: "0.75rem" }}>No vendran</strong>
-                <div className="mini-list">
-                  {availableVisitors.length === 0 ? (
-                    <div className="mini-row">
-                      <span>Sin registros</span>
-                      <span className="chip">0</span>
-                    </div>
-                  ) : (
-                    availableVisitors.map((item) => (
-                      <button
-                        key={item.id}
-                        type="button"
-                        className="mini-row"
-                        onClick={() => toggleVisitor(item.visitaId)}
-                        style={{
-                          border: "1px solid var(--line)",
-                          borderRadius: "16px",
-                          padding: "0.9rem 1rem",
-                          background: "var(--surface)",
-                          width: "100%",
-                          textAlign: "left",
-                          cursor: "pointer"
-                        }}
-                      >
-                        <div className="record-title">
-                          <strong>{item.visitor.fullName}</strong>
-                          <span>{maskValue(item.visitor.edad, canViewSensitiveData)} anos</span>
-                        </div>
-                      </button>
-                    ))
-                  )}
+            <div className="split-grid">
+              <article className="data-card">
+                <strong>No vendran</strong>
+                <div className="record-stack" style={{ marginTop: "0.7rem" }}>
+                  {availableVisitors.length === 0 ? <span className="muted">Sin registros.</span> : availableVisitors.map((item) => (
+                    <button key={item.id} type="button" className="inline-search-item" onClick={() => toggleVisitor(item.visitaId)}>
+                      <strong>{item.visitor.fullName}</strong>
+                      <span className="muted">{maskValue(item.visitor.edad, canViewSensitiveData)} años</span>
+                    </button>
+                  ))}
                 </div>
-              </div>
+              </article>
 
-              <div className="data-card" style={{ padding: "1rem" }}>
-                <strong style={{ display: "block", marginBottom: "0.75rem" }}>Vendran</strong>
-                <div className="mini-list">
-                  {selectedVisitors.length === 0 ? (
-                    <div className="mini-row">
-                      <span>Sin registros</span>
-                      <span className="chip">0</span>
-                    </div>
-                  ) : (
-                    selectedVisitors.map((item) => (
-                      <button
-                        key={item.id}
-                        type="button"
-                        className="mini-row"
-                        onClick={() => toggleVisitor(item.visitaId)}
-                        style={{
-                          border: "1px solid var(--line)",
-                          borderRadius: "16px",
-                          padding: "0.9rem 1rem",
-                          background: "var(--surface)",
-                          width: "100%",
-                          textAlign: "left",
-                          cursor: "pointer"
-                        }}
-                      >
-                        <div className="record-title">
-                          <strong>{item.visitor.fullName}</strong>
-                          <span>{maskValue(item.visitor.edad, canViewSensitiveData)} anos</span>
-                        </div>
-                      </button>
-                    ))
-                  )}
+              <article className="data-card">
+                <strong>Vendran</strong>
+                <div className="record-stack" style={{ marginTop: "0.7rem" }}>
+                  {selectedVisitors.length === 0 ? <span className="muted">Sin registros.</span> : selectedVisitors.map((item) => (
+                    <button key={item.id} type="button" className="inline-search-item active" onClick={() => toggleVisitor(item.visitaId)}>
+                      <strong>{item.visitor.fullName}</strong>
+                      <span className="muted">{maskValue(item.visitor.edad, canViewSensitiveData)} años</span>
+                    </button>
+                  ))}
                 </div>
-              </div>
+              </article>
             </div>
 
-            <div className="split-grid" style={{ marginTop: "1rem" }}>
-              <div className="data-card" style={{ padding: "1rem" }}>
-                <strong style={{ display: "block", marginBottom: "0.75rem" }}>Nueva visita</strong>
+            <div className="split-grid">
+              <article className="data-card">
+                <strong>Nueva visita</strong>
                 <MutationBanner state={visitorState} />
                 <form
+                  key={`visitor-form-${selected.id}-${formSeed}`}
                   ref={visitorFormRef}
                   action={visitorAction}
                   className="field-grid"
-                  style={{ marginTop: "1rem" }}
+                  style={{ marginTop: "0.8rem" }}
                   autoComplete="off"
                 >
                   <input type="hidden" name="interno_id" value={selected.id} />
-                  <div className="field">
-                    <input name="nombres" placeholder="Nombres" autoComplete="off" required />
-                  </div>
-                  <div className="field">
-                    <input name="apellido_pat" placeholder="Apellido paterno" autoComplete="off" required />
-                  </div>
-                  <div className="field">
-                    <input name="apellido_mat" placeholder="Apellido materno" autoComplete="off" required />
-                  </div>
-                  <div className="field">
-                    <input name="fecha_nacimiento" type="date" autoComplete="off" required />
-                  </div>
+                  <div className="field"><input name="nombres" placeholder="Nombres" autoComplete="off" required /></div>
+                  <div className="field"><input name="apellido_pat" placeholder="Apellido paterno" autoComplete="off" required /></div>
+                  <div className="field"><input name="apellido_mat" placeholder="Apellido materno" autoComplete="off" required /></div>
+                  <div className="field"><input name="fecha_nacimiento" type="date" autoComplete="off" required /></div>
                   <div className="field">
                     <select name="sexo" defaultValue="" required>
                       <option value="" disabled>Sexo</option>
@@ -552,12 +529,8 @@ export function InternalBrowser({
                       <option value="mujer">Mujer</option>
                     </select>
                   </div>
-                  <div className="field">
-                    <input name="parentesco" placeholder="Parentesco" autoComplete="off" required />
-                  </div>
-                  <div className="field">
-                    <input name="telefono" placeholder="Telefono" autoComplete="off" />
-                  </div>
+                  <div className="field"><input name="parentesco" placeholder="Parentesco" autoComplete="off" required /></div>
+                  <div className="field"><input name="telefono" placeholder="Telefono" autoComplete="off" /></div>
                   {canManageVisitorAvailability ? (
                     <div className="field">
                       <select name="betada" defaultValue="false">
@@ -573,14 +546,16 @@ export function InternalBrowser({
                     <LoadingButton pending={visitorPending} label="Guardar visita" loadingLabel="Loading..." className="button-secondary" />
                   </div>
                 </form>
-              </div>
+              </article>
 
-              <div className="data-card" style={{ padding: "1rem" }}>
+              <article className="data-card">
+                <strong>Crear pase</strong>
                 <MutationBanner state={passState} />
                 <form
+                  key={`pass-form-${selected.id}-${formSeed}`}
                   action={passAction}
                   className="field-grid"
-                  style={{ marginTop: "1rem" }}
+                  style={{ marginTop: "0.8rem" }}
                   autoComplete="off"
                 >
                   <input type="hidden" name="interno_id" value={selected.id} />
@@ -591,42 +566,22 @@ export function InternalBrowser({
 
                   <div className="field">
                     <label htmlFor="fecha_visita_modal">Fecha del pase</label>
-                    <select
-                      id="fecha_visita_modal"
-                      value={selectedDateValue}
-                      onChange={(event) => setSelectedDateValue(event.target.value)}
-                    >
+                    <select id="fecha_visita_modal" value={selectedDateValue} onChange={(event) => setSelectedDateValue(event.target.value)}>
                       {availableDates.map((date) => (
                         <option key={date.id} value={date.fechaCompleta}>
-                          {getStatusDisplayLabel(date.estado)} - {formatLongDate(date.fechaCompleta)}
+                          {formatLongDate(date.fechaCompleta)}
                         </option>
                       ))}
                     </select>
-                    <span className="field-hint" style={{ color: "var(--muted)" }}>
-                      Se creara para{" "}
-                      {selectedDateMeta
-                        ? `${formatLongDate(selectedDateMeta.fechaCompleta)}`
-                        : "la fecha configurada"}
-                    </span>
                   </div>
 
                   {canManageMentions(roleKey) ? (
                     <>
                       <div className="field" style={{ gridColumn: "1 / -1" }}>
-                        <textarea
-                          name="menciones"
-                          placeholder="Peticiones basicas"
-                          defaultValue={selectedPass?.menciones ?? ""}
-                          autoComplete="off"
-                        />
+                        <textarea name="menciones" placeholder="Peticiones basicas" autoComplete="off" />
                       </div>
                       <div className="field" style={{ gridColumn: "1 / -1" }}>
-                        <textarea
-                          name="especiales"
-                          placeholder="Peticiones especiales"
-                          defaultValue={selectedPass?.especiales ?? ""}
-                          autoComplete="off"
-                        />
+                        <textarea name="especiales" placeholder="Peticiones especiales" autoComplete="off" />
                       </div>
                       <div className="field" style={{ gridColumn: "1 / -1" }}>
                         <label>Articulos</label>
@@ -634,14 +589,7 @@ export function InternalBrowser({
                           {passArticles.map((article) => (
                             <div key={article.id} className="field">
                               <label htmlFor={`article_${article.id}`}>{article.name}</label>
-                              <input
-                                id={`article_${article.id}`}
-                                type="number"
-                                min="0"
-                                name={`article_qty_${article.id}`}
-                                placeholder="0"
-                                autoComplete="off"
-                              />
+                              <input id={`article_${article.id}`} type="number" min="0" name={`article_qty_${article.id}`} placeholder="0" autoComplete="off" />
                             </div>
                           ))}
                         </div>
@@ -651,17 +599,11 @@ export function InternalBrowser({
 
                   {!selectedPass ? (
                     <div className="actions-row">
-                      <LoadingButton
-                        pending={passPending}
-                        label="CREAR PASE"
-                        loadingLabel="Loading..."
-                        className="button"
-                        disabled={!canSubmitPass}
-                      />
+                      <LoadingButton pending={passPending} label="CREAR PASE" loadingLabel="Loading..." className="button" disabled={!canSubmitPass} />
                     </div>
                   ) : null}
                 </form>
-              </div>
+              </article>
             </div>
           </div>
         </div>

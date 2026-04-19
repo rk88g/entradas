@@ -30,9 +30,7 @@ export default async function ListadoPage() {
           <h3>Mañana</h3>
           <div className="mini-list">
             <div className="mini-row">
-              <strong>
-                {builderData.openDate ? formatLongDate(builderData.openDate.fechaCompleta) : "Sin fecha"}
-              </strong>
+              <strong>{builderData.openDate ? formatLongDate(builderData.openDate.fechaCompleta) : "Sin fecha"}</strong>
             </div>
             <div className="mini-row">
               <span>Pases</span>
@@ -41,12 +39,10 @@ export default async function ListadoPage() {
           </div>
         </article>
         <article className="quick-card">
-          <h3>618</h3>
+          <h3>En espera</h3>
           <div className="mini-list">
             <div className="mini-row">
-              <strong>
-                {builderData.nextDate ? formatLongDate(builderData.nextDate.fechaCompleta) : "Sin fecha"}
-              </strong>
+              <strong>{builderData.nextDate ? formatLongDate(builderData.nextDate.fechaCompleta) : "Sin fecha"}</strong>
             </div>
             <div className="mini-row">
               <span>Pases</span>

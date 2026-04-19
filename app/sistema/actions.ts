@@ -115,9 +115,12 @@ export async function createDateAction(
 ): Promise<MutationState> {
   try {
     const profile = await requireProfile();
+    if (profile.roleKey !== "super-admin") {
+      return failure("Solo super-admin puede guardar zonas.");
+    }
     const supabase = await createServerSupabaseClient();
 
-    if (!["super-admin", "control", "supervisor"].includes(profile.roleKey)) {
+    if (profile.roleKey !== "super-admin") {
       return failure("Tu rol no puede registrar fechas.");
     }
 
@@ -307,6 +310,9 @@ export async function createInternalAction(
 ): Promise<MutationState> {
   try {
     const profile = await requireProfile();
+    if (profile.roleKey !== "super-admin") {
+      return failure("Solo super-admin puede guardar precios.");
+    }
     const supabase = await createServerSupabaseClient();
 
     const age = Number(formData.get("edad") ?? 0);
@@ -1023,7 +1029,7 @@ export async function createPassAction(
               source_listing_id: passId,
               quantity: item.quantity,
               assigned_manually: false,
-              status: "activo",
+              status: "pendiente",
               created_by: profile.id
             };
           })
@@ -1085,6 +1091,10 @@ export async function createModuleZoneAction(
       return failure("Debes escribir el nombre de la zona.");
     }
 
+    if (!/^M\d+$/i.test(name)) {
+      return failure("La zona debe tener formato M + numero, por ejemplo M8.");
+    }
+
     const { error } = await supabase.from("module_zones").insert({
       module_key: moduleKey,
       name,
@@ -1097,6 +1107,7 @@ export async function createModuleZoneAction(
     }
 
     revalidatePath(`/sistema/${moduleKey}`);
+    revalidatePath("/sistema/admin");
     return success("Zona guardada.");
   } catch (error) {
     return failure(error instanceof Error ? error.message : "No se pudo guardar la zona.");
@@ -1113,6 +1124,10 @@ export async function saveModulePriceAction(
     const moduleKey = String(formData.get("module_key") ?? "").trim();
     const deviceTypeId = String(formData.get("device_type_id") ?? "").trim();
     const weeklyPrice = Number(formData.get("weekly_price") ?? 0);
+    const activationPrice = Number(formData.get("activation_price") ?? 0);
+    const finePrice = Number(formData.get("fine_price") ?? 0);
+    const maintenancePrice = Number(formData.get("maintenance_price") ?? 0);
+    const retentionPrice = Number(formData.get("retention_price") ?? 0);
     const discountAmount = Number(formData.get("discount_amount") ?? 0);
 
     if (!deviceTypeId) {
@@ -1124,6 +1139,10 @@ export async function saveModulePriceAction(
         module_key: moduleKey,
         device_type_id: deviceTypeId,
         weekly_price: weeklyPrice,
+        activation_price: activationPrice,
+        fine_price: finePrice,
+        maintenance_price: maintenancePrice,
+        retention_price: retentionPrice,
         discount_amount: discountAmount,
         created_by: profile.id
       },
@@ -1135,6 +1154,7 @@ export async function saveModulePriceAction(
     }
 
     revalidatePath(`/sistema/${moduleKey}`);
+    revalidatePath("/sistema/admin");
     return success("Precio guardado.");
   } catch (error) {
     return failure(error instanceof Error ? error.message : "No se pudo guardar el precio.");
@@ -1152,35 +1172,134 @@ export async function saveModuleSettingsAction(
     }
 
     const supabase = await createServerSupabaseClient();
-    const moduleKey = String(formData.get("module_key") ?? "").trim();
     const cutoffWeekday = Number(formData.get("cutoff_weekday") ?? 1);
+    const blockModules = ["visual", "comunicacion", "escaleras", "rentas"];
 
-    const { error } = await supabase.from("module_settings").upsert(
+    const { error: appSettingError } = await supabase.from("app_settings").upsert(
       {
-        module_key: moduleKey,
-        cutoff_weekday: cutoffWeekday,
-        created_by: profile.id
+        key: "global_cutoff_weekday",
+        value: String(cutoffWeekday),
+        updated_by: profile.id
       },
-      { onConflict: "module_key" }
+      { onConflict: "key" }
     );
 
-    if (error) {
-      return failure(error.message || "No se pudo guardar el corte.");
+    if (appSettingError) {
+      return failure(appSettingError.message || "No se pudo guardar el corte global.");
     }
 
-    revalidatePath(`/sistema/${moduleKey}`);
+    const settingsPayload = blockModules.map((moduleKey) => ({
+      module_key: moduleKey,
+      cutoff_weekday: cutoffWeekday,
+      created_by: profile.id
+    }));
+
+    const { error } = await supabase.from("module_settings").upsert(settingsPayload, {
+      onConflict: "module_key"
+    });
+
+    if (error) {
+      return failure(error.message || "No se pudo sincronizar el corte global.");
+    }
+
+    revalidatePath("/sistema/admin");
+    revalidatePath("/sistema/visual");
+    revalidatePath("/sistema/comunicacion");
+    revalidatePath("/sistema/escaleras");
     await auditAction({
       userId: profile.id,
-      moduleKey,
-      sectionKey: "configuracion",
+      moduleKey: "admin",
+      sectionKey: "danger-zone",
       actionKey: "update",
-      entityType: "module_settings",
-      entityId: moduleKey,
+      entityType: "global_cutoff_weekday",
+      entityId: "global_cutoff_weekday",
       afterData: { cutoffWeekday }
     });
     return success("Configuracion guardada.");
   } catch (error) {
     return failure(error instanceof Error ? error.message : "No se pudo guardar la configuracion.");
+  }
+}
+
+export async function createWorkplaceAction(
+  _prevState: MutationState,
+  formData: FormData
+): Promise<MutationState> {
+  try {
+    const profile = await requireProfile();
+    if (profile.roleKey !== "super-admin") {
+      return failure("Solo super-admin puede guardar centros de trabajo.");
+    }
+
+    const supabase = await createServerSupabaseClient();
+    const name = String(formData.get("name") ?? "").trim();
+    const type = String(formData.get("type") ?? "").trim();
+
+    if (!name || !["negocio", "oficina"].includes(type)) {
+      return failure("Debes capturar nombre y tipo.");
+    }
+
+    const { error } = await supabase.from("workplaces").insert({
+      name,
+      type,
+      created_by: profile.id
+    });
+
+    if (error) {
+      return failure(error.message || "No se pudo guardar el centro de trabajo.");
+    }
+
+    revalidatePath("/sistema/admin");
+    return success("Centro de trabajo guardado.");
+  } catch (error) {
+    return failure(error instanceof Error ? error.message : "No se pudo guardar el centro de trabajo.");
+  }
+}
+
+export async function saveWorkplacePositionAction(
+  _prevState: MutationState,
+  formData: FormData
+): Promise<MutationState> {
+  try {
+    const profile = await requireProfile();
+    if (profile.roleKey !== "super-admin") {
+      return failure("Solo super-admin puede guardar puestos.");
+    }
+
+    const supabase = await createServerSupabaseClient();
+    const workplaceId = String(formData.get("workplace_id") ?? "").trim();
+    const title = String(formData.get("title") ?? "").trim();
+    const salary = Number(formData.get("salary") ?? 0);
+    const assignedInternalId = String(formData.get("assigned_internal_id") ?? "").trim() || null;
+
+    if (!workplaceId || !title) {
+      return failure("Debes elegir centro de trabajo y puesto.");
+    }
+
+    const { error } = await supabase.from("workplace_positions").upsert(
+      {
+        workplace_id: workplaceId,
+        title,
+        salary: Number.isFinite(salary) ? salary : 0,
+        assigned_internal_id: assignedInternalId,
+        created_by: profile.id
+      },
+      { onConflict: "workplace_id,title" }
+    );
+
+    if (error) {
+      return failure(error.message || "No se pudo guardar el puesto.");
+    }
+
+    if (assignedInternalId) {
+      await supabase.from("internos").update({ laborando: true, estatus: "activo" }).eq("id", assignedInternalId);
+    }
+
+    revalidatePath("/sistema/admin");
+    revalidatePath("/sistema/internos");
+    return success("Puesto guardado.");
+  } catch (error) {
+    return failure(error instanceof Error ? error.message : "No se pudo guardar el puesto.");
   }
 }
 
@@ -1237,7 +1356,7 @@ export async function assignModuleDeviceAction(
       quantity: Number.isFinite(quantity) && quantity > 0 ? quantity : 1,
       cameras_allowed: camerasAllowed,
       assigned_manually: true,
-      status: "activo",
+      status: "pendiente",
       notes,
       created_by: profile.id
     });
@@ -1247,6 +1366,7 @@ export async function assignModuleDeviceAction(
     }
 
     revalidatePath(`/sistema/${moduleKey}`);
+    revalidatePath("/sistema/internos");
     await auditAction({
       userId: profile.id,
       moduleKey,
@@ -1319,13 +1439,13 @@ export async function registerModulePaymentAction(
     const targetDevices = internalId
       ? await supabase
           .from("internal_devices")
-          .select("id, internal_id, module_device_types!inner(name)")
+          .select("id, internal_id, device_type_id, quantity, status, weekly_price_override, discount_override, module_device_types!inner(name)")
           .eq("module_key", moduleKey)
           .eq("internal_id", internalId)
           .neq("status", "baja")
       : await supabase
           .from("internal_devices")
-          .select("id, internal_id, module_device_types!inner(name)")
+          .select("id, internal_id, device_type_id, quantity, status, weekly_price_override, discount_override, module_device_types!inner(name)")
           .eq("id", internalDeviceId)
           .eq("module_key", moduleKey)
           .neq("status", "baja");
@@ -1335,7 +1455,13 @@ export async function registerModulePaymentAction(
     }
 
     const filteredTargetDevices = (targetDevices.data ?? []).filter((device) => {
-      const typeName = device.module_device_types?.[0]?.name;
+      const deviceTypeRelation = device.module_device_types as
+        | Array<{ name?: string }>
+        | { name?: string }
+        | null;
+      const typeName = Array.isArray(deviceTypeRelation)
+        ? deviceTypeRelation[0]?.name
+        : deviceTypeRelation?.name;
       return !allowedDeviceNames || (typeName ? allowedDeviceNames.has(typeName) : false);
     });
 
@@ -1343,14 +1469,37 @@ export async function registerModulePaymentAction(
       return failure("No se encontraron aparatos validos para este bloque.");
     }
 
-    const perDeviceAmount =
-      amount && filteredTargetDevices.length > 0 ? amount / filteredTargetDevices.length : amount;
+    const deviceTypeIds = [...new Set(filteredTargetDevices.map((device) => device.device_type_id))];
+    const { data: modulePrices } = deviceTypeIds.length
+      ? await supabase
+          .from("module_prices")
+          .select("device_type_id, weekly_price, activation_price, discount_amount")
+          .eq("module_key", moduleKey)
+          .in("device_type_id", deviceTypeIds)
+      : { data: [] as Array<{ device_type_id: string; weekly_price: number; activation_price: number; discount_amount: number }> };
+    const priceMap = new Map(
+      (modulePrices ?? []).map((item) => [
+        item.device_type_id,
+        {
+          weeklyPrice: Number(item.weekly_price ?? 0),
+          activationPrice: Number(item.activation_price ?? 0),
+          discountAmount: Number(item.discount_amount ?? 0)
+        }
+      ])
+    );
     const paymentsPayload = filteredTargetDevices.map((device) => ({
       internal_device_id: device.id,
       module_key: moduleKey,
       zone_id: zoneId,
       cycle_id: cycle.id,
-      amount: perDeviceAmount,
+      amount:
+        device.status === "pendiente"
+          ? priceMap.get(device.device_type_id)?.activationPrice ?? 0
+          : Math.max(
+              0,
+              (device.weekly_price_override ?? priceMap.get(device.device_type_id)?.weeklyPrice ?? 0) -
+                (device.discount_override ?? priceMap.get(device.device_type_id)?.discountAmount ?? 0)
+            ) * Math.max(Number(device.quantity ?? 1), 1),
       status: "pagado",
       paid_at: new Date().toISOString(),
       paid_by: profile.id,
@@ -1364,6 +1513,18 @@ export async function registerModulePaymentAction(
     if (error) {
       return failure(error.message || "No se pudo registrar el pago.");
     }
+
+    await supabase
+      .from("internal_devices")
+      .update({
+        status: "activo",
+        activated_at: new Date().toISOString()
+      })
+      .in(
+        "id",
+        filteredTargetDevices.map((device) => device.id)
+      )
+      .eq("status", "pendiente");
 
     revalidatePath(`/sistema/${moduleKey}`);
     await auditAction({
