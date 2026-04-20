@@ -96,6 +96,34 @@ function ensureModuleKey(value?: string | null): ModuleKey {
   return "rentas";
 }
 
+async function fetchAllRows<T>(
+  queryFactory: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: unknown }>,
+  chunkSize = 1000
+) {
+  const rows: T[] = [];
+
+  for (let from = 0; ; from += chunkSize) {
+    const to = from + chunkSize - 1;
+    const { data, error } = await queryFactory(from, to);
+
+    if (error) {
+      return { data: null as T[] | null, error };
+    }
+
+    if (!data || data.length === 0) {
+      break;
+    }
+
+    rows.push(...data);
+
+    if (data.length < chunkSize) {
+      break;
+    }
+  }
+
+  return { data: rows, error: null as unknown };
+}
+
 function mapInternalRecord(item: {
   id: string;
   expediente: string;
@@ -173,9 +201,39 @@ function mapVisitorRecord(
 
 async function getVisitorHistoryData(supabase: SupabaseClient) {
   const [{ data: visitHistory }, { data: transferHistory }, { data: internals }] = await Promise.all([
-    supabase.from("historial_ingresos").select("listado_id, visita_id, interno_nombre, fecha_visita"),
-    supabase.from("visita_interno_historial").select("id, visita_id, interno_id, created_at"),
-    supabase.from("internos").select("id, nombres, apellido_pat, apellido_mat")
+    fetchAllRows<{
+      listado_id: string;
+      visita_id: string;
+      interno_nombre: string;
+      fecha_visita: string;
+    }>((from, to) =>
+      supabase
+        .from("historial_ingresos")
+        .select("listado_id, visita_id, interno_nombre, fecha_visita")
+        .range(from, to)
+    ),
+    fetchAllRows<{
+      id: string;
+      visita_id: string;
+      interno_id: string;
+      created_at: string;
+    }>((from, to) =>
+      supabase
+        .from("visita_interno_historial")
+        .select("id, visita_id, interno_id, created_at")
+        .range(from, to)
+    ),
+    fetchAllRows<{
+      id: string;
+      nombres: string;
+      apellido_pat: string;
+      apellido_mat: string | null;
+    }>((from, to) =>
+      supabase
+        .from("internos")
+        .select("id, nombres, apellido_pat, apellido_mat")
+        .range(from, to)
+    )
   ]);
   const historyMap = new Map<string, string[]>();
   const detailedHistoryMap = new Map<string, VisitorHistoryEntry[]>();
@@ -502,17 +560,37 @@ export async function getCurrentUserProfile(): Promise<UserProfile | null> {
 
 export async function getInternos(includeAll = false): Promise<InternalRecord[]> {
   const supabase = await createServerSupabaseClient();
-  let query = supabase
-    .from("internos")
-    .select(
-      "id, expediente, nombres, apellido_pat, apellido_mat, nacimiento, llego, libre, ubicacion, telefono, ubi_filiacion, laborando, estatus, observaciones, created_at, updated_at"
-    );
+  const { data, error } = await fetchAllRows<{
+    id: string;
+    expediente: string;
+    nombres: string;
+    apellido_pat: string;
+    apellido_mat: string | null;
+    nacimiento: string;
+    llego: string;
+    libre: string | null;
+    ubicacion: string | number;
+    telefono: string | null;
+    ubi_filiacion: string;
+    laborando: boolean | null;
+    estatus: string;
+    observaciones: string | null;
+    created_at: string;
+    updated_at: string;
+  }>((from, to) => {
+    let query = supabase
+      .from("internos")
+      .select(
+        "id, expediente, nombres, apellido_pat, apellido_mat, nacimiento, llego, libre, ubicacion, telefono, ubi_filiacion, laborando, estatus, observaciones, created_at, updated_at"
+      )
+      .range(from, to);
 
-  if (!includeAll) {
-    query = query.eq("estatus", "activo");
-  }
+    if (!includeAll) {
+      query = query.eq("estatus", "activo");
+    }
 
-  const { data, error } = await query;
+    return query;
+  });
 
   if (error || !data) {
     return [];
@@ -525,15 +603,33 @@ export async function getVisitas(): Promise<VisitorRecord[]> {
   const supabase = await createServerSupabaseClient();
   const { historyMap, detailedHistoryMap } = await getVisitorHistoryData(supabase);
   const [{ data, error }, { data: currentRelations, error: relationError }] = await Promise.all([
-    supabase
-      .from("visitas")
-      .select(
-        "id, \"nombreCompleto\", fecha_nacimiento, edad, menor, sexo, parentesco, betada, telefono, created_at, updated_at"
-      )
-      .order("updated_at", { ascending: false }),
-    supabase
-      .from("interno_visitas")
-      .select("visita_id, interno_id")
+    fetchAllRows<{
+      id: string;
+      nombreCompleto: string;
+      fecha_nacimiento: string;
+      edad: number | null;
+      menor: boolean | null;
+      sexo: string | null;
+      parentesco: string;
+      betada: boolean | null;
+      telefono: string | null;
+      created_at: string;
+      updated_at: string;
+    }>((from, to) =>
+      supabase
+        .from("visitas")
+        .select(
+          "id, \"nombreCompleto\", fecha_nacimiento, edad, menor, sexo, parentesco, betada, telefono, created_at, updated_at"
+        )
+        .order("updated_at", { ascending: false })
+        .range(from, to)
+    ),
+    fetchAllRows<{ visita_id: string; interno_id: string }>((from, to) =>
+      supabase
+        .from("interno_visitas")
+        .select("visita_id, interno_id")
+        .range(from, to)
+    )
   ]);
 
   if (error || !data) {
@@ -570,6 +666,7 @@ export async function getVisitas(): Promise<VisitorRecord[]> {
         currentInternalName: currentRelation?.internoName
       };
     })
+    .filter((item) => Boolean(item.currentInternalId && item.currentInternalName))
   );
 }
 
