@@ -112,6 +112,8 @@ export function InternalBrowser({
   const [statusState, statusAction, statusPending] = useActionState(updateInternalStatusAction, mutationInitialState);
   const visitorFormRef = useRef<HTMLFormElement>(null);
   const internalFormRef = useRef<HTMLFormElement>(null);
+  const handledPassSuccessKeyRef = useRef<number | null>(null);
+  const pendingPassContextRef = useRef<{ internoId: string; fechaVisita: string } | null>(null);
   const canViewSensitiveData = roleKey === "super-admin";
   const canManageVisitorAvailability = roleKey === "super-admin" || roleKey === "control";
 
@@ -144,15 +146,29 @@ export function InternalBrowser({
     );
 
   useEffect(() => {
-    if (passState.success && selected && selectedDateValue) {
-      setRecentCreatedPass({
-        internoId: selected.id,
-        fechaVisita: selectedDateValue
-      });
-      setSelectedVisitorIds([]);
-      router.refresh();
+    if (!passState.success) {
+      return;
     }
-  }, [passState.success, router, selected, selectedDateValue]);
+
+    if (handledPassSuccessKeyRef.current === passBannerStateKey) {
+      return;
+    }
+
+    handledPassSuccessKeyRef.current = passBannerStateKey;
+    const pendingContext = pendingPassContextRef.current;
+    if (pendingContext) {
+      setRecentCreatedPass(pendingContext);
+    }
+    pendingPassContextRef.current = null;
+    setSelectedVisitorIds([]);
+    router.refresh();
+  }, [passState.success, passBannerStateKey, router]);
+
+  useEffect(() => {
+    if (passState.error) {
+      pendingPassContextRef.current = null;
+    }
+  }, [passState.error]);
 
   useEffect(() => {
     if (visitorState.success) {
@@ -209,6 +225,8 @@ export function InternalBrowser({
     setFormSeed((current) => current + 1);
     setModalBannerResetKey((current) => current + 1);
     setRecentCreatedPass(null);
+    pendingPassContextRef.current = null;
+    handledPassSuccessKeyRef.current = null;
   }
 
   function toggleVisitor(visitaId: string) {
@@ -549,6 +567,12 @@ export function InternalBrowser({
                   autoComplete="off"
                   onSubmitCapture={() => {
                     setPassBannerStateKey((current) => current + 1);
+                    pendingPassContextRef.current = selected
+                      ? {
+                          internoId: selected.id,
+                          fechaVisita: selectedDateValue
+                        }
+                      : null;
                     setScreenLoading(true);
                   }}
                 >
