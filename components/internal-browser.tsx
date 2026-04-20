@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
+import { useActionState, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   createInternalAction,
@@ -107,7 +107,6 @@ export function InternalBrowser({
   const [statusState, statusAction, statusPending] = useActionState(updateInternalStatusAction, mutationInitialState);
   const visitorFormRef = useRef<HTMLFormElement>(null);
   const internalFormRef = useRef<HTMLFormElement>(null);
-  const deferredQuery = useDeferredValue(queryInput);
   const canViewSensitiveData = roleKey === "super-admin";
   const canManageVisitorAvailability = roleKey === "super-admin" || roleKey === "control";
 
@@ -180,21 +179,6 @@ export function InternalBrowser({
   useEffect(() => {
     setQueryInput(query);
   }, [query]);
-
-  useEffect(() => {
-    if (deferredQuery === query) {
-      return;
-    }
-
-    const params = new URLSearchParams(searchParams.toString());
-    if (deferredQuery.trim()) {
-      params.set("q", deferredQuery.trim());
-    } else {
-      params.delete("q");
-    }
-    params.delete("page");
-    router.replace(params.size ? `${pathname}?${params.toString()}` : pathname, { scroll: false });
-  }, [deferredQuery, pathname, query, router, searchParams]);
 
   function openInternalModal(profile: InternalProfile) {
     setModalInternalId(profile.id);
@@ -269,6 +253,18 @@ export function InternalBrowser({
     router.replace(params.size ? `${pathname}?${params.toString()}` : pathname, { scroll: false });
   }
 
+  function applySearch(rawValue: string) {
+    const params = new URLSearchParams(searchParams.toString());
+    const normalized = rawValue.trim();
+    if (normalized) {
+      params.set("q", normalized);
+    } else {
+      params.delete("q");
+    }
+    params.delete("page");
+    router.replace(params.size ? `${pathname}?${params.toString()}` : pathname, { scroll: false });
+  }
+
   return (
     <>
       <FullscreenLoading active={screenLoading || createPending || passPending || visitorPending || statusPending} />
@@ -278,22 +274,34 @@ export function InternalBrowser({
             <strong className="section-title">Internos</strong>
           </div>
 
-          <div className="field" style={{ marginBottom: "0.8rem" }}>
-            <input
-              id="internal-search"
-              value={queryInput}
-              onChange={(event) => setQueryInput(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === "Escape") {
-                  event.preventDefault();
-                  setQueryInput("");
-                  goToPage(1);
-                }
-              }}
-              placeholder="Buscar por nombre o ubicacion"
-              autoComplete="off"
-            />
-          </div>
+          <form
+            className="actions-row"
+            style={{ marginBottom: "0.8rem", alignItems: "stretch" }}
+            onSubmit={(event) => {
+              event.preventDefault();
+              applySearch(queryInput);
+            }}
+          >
+            <div className="field" style={{ flex: 1 }}>
+              <input
+                id="internal-search"
+                value={queryInput}
+                onChange={(event) => setQueryInput(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Escape") {
+                    event.preventDefault();
+                    setQueryInput("");
+                    applySearch("");
+                  }
+                }}
+                placeholder="Buscar por nombre o ubicacion"
+                autoComplete="off"
+              />
+            </div>
+            <button type="submit" className="button-soft">
+              Buscar
+            </button>
+          </form>
 
           <div className="table-wrap compact-table">
             <table>

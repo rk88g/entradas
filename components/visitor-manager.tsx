@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
+import { useActionState, useEffect, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { createVisitorAction, reassignVisitorAction } from "@/app/sistema/actions";
 import { FullscreenLoading } from "@/components/fullscreen-loading";
@@ -51,7 +51,6 @@ export function VisitorManager({
   const [createState, createAction, createPending] = useActionState(createVisitorAction, mutationInitialState);
   const [reassignState, reassignAction, reassignPending] = useActionState(reassignVisitorAction, mutationInitialState);
   const createFormRef = useRef<HTMLFormElement>(null);
-  const deferredQuery = useDeferredValue(queryInput);
 
   const selectedVisitor = visitors.find((visitor) => visitor.id === selectedVisitorId) ?? null;
   const canReassign = roleKey === "super-admin";
@@ -83,21 +82,6 @@ export function VisitorManager({
   }, [query]);
 
   useEffect(() => {
-    if (deferredQuery === query) {
-      return;
-    }
-
-    const params = new URLSearchParams(searchParams.toString());
-    if (deferredQuery.trim()) {
-      params.set("q", deferredQuery.trim());
-    } else {
-      params.delete("q");
-    }
-    params.delete("page");
-    router.replace(params.size ? `${pathname}?${params.toString()}` : pathname, { scroll: false });
-  }, [deferredQuery, pathname, query, router, searchParams]);
-
-  useEffect(() => {
     if (!createPending && !reassignPending) {
       setScreenLoading(false);
     }
@@ -127,6 +111,18 @@ export function VisitorManager({
     router.replace(params.size ? `${pathname}?${params.toString()}` : pathname, { scroll: false });
   }
 
+  function applySearch(rawValue: string) {
+    const params = new URLSearchParams(searchParams.toString());
+    const normalized = rawValue.trim();
+    if (normalized) {
+      params.set("q", normalized);
+    } else {
+      params.delete("q");
+    }
+    params.delete("page");
+    router.replace(params.size ? `${pathname}?${params.toString()}` : pathname, { scroll: false });
+  }
+
   return (
     <section className="module-grid module-grid-single">
       <FullscreenLoading active={screenLoading || createPending || reassignPending} />
@@ -135,21 +131,33 @@ export function VisitorManager({
           <strong className="section-title">Visitas</strong>
         </div>
 
-        <div className="field" style={{ marginBottom: "0.8rem" }}>
-          <input
-            value={queryInput}
-            onChange={(event) => setQueryInput(event.target.value)}
-            onKeyDown={(event) => {
-              if (event.key === "Escape") {
-                event.preventDefault();
-                setQueryInput("");
-                goToPage(1);
-              }
-            }}
-            placeholder="Buscar visita o interno"
-            autoComplete="off"
-          />
-        </div>
+        <form
+          className="actions-row"
+          style={{ marginBottom: "0.8rem", alignItems: "stretch" }}
+          onSubmit={(event) => {
+            event.preventDefault();
+            applySearch(queryInput);
+          }}
+        >
+          <div className="field" style={{ flex: 1 }}>
+            <input
+              value={queryInput}
+              onChange={(event) => setQueryInput(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Escape") {
+                  event.preventDefault();
+                  setQueryInput("");
+                  applySearch("");
+                }
+              }}
+              placeholder="Buscar visita o interno"
+              autoComplete="off"
+            />
+          </div>
+          <button type="submit" className="button-soft">
+            Buscar
+          </button>
+        </form>
 
         <div className="table-wrap compact-table">
           <table>
