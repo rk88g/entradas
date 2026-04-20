@@ -1420,7 +1420,6 @@ export async function assignModuleDeviceAction(
     const characteristics = String(formData.get("characteristics") ?? "").trim() || null;
     const imei = String(formData.get("imei") ?? "").trim() || null;
     const chipNumber = String(formData.get("chip_number") ?? "").trim() || null;
-    const quantity = Number(formData.get("quantity") ?? 1);
     const camerasAllowed = String(formData.get("cameras_allowed") ?? "") === "on";
     const notes = String(formData.get("notes") ?? "").trim() || null;
 
@@ -1452,25 +1451,55 @@ export async function assignModuleDeviceAction(
       return failure(`Ese aparato no corresponde al bloque ${moduleKey}.`);
     }
 
-    const { error } = await supabase.from("internal_devices").insert({
+    const { data: selectedInternal, error: internalError } = await supabase
+      .from("internos")
+      .select("id")
+      .eq("id", internalId)
+      .maybeSingle();
+
+    if (internalError || !selectedInternal) {
+      return failure(internalError?.message || "El interno seleccionado ya no existe.");
+    }
+
+    if (zoneId) {
+      const { data: selectedZone, error: selectedZoneError } = await supabase
+        .from("zones")
+        .select("id")
+        .eq("id", zoneId)
+        .maybeSingle();
+
+      if (selectedZoneError || !selectedZone) {
+        return failure(selectedZoneError?.message || "La zona seleccionada ya no existe.");
+      }
+    }
+
+    const insertPayload: Record<string, unknown> = {
       internal_id: internalId,
       module_key: selectedType.module_key,
       device_type_id: deviceTypeId,
-      zone_id: zoneId,
       brand,
       model,
       characteristics,
       imei,
       chip_number: chipNumber,
-      quantity: Number.isFinite(quantity) && quantity > 0 ? quantity : 1,
+      quantity: 1,
       cameras_allowed: camerasAllowed,
       assigned_manually: true,
       status: "pendiente",
       notes,
       created_by: profile.id
-    });
+    };
+
+    if (zoneId) {
+      insertPayload.zone_id = zoneId;
+    }
+
+    const { error } = await supabase.from("internal_devices").insert(insertPayload);
 
     if (error) {
+      if (error.code === "23503") {
+        return failure("No se pudo guardar el aparato porque el interno, la zona o el dispositivo ya no existen.");
+      }
       return failure(error.message || "No se pudo asignar el aparato.");
     }
 
@@ -1489,7 +1518,7 @@ export async function assignModuleDeviceAction(
         zoneId,
         brand,
         model,
-        quantity
+        quantity: 1
       }
     });
     return success("Aparato asignado.");
