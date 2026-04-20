@@ -923,9 +923,9 @@ export async function updateAuthUserPasswordAction(
     }
 
     const userId = String(formData.get("user_id") ?? "").trim();
-    const password = String(formData.get("password") ?? "").trim();
+    const password = String(formData.get("password") ?? "");
 
-    if (!userId || !password) {
+    if (!userId || !password.trim()) {
       return failure("Debes elegir el usuario y escribir la nueva contrasena.");
     }
 

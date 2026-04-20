@@ -48,7 +48,7 @@ export function LoginForm({
             name="username"
             type="text"
             autoComplete="off"
-            placeholder="cap1"
+                placeholder="USUARIO"
             disabled={disabled}
           />
           <small className="muted">@intranetprev.com</small>

@@ -17,7 +17,7 @@ const coreNavItems = [
   { href: "/sistema/fechas", icon: "FC", label: "Fechas", scopeKey: "fechas" }
 ];
 
-const supportNavItem = { href: "/sistema/tickets", icon: "TK", label: "Tickets", scopeKey: "tickets" };
+const supportNavItem = { href: "/sistema/tickets", icon: "TK", label: "Cumplido Chat", scopeKey: "tickets" };
 
 const moduleNavItems = [
   { href: "/sistema/visual", icon: "VI", label: "Visual", moduleKey: "visual" as const, scopeKey: "visual" },
@@ -103,7 +103,7 @@ export function AppShell({
         const payload = (await response.json()) as { count?: number };
         setSupportCount(payload.count ?? 0);
         if (showToast) {
-          setSupportToast("Tienes actividad nueva en Tickets.");
+          setSupportToast("Tienes actividad nueva en Cumplido Chat.");
         }
       } catch {
         // ignore
@@ -246,7 +246,7 @@ export function AppShell({
           ) : null}
           {supportToast ? (
             <div className="floating-alert success hide-print">
-              <strong>Tickets</strong>
+              <strong>Cumplido Chat</strong>
               <span>{supportToast}</span>
             </div>
           ) : null}

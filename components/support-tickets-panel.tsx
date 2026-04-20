@@ -418,7 +418,7 @@ export function SupportTicketsPanel({
         },
         (payload) => {
           if (payload.new && typeof payload.new === "object" && "sender_user_id" in payload.new && payload.new.sender_user_id !== userId) {
-            setToastState({ success: "Tienes actividad nueva en tickets.", error: null });
+          setToastState({ success: "Tienes actividad nueva en Cumplido Chat.", error: null });
             router.refresh();
           }
         }
@@ -443,7 +443,7 @@ export function SupportTicketsPanel({
       <section className="module-panel">
         <div className="tickets-header">
           <div>
-            <strong className="section-title">Tickets</strong>
+          <strong className="section-title">Cumplido Chat</strong>
             <div className="muted">No leidos: {unreadCount}</div>
           </div>
           <button type="button" className="button" onClick={() => setCreateOpen((current) => !current)}>

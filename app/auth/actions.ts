@@ -2,10 +2,71 @@
 
 import { redirect } from "next/navigation";
 import { logConnectionEvent } from "@/lib/audit";
+import { createSupabaseAdminClient } from "@/lib/supabase/admin";
+import { isSupabaseAdminConfigured } from "@/lib/supabase/env";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 
 export interface AuthActionState {
   error: string | null;
+}
+
+async function resolveAuthEmail(rawUsername: string) {
+  if (rawUsername.includes("@")) {
+    return rawUsername;
+  }
+
+  const normalizedUsername = rawUsername.trim().toLowerCase();
+  const defaultEmail = `${normalizedUsername}@intranetprev.com`;
+
+  if (!isSupabaseAdminConfigured()) {
+    return defaultEmail;
+  }
+
+  try {
+    const admin = createSupabaseAdminClient();
+    let page = 1;
+
+    while (true) {
+      const { data, error } = await admin.auth.admin.listUsers({
+        page,
+        perPage: 200
+      });
+
+      if (error) {
+        break;
+      }
+
+      const users = data?.users ?? [];
+      if (users.length === 0) {
+        break;
+      }
+
+      const exactEmail = users.find((user) => (user.email ?? "").toLowerCase() === defaultEmail);
+      if (exactEmail?.email) {
+        return exactEmail.email;
+      }
+
+      const sameLocalPart = users.find((user) => {
+        const email = (user.email ?? "").toLowerCase();
+        const [localPart] = email.split("@");
+        return localPart === normalizedUsername;
+      });
+
+      if (sameLocalPart?.email) {
+        return sameLocalPart.email;
+      }
+
+      if (users.length < 200) {
+        break;
+      }
+
+      page += 1;
+    }
+  } catch {
+    return defaultEmail;
+  }
+
+  return defaultEmail;
 }
 
 export async function signInAction(
@@ -14,15 +75,16 @@ export async function signInAction(
 ): Promise<AuthActionState> {
   const rawUsername = String(formData.get("username") ?? "").trim();
   const password = String(formData.get("password") ?? "");
-  const email = rawUsername.includes("@")
+  const fallbackEmail = rawUsername.includes("@")
     ? rawUsername
-    : `${rawUsername}@intranetprev.com`;
+    : `${rawUsername.toLowerCase()}@intranetprev.com`;
 
   if (!rawUsername || !password) {
     return { error: "Escribe tu usuario y tu contrasena." };
   }
 
   try {
+    const email = await resolveAuthEmail(rawUsername);
     const supabase = await createServerSupabaseClient();
     const { data, error } = await supabase.auth.signInWithPassword({ email, password });
 
@@ -42,7 +104,7 @@ export async function signInAction(
     });
   } catch {
     await logConnectionEvent({
-      email,
+      email: fallbackEmail,
       success: false,
       failureReason: "No se pudo conectar con Supabase."
     });
