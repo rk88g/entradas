@@ -21,6 +21,7 @@ export type PassStatus = "capturado" | "autorizado" | "impreso" | "cancelado";
 export type VisitorSex = "hombre" | "mujer" | "sin-definir";
 export type DeviceStatus = "pendiente" | "activo" | "retenido" | "reparacion" | "baja";
 export type WorkplaceType = "negocio" | "oficina";
+export type PermissionAccessLevel = "none" | "view" | "manage";
 
 export interface UserProfile {
   id: string;
@@ -31,6 +32,7 @@ export interface UserProfile {
   active: boolean;
   moduleOnly: boolean;
   accessibleModules: ModuleAccess[];
+  permissionGrants: PermissionGrantRecord[];
 }
 
 export interface ModuleAccess {
@@ -466,6 +468,38 @@ export interface ConnectionLogRecord {
   createdAt: string;
 }
 
+export interface PermissionScopeRecord {
+  key: string;
+  moduleKey?: string | null;
+  scopeType: "module" | "section";
+  parentKey?: string | null;
+  label: string;
+  description?: string | null;
+  sortOrder: number;
+  active: boolean;
+}
+
+export interface PermissionGrantRecord {
+  scopeKey: string;
+  accessLevel: PermissionAccessLevel;
+  source: "role" | "user";
+}
+
+export interface AdminRoleRecord {
+  id: string;
+  key: string;
+  name: string;
+}
+
+export interface StoredPermissionGrantRecord {
+  id: string;
+  subjectType: "role" | "user";
+  subjectId: string;
+  subjectLabel: string;
+  scopeKey: string;
+  accessLevel: PermissionAccessLevel;
+}
+
 export interface ActionAuditRecord {
   id: string;
   userId?: string | null;
@@ -497,4 +531,8 @@ export interface DangerZoneConfigData {
   deviceTypes: ModuleDeviceType[];
   workplaces: WorkplaceRecord[];
   workplacePositions: WorkplacePositionRecord[];
+  roles: AdminRoleRecord[];
+  permissionScopes: PermissionScopeRecord[];
+  rolePermissionGrants: StoredPermissionGrantRecord[];
+  userPermissionGrants: StoredPermissionGrantRecord[];
 }

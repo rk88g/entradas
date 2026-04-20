@@ -6,8 +6,10 @@ import {
   createModuleChargeRouteAction,
   createWorkplaceAction,
   forceCloseUserSessionsAction,
+  saveRolePermissionGrantAction,
   saveModulePriceAction,
   saveModuleSettingsAction,
+  saveUserPermissionGrantAction,
   saveWorkplacePositionAction,
   updateAuthUserPasswordAction
 } from "@/app/sistema/actions";
@@ -77,12 +79,14 @@ export function AdminControlPanel({
   config: DangerZoneConfigData;
   adminConfigured: boolean;
 }) {
-  const [tab, setTab] = useState<"sesiones" | "acciones" | "usuarios" | "configuracion">("configuracion");
+  const [tab, setTab] = useState<"sesiones" | "acciones" | "usuarios" | "configuracion" | "permisos">("configuracion");
   const [selectedModuleForRoute, setSelectedModuleForRoute] = useState<ModuleKey>("visual");
   const [selectedModuleForPrice, setSelectedModuleForPrice] = useState<ModuleKey>("visual");
   const [selectedWorkplaceInternal, setSelectedWorkplaceInternal] = useState<InternalSearchOption | null>(null);
   const [passwordState, passwordAction, passwordPending] = useActionState(updateAuthUserPasswordAction, mutationInitialState);
   const [forceState, forceAction, forcePending] = useActionState(forceCloseUserSessionsAction, mutationInitialState);
+  const [rolePermissionState, rolePermissionAction, rolePermissionPending] = useActionState(saveRolePermissionGrantAction, mutationInitialState);
+  const [userPermissionState, userPermissionAction, userPermissionPending] = useActionState(saveUserPermissionGrantAction, mutationInitialState);
   const [cutoffState, cutoffAction, cutoffPending] = useActionState(saveModuleSettingsAction, mutationInitialState);
   const [zoneState, zoneAction, zonePending] = useActionState(createModuleZoneAction, mutationInitialState);
   const [routeState, routeAction, routePending] = useActionState(createModuleChargeRouteAction, mutationInitialState);
@@ -109,6 +113,9 @@ export function AdminControlPanel({
         </button>
         <button type="button" className={`button-secondary listing-toggle ${tab === "usuarios" ? "active" : ""}`} onClick={() => setTab("usuarios")}>
           Usuarios
+        </button>
+        <button type="button" className={`button-secondary listing-toggle ${tab === "permisos" ? "active" : ""}`} onClick={() => setTab("permisos")}>
+          Permisos
         </button>
         <button type="button" className={`button-secondary listing-toggle ${tab === "sesiones" ? "active" : ""}`} onClick={() => setTab("sesiones")}>
           Sesiones
@@ -503,6 +510,142 @@ export function AdminControlPanel({
                 </tbody>
               </table>
             </div>
+            </div>
+          </details>
+        </section>
+      ) : null}
+
+      {tab === "permisos" ? (
+        <section className="collapse-stack" style={{ marginTop: "1rem" }}>
+          <details className="data-card section-collapse">
+            <summary>
+              <span>Permisos por rol</span>
+              <span>{config.rolePermissionGrants.length} registros</span>
+            </summary>
+            <div className="section-collapse-body">
+              <MutationBanner state={rolePermissionState} />
+              <form action={rolePermissionAction} className="field-grid" autoComplete="off">
+                <div className="field">
+                  <select name="role_id" defaultValue="">
+                    <option value="" disabled>Rol</option>
+                    {config.roles.map((role) => (
+                      <option key={role.id} value={role.id}>{role.name}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="field">
+                  <select name="scope_key" defaultValue="">
+                    <option value="" disabled>Modulo o seccion</option>
+                    {config.permissionScopes.map((scope) => (
+                      <option key={scope.key} value={scope.key}>
+                        {scope.scopeType === "section" ? `${scope.label} (${scope.key})` : scope.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="field">
+                  <select name="access_level" defaultValue="manage">
+                    <option value="inherit">Heredar</option>
+                    <option value="none">Ocultar</option>
+                    <option value="view">Solo ver</option>
+                    <option value="manage">Gestionar</option>
+                  </select>
+                </div>
+                <div className="actions-row">
+                  <LoadingButton pending={rolePermissionPending} label="Guardar permiso de rol" loadingLabel="Loading..." className="button" />
+                </div>
+              </form>
+
+              <div className="table-wrap compact-table responsive-mobile-table" style={{ marginTop: "0.8rem" }}>
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Rol</th>
+                      <th>Alcance</th>
+                      <th>Nivel</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {config.rolePermissionGrants.length === 0 ? (
+                      <tr><td colSpan={3}>Sin permisos por rol.</td></tr>
+                    ) : (
+                      config.rolePermissionGrants.map((grant) => (
+                        <tr key={grant.id}>
+                          <td data-label="Rol">{grant.subjectLabel}</td>
+                          <td data-label="Alcance">{config.permissionScopes.find((scope) => scope.key === grant.scopeKey)?.label ?? grant.scopeKey}</td>
+                          <td data-label="Nivel">{grant.accessLevel}</td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </details>
+
+          <details className="data-card section-collapse">
+            <summary>
+              <span>Permisos por usuario</span>
+              <span>{config.userPermissionGrants.length} registros</span>
+            </summary>
+            <div className="section-collapse-body">
+              <MutationBanner state={userPermissionState} />
+              <form action={userPermissionAction} className="field-grid" autoComplete="off">
+                <div className="field">
+                  <select name="user_id" defaultValue="">
+                    <option value="" disabled>Usuario</option>
+                    {users.map((user) => (
+                      <option key={user.id} value={user.id}>{user.fullName} - {user.roleKey}</option>
+                    ))}
+                  </select>
+                </div>
+                <div className="field">
+                  <select name="scope_key" defaultValue="">
+                    <option value="" disabled>Modulo o seccion</option>
+                    {config.permissionScopes.map((scope) => (
+                      <option key={scope.key} value={scope.key}>
+                        {scope.scopeType === "section" ? `${scope.label} (${scope.key})` : scope.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="field">
+                  <select name="access_level" defaultValue="manage">
+                    <option value="inherit">Heredar</option>
+                    <option value="none">Ocultar</option>
+                    <option value="view">Solo ver</option>
+                    <option value="manage">Gestionar</option>
+                  </select>
+                </div>
+                <div className="actions-row">
+                  <LoadingButton pending={userPermissionPending} label="Guardar permiso de usuario" loadingLabel="Loading..." className="button-secondary" />
+                </div>
+              </form>
+
+              <div className="table-wrap compact-table responsive-mobile-table" style={{ marginTop: "0.8rem" }}>
+                <table>
+                  <thead>
+                    <tr>
+                      <th>Usuario</th>
+                      <th>Alcance</th>
+                      <th>Nivel</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {config.userPermissionGrants.length === 0 ? (
+                      <tr><td colSpan={3}>Sin permisos por usuario.</td></tr>
+                    ) : (
+                      config.userPermissionGrants.map((grant) => (
+                        <tr key={grant.id}>
+                          <td data-label="Usuario">{grant.subjectLabel}</td>
+                          <td data-label="Alcance">{config.permissionScopes.find((scope) => scope.key === grant.scopeKey)?.label ?? grant.scopeKey}</td>
+                          <td data-label="Nivel">{grant.accessLevel}</td>
+                        </tr>
+                      ))
+                    )}
+                  </tbody>
+                </table>
+              </div>
             </div>
           </details>
         </section>

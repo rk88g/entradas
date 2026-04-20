@@ -7,7 +7,7 @@ import {
   getNextDate,
   getOpenDate
 } from "@/lib/supabase/queries";
-import { canAccessCoreSystem } from "@/lib/utils";
+import { canAccessCoreSystem, canAccessScope } from "@/lib/utils";
 
 export default async function FechasPage() {
   const [profile, dates, nextDate, openDate, closePasswordConfigured] = await Promise.all([
@@ -22,7 +22,15 @@ export default async function FechasPage() {
     redirect(`/sistema/${profile.accessibleModules[0].moduleKey}`);
   }
 
-  if (profile && !canAccessCoreSystem(profile.roleKey, profile.moduleOnly)) {
+  if (
+    profile &&
+    !canAccessScope(
+      profile.roleKey,
+      profile.permissionGrants,
+      "fechas",
+      canAccessCoreSystem(profile.roleKey, profile.moduleOnly)
+    )
+  ) {
     redirect("/sistema/escaleras");
   }
 

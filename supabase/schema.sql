@@ -254,6 +254,83 @@ insert into public.app_settings (key, value)
 values ('global_cutoff_weekday', '1')
 on conflict (key) do nothing;
 
+create table if not exists public.permission_scopes (
+  key text primary key,
+  module_key text,
+  scope_type text not null check (scope_type in ('module', 'section')),
+  parent_key text references public.permission_scopes (key) on delete cascade,
+  label text not null,
+  description text,
+  sort_order integer not null default 0,
+  active boolean not null default true,
+  created_at timestamptz not null default timezone('utc', now()),
+  updated_at timestamptz not null default timezone('utc', now())
+);
+
+insert into public.permission_scopes (key, module_key, scope_type, parent_key, label, description, sort_order)
+values
+  ('inicio', null, 'module', null, 'Inicio', 'Resumen principal del sistema', 10),
+  ('internos', null, 'module', null, 'Internos', 'Modulo de internos', 20),
+  ('internos.historial', null, 'section', 'internos', 'Historial interno', 'Historial completo del interno', 21),
+  ('visitas', null, 'module', null, 'Visitas', 'Modulo de visitas', 30),
+  ('visitas.reasignar', null, 'section', 'visitas', 'Reasignar visita', 'Reasignacion de visitas', 31),
+  ('listado', null, 'module', null, 'Listado', 'Modulo de pases e impresion', 40),
+  ('listado.hombres-mujeres', null, 'section', 'listado', 'Hombres / Mujeres', 'Listado separado por sexo', 41),
+  ('listado.menciones', null, 'section', 'listado', 'Menciones', 'Listado de menciones', 42),
+  ('fechas', null, 'module', null, 'Fechas', 'Modulo de fechas', 50),
+  ('fechas.crear', null, 'section', 'fechas', 'Crear fechas', 'Registrar nuevas fechas', 51),
+  ('fechas.cerrar', null, 'section', 'fechas', 'Cerrar fechas', 'Cerrar fechas operativas', 52),
+  ('danger-zone', null, 'module', null, 'Danger Zone', 'Configuracion avanzada y seguridad', 60),
+  ('danger-zone.configuracion', null, 'section', 'danger-zone', 'Configuracion', 'Configuracion general', 61),
+  ('danger-zone.usuarios', null, 'section', 'danger-zone', 'Usuarios', 'Usuarios y seguridad', 62),
+  ('danger-zone.permisos', null, 'section', 'danger-zone', 'Permisos', 'Permisos por rol y usuario', 63),
+  ('danger-zone.sesiones', null, 'section', 'danger-zone', 'Sesiones', 'Logs de conexion', 64),
+  ('danger-zone.acciones', null, 'section', 'danger-zone', 'Acciones', 'Logs de acciones', 65),
+  ('visual', 'visual', 'module', null, 'Visual', 'Bloque visual', 70),
+  ('visual.resumen', 'visual', 'section', 'visual', 'Resumen', 'Resumen de visual', 71),
+  ('visual.aparatos', 'visual', 'section', 'visual', 'Aparatos', 'Alta y gestion de aparatos', 72),
+  ('visual.cobranza', 'visual', 'section', 'visual', 'Cobranza', 'Cobranza visual', 73),
+  ('comunicacion', 'comunicacion', 'module', null, 'Comunicacion', 'Bloque comunicacion', 80),
+  ('comunicacion.resumen', 'comunicacion', 'section', 'comunicacion', 'Resumen', 'Resumen de comunicacion', 81),
+  ('comunicacion.aparatos', 'comunicacion', 'section', 'comunicacion', 'Aparatos', 'Alta y gestion de aparatos', 82),
+  ('comunicacion.cobranza', 'comunicacion', 'section', 'comunicacion', 'Cobranza', 'Cobranza de comunicacion', 83),
+  ('escaleras', 'escaleras', 'module', null, 'Escaleras', 'Bloque escaleras', 90),
+  ('escaleras.registro', 'escaleras', 'section', 'escaleras', 'Registro', 'Registro y gestion de escaleras', 91),
+  ('aduana', 'escaleras', 'module', null, 'Aduana', 'Bloque aduana', 92),
+  ('rentas', 'rentas', 'module', null, 'Rentas', 'Bloque rentas', 100)
+on conflict (key) do update
+set
+  module_key = excluded.module_key,
+  scope_type = excluded.scope_type,
+  parent_key = excluded.parent_key,
+  label = excluded.label,
+  description = excluded.description,
+  sort_order = excluded.sort_order,
+  active = true,
+  updated_at = timezone('utc', now());
+
+create table if not exists public.role_permission_grants (
+  id uuid primary key default gen_random_uuid(),
+  role_id uuid not null references public.roles (id) on delete cascade,
+  scope_key text not null references public.permission_scopes (key) on delete cascade,
+  access_level text not null check (access_level in ('none', 'view', 'manage')),
+  created_by uuid references public.user_profiles (id),
+  created_at timestamptz not null default timezone('utc', now()),
+  updated_at timestamptz not null default timezone('utc', now()),
+  unique (role_id, scope_key)
+);
+
+create table if not exists public.user_permission_grants (
+  id uuid primary key default gen_random_uuid(),
+  user_profile_id uuid not null references public.user_profiles (id) on delete cascade,
+  scope_key text not null references public.permission_scopes (key) on delete cascade,
+  access_level text not null check (access_level in ('none', 'view', 'manage')),
+  created_by uuid references public.user_profiles (id),
+  created_at timestamptz not null default timezone('utc', now()),
+  updated_at timestamptz not null default timezone('utc', now()),
+  unique (user_profile_id, scope_key)
+);
+
 create table if not exists public.connection_logs (
   id uuid primary key default gen_random_uuid(),
   user_profile_id uuid references public.user_profiles (id) on delete set null,
@@ -320,6 +397,13 @@ values
   ('escaleras', 'Escaleras', 'Control de ingreso de mercancia y menciones'),
   ('rentas', 'Rentas', 'Control de rentas')
 on conflict (key) do nothing;
+
+alter table public.permission_scopes
+  drop constraint if exists permission_scopes_module_key_fkey;
+
+alter table public.permission_scopes
+  add constraint permission_scopes_module_key_fkey
+  foreign key (module_key) references public.block_modules (key) on delete cascade;
 
 create table if not exists public.module_worker_functions (
   key text primary key,
@@ -824,6 +908,9 @@ on public.visitas ((lower(regexp_replace(btrim("nombreCompleto"), '\s+', ' ', 'g
 create index if not exists idx_fechas_fecha_completa on public.fechas (fecha_completa);
 create index if not exists idx_listado_fecha_visita on public.listado (fecha_visita, apartado);
 create index if not exists idx_listado_numero_pase on public.listado (fecha_visita, numero_pase);
+create index if not exists idx_permission_scopes_module on public.permission_scopes (module_key, sort_order);
+create index if not exists idx_role_permission_grants_role on public.role_permission_grants (role_id, scope_key);
+create index if not exists idx_user_permission_grants_user on public.user_permission_grants (user_profile_id, scope_key);
 create unique index if not exists idx_listado_unique_interno_fecha_activo
 on public.listado (interno_id, fecha_id)
 where status <> 'cancelado';
@@ -936,6 +1023,24 @@ before update on public.module_workers
 for each row
 execute function public.set_updated_at();
 
+drop trigger if exists permission_scopes_set_updated_at on public.permission_scopes;
+create trigger permission_scopes_set_updated_at
+before update on public.permission_scopes
+for each row
+execute function public.set_updated_at();
+
+drop trigger if exists role_permission_grants_set_updated_at on public.role_permission_grants;
+create trigger role_permission_grants_set_updated_at
+before update on public.role_permission_grants
+for each row
+execute function public.set_updated_at();
+
+drop trigger if exists user_permission_grants_set_updated_at on public.user_permission_grants;
+create trigger user_permission_grants_set_updated_at
+before update on public.user_permission_grants
+for each row
+execute function public.set_updated_at();
+
 drop trigger if exists module_settings_set_updated_at on public.module_settings;
 create trigger module_settings_set_updated_at
 before update on public.module_settings
@@ -1043,6 +1148,9 @@ alter table public.listado_visitas enable row level security;
 alter table public.interno_visitas enable row level security;
 alter table public.visita_interno_historial enable row level security;
 alter table public.app_settings enable row level security;
+alter table public.permission_scopes enable row level security;
+alter table public.role_permission_grants enable row level security;
+alter table public.user_permission_grants enable row level security;
 alter table public.connection_logs enable row level security;
 alter table public.action_audit_logs enable row level security;
 alter table public.block_modules enable row level security;
@@ -1165,6 +1273,33 @@ for select
 to authenticated
 using (true);
 
+drop policy if exists "read access permission scopes" on public.permission_scopes;
+create policy "read access permission scopes"
+on public.permission_scopes
+for select
+to authenticated
+using (true);
+
+drop policy if exists "read access role permission grants" on public.role_permission_grants;
+create policy "read access role permission grants"
+on public.role_permission_grants
+for select
+to authenticated
+using (
+  public.current_role_key() = 'super-admin'
+  or role_id in (select role_id from public.user_profiles where id = auth.uid())
+);
+
+drop policy if exists "read access user permission grants" on public.user_permission_grants;
+create policy "read access user permission grants"
+on public.user_permission_grants
+for select
+to authenticated
+using (
+  public.current_role_key() = 'super-admin'
+  or user_profile_id = auth.uid()
+);
+
 drop policy if exists "read access connection logs" on public.connection_logs;
 create policy "read access connection logs"
 on public.connection_logs
@@ -1245,6 +1380,30 @@ with check (public.current_role_key() in ('super-admin', 'control'));
 drop policy if exists "manage app settings" on public.app_settings;
 create policy "manage app settings"
 on public.app_settings
+for all
+to authenticated
+using (public.current_role_key() = 'super-admin')
+with check (public.current_role_key() = 'super-admin');
+
+drop policy if exists "manage permission scopes" on public.permission_scopes;
+create policy "manage permission scopes"
+on public.permission_scopes
+for all
+to authenticated
+using (public.current_role_key() = 'super-admin')
+with check (public.current_role_key() = 'super-admin');
+
+drop policy if exists "manage role permission grants" on public.role_permission_grants;
+create policy "manage role permission grants"
+on public.role_permission_grants
+for all
+to authenticated
+using (public.current_role_key() = 'super-admin')
+with check (public.current_role_key() = 'super-admin');
+
+drop policy if exists "manage user permission grants" on public.user_permission_grants;
+create policy "manage user permission grants"
+on public.user_permission_grants
 for all
 to authenticated
 using (public.current_role_key() = 'super-admin')

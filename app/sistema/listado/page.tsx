@@ -6,7 +6,7 @@ import {
   getNextDate,
   getOpenDate
 } from "@/lib/supabase/queries";
-import { canAccessCoreSystem, formatLongDate } from "@/lib/utils";
+import { canAccessCoreSystem, canAccessScope, formatLongDate } from "@/lib/utils";
 
 export default async function ListadoPage() {
   const [profile, openDate, nextDate] = await Promise.all([
@@ -19,7 +19,15 @@ export default async function ListadoPage() {
     redirect(`/sistema/${profile.accessibleModules[0].moduleKey}`);
   }
 
-  if (profile && !canAccessCoreSystem(profile.roleKey, profile.moduleOnly)) {
+  if (
+    profile &&
+    !canAccessScope(
+      profile.roleKey,
+      profile.permissionGrants,
+      "listado",
+      canAccessCoreSystem(profile.roleKey, profile.moduleOnly)
+    )
+  ) {
     redirect("/sistema/escaleras");
   }
 

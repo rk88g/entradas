@@ -6,21 +6,21 @@ import { signOutAction } from "@/app/auth/actions";
 import { LogoutButton } from "@/components/logout-button";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { UserProfile } from "@/lib/types";
-import { canAccessCoreSystem, canAccessModule } from "@/lib/utils";
+import { canAccessCoreSystem, canAccessModule, canAccessScope } from "@/lib/utils";
 
 const coreNavItems = [
-  { href: "/sistema", icon: "IN", label: "Inicio" },
-  { href: "/sistema/internos", icon: "IT", label: "Internos" },
-  { href: "/sistema/visitas", icon: "VS", label: "Visitas" },
-  { href: "/sistema/listado", icon: "LS", label: "Listado" },
-  { href: "/sistema/fechas", icon: "FC", label: "Fechas" }
+  { href: "/sistema", icon: "IN", label: "Inicio", scopeKey: "inicio" },
+  { href: "/sistema/internos", icon: "IT", label: "Internos", scopeKey: "internos" },
+  { href: "/sistema/visitas", icon: "VS", label: "Visitas", scopeKey: "visitas" },
+  { href: "/sistema/listado", icon: "LS", label: "Listado", scopeKey: "listado" },
+  { href: "/sistema/fechas", icon: "FC", label: "Fechas", scopeKey: "fechas" }
 ];
 
 const moduleNavItems = [
-  { href: "/sistema/visual", icon: "VI", label: "Visual", moduleKey: "visual" as const },
-  { href: "/sistema/comunicacion", icon: "CO", label: "Comunicacion", moduleKey: "comunicacion" as const },
-  { href: "/sistema/escaleras", icon: "ES", label: "Escaleras", moduleKey: "escaleras" as const },
-  { href: "/sistema/aduana", icon: "AD", label: "Aduana", moduleKey: "escaleras" as const }
+  { href: "/sistema/visual", icon: "VI", label: "Visual", moduleKey: "visual" as const, scopeKey: "visual" },
+  { href: "/sistema/comunicacion", icon: "CO", label: "Comunicacion", moduleKey: "comunicacion" as const, scopeKey: "comunicacion" },
+  { href: "/sistema/escaleras", icon: "ES", label: "Escaleras", moduleKey: "escaleras" as const, scopeKey: "escaleras" },
+  { href: "/sistema/aduana", icon: "AD", label: "Aduana", moduleKey: "escaleras" as const, scopeKey: "aduana" }
 ];
 
 export function AppShell({
@@ -40,16 +40,26 @@ export function AppShell({
   const idleLogoutFormRef = useRef<HTMLFormElement | null>(null);
   const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const visibleNavItems = [
-    ...(canAccessCoreSystem(user.roleKey, user.moduleOnly) ? coreNavItems : []),
+    ...(canAccessCoreSystem(user.roleKey, user.moduleOnly)
+      ? coreNavItems.filter((item) =>
+          canAccessScope(
+            user.roleKey,
+            user.permissionGrants,
+            item.scopeKey,
+            true
+          )
+        )
+      : []),
     ...(user.roleKey === "super-admin"
-      ? [{ href: "/sistema/admin", icon: "DZ", label: "Danger Zone", danger: true }]
+      ? [{ href: "/sistema/admin", icon: "DZ", label: "Danger Zone", danger: true, scopeKey: "danger-zone" }]
       : []),
     ...moduleNavItems.filter((item) => {
-      if (user.roleKey === "control" && item.href === "/sistema/aduana") {
-        return false;
-      }
-
-      return canAccessModule(user.roleKey, user.accessibleModules, item.moduleKey);
+      return canAccessScope(
+        user.roleKey,
+        user.permissionGrants,
+        item.scopeKey,
+        canAccessModule(user.roleKey, user.accessibleModules, item.moduleKey)
+      );
     })
   ];
 

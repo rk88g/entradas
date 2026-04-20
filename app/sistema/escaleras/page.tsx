@@ -1,12 +1,20 @@
 import { redirect } from "next/navigation";
 import { EscalerasPanel } from "@/components/escaleras-panel";
 import { getCurrentUserProfile, getEscalerasPanelData } from "@/lib/supabase/queries";
-import { canAccessModule } from "@/lib/utils";
+import { canAccessModule, canAccessScope } from "@/lib/utils";
 
 export default async function EscalerasPage() {
   const profile = await getCurrentUserProfile();
 
-  if (!profile?.active || !canAccessModule(profile.roleKey, profile.accessibleModules, "escaleras")) {
+  if (
+    !profile?.active ||
+    !canAccessScope(
+      profile.roleKey,
+      profile.permissionGrants,
+      "escaleras",
+      canAccessModule(profile.roleKey, profile.accessibleModules, "escaleras")
+    )
+  ) {
     redirect("/sistema");
   }
 

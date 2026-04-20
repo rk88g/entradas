@@ -15,10 +15,11 @@ import {
   ModuleAccess,
   ModulePanelData,
   MutationState,
+  PermissionGrantRecord,
   RoleKey
 } from "@/lib/types";
 import { StatusBadge } from "@/components/status-badge";
-import { canManageModuleFunction, compareInternalLocations, formatLongDate, getDeviceStatusMeta } from "@/lib/utils";
+import { canAccessScope, canManageModuleFunction, compareInternalLocations, formatLongDate, getDeviceStatusMeta } from "@/lib/utils";
 
 const mutationInitialState: MutationState = {
   success: null,
@@ -58,11 +59,13 @@ function getDeviceWeeklyCharge(
 export function IntegratedModulePanel({
   data,
   roleKey,
-  accesses
+  accesses,
+  permissionGrants
 }: {
   data: ModulePanelData;
   roleKey: RoleKey;
   accesses: ModuleAccess[];
+  permissionGrants: PermissionGrantRecord[];
 }) {
   const [tab, setTab] = useState<ModuleTab>("resumen");
   const [selectedInternalId, setSelectedInternalId] = useState<string | null>(null);
@@ -79,6 +82,9 @@ export function IntegratedModulePanel({
   const canCloseWeek =
     roleKey === "super-admin" ||
     canManageModuleFunction(roleKey, accesses, data.moduleKey, "encargado");
+  const canSeeSummary = canAccessScope(roleKey, permissionGrants, `${data.moduleKey}.resumen`, true);
+  const canSeeDevices = canAccessScope(roleKey, permissionGrants, `${data.moduleKey}.aparatos`, true);
+  const canSeeCharges = canAccessScope(roleKey, permissionGrants, `${data.moduleKey}.cobranza`, true);
 
   const priceMap = useMemo(
     () =>
@@ -96,6 +102,17 @@ export function IntegratedModulePanel({
   );
   const selectedDeviceType = data.deviceTypes.find((item) => item.id === selectedDeviceTypeId) ?? null;
   const showInternalNumberField = selectedDeviceType?.key === "celular" || selectedDeviceType?.key === "tablet";
+  const visibleTabs = ([
+    canSeeSummary ? "resumen" : null,
+    canSeeDevices ? "aparatos" : null,
+    canSeeCharges ? "cobranza" : null
+  ].filter(Boolean) as ModuleTab[]);
+
+  useEffect(() => {
+    if (!visibleTabs.includes(tab)) {
+      setTab(visibleTabs[0] ?? "resumen");
+    }
+  }, [tab, visibleTabs]);
 
   const groupedInternals = useMemo(() => {
     const map = new Map<
@@ -183,15 +200,21 @@ export function IntegratedModulePanel({
     <>
       <section className="module-panel">
         <div className="toolbar hide-print">
-          <button type="button" className={`button-secondary listing-toggle ${tab === "resumen" ? "active" : ""}`} onClick={() => setTab("resumen")}>
-            Resumen
-          </button>
-          <button type="button" className={`button-secondary listing-toggle ${tab === "aparatos" ? "active" : ""}`} onClick={() => setTab("aparatos")}>
-            Aparatos
-          </button>
-          <button type="button" className={`button-secondary listing-toggle ${tab === "cobranza" ? "active" : ""}`} onClick={() => setTab("cobranza")}>
-            Cobranza
-          </button>
+          {canSeeSummary ? (
+            <button type="button" className={`button-secondary listing-toggle ${tab === "resumen" ? "active" : ""}`} onClick={() => setTab("resumen")}>
+              Resumen
+            </button>
+          ) : null}
+          {canSeeDevices ? (
+            <button type="button" className={`button-secondary listing-toggle ${tab === "aparatos" ? "active" : ""}`} onClick={() => setTab("aparatos")}>
+              Aparatos
+            </button>
+          ) : null}
+          {canSeeCharges ? (
+            <button type="button" className={`button-secondary listing-toggle ${tab === "cobranza" ? "active" : ""}`} onClick={() => setTab("cobranza")}>
+              Cobranza
+            </button>
+          ) : null}
         </div>
 
         {tab === "resumen" ? (

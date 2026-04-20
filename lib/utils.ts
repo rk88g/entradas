@@ -5,6 +5,7 @@ import {
   ModuleAccess,
   ModuleKey,
   ModuleWorkerFunctionKey,
+  PermissionGrantRecord,
   PassVisitor,
   RoleKey,
   VisitorRecord
@@ -291,6 +292,46 @@ export function canAccessCoreSystem(role: RoleKey, moduleOnly: boolean) {
   }
 
   return !moduleOnly;
+}
+
+function getExplicitPermissionLevel(permissionGrants: PermissionGrantRecord[] = [], scopeKey: string) {
+  return permissionGrants.find((item) => item.scopeKey === scopeKey)?.accessLevel ?? null;
+}
+
+export function canAccessScope(
+  role: RoleKey,
+  permissionGrants: PermissionGrantRecord[] = [],
+  scopeKey: string,
+  fallback: boolean
+) {
+  if (role === "super-admin") {
+    return true;
+  }
+
+  const explicit = getExplicitPermissionLevel(permissionGrants, scopeKey);
+  if (explicit) {
+    return explicit !== "none";
+  }
+
+  return fallback;
+}
+
+export function canManageScope(
+  role: RoleKey,
+  permissionGrants: PermissionGrantRecord[] = [],
+  scopeKey: string,
+  fallback: boolean
+) {
+  if (role === "super-admin") {
+    return true;
+  }
+
+  const explicit = getExplicitPermissionLevel(permissionGrants, scopeKey);
+  if (explicit) {
+    return explicit === "manage";
+  }
+
+  return fallback;
 }
 
 export function canAccessModule(

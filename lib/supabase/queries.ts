@@ -6,6 +6,7 @@ import { isSupabaseAdminConfigured } from "@/lib/supabase/env";
 import { createServerSupabaseClient } from "@/lib/supabase/server";
 import {
   AdminUserRecord,
+  AdminRoleRecord,
   AccessStatus,
   ActionAuditRecord,
   BetadaRecord,
@@ -38,7 +39,10 @@ import {
   InternalWeeklyPaymentRecord,
   PassVisitor,
   PaginatedResult,
+  PermissionGrantRecord,
+  PermissionScopeRecord,
   RoleKey,
+  StoredPermissionGrantRecord,
   UserProfile,
   VisitorHistoryEntry,
   ZoneRecord,
@@ -660,6 +664,33 @@ export async function getCurrentUserProfile(): Promise<UserProfile | null> {
     });
   }
 
+  const [{ data: rolePermissionGrants }, { data: userPermissionGrants }] = await Promise.all([
+    supabase
+      .from("role_permission_grants")
+      .select("scope_key, access_level")
+      .eq("role_id", profile.role_id),
+    supabase
+      .from("user_permission_grants")
+      .select("scope_key, access_level")
+      .eq("user_profile_id", profile.id)
+  ]);
+
+  const permissionGrantMap = new Map<string, PermissionGrantRecord>();
+  (rolePermissionGrants ?? []).forEach((item) => {
+    permissionGrantMap.set(item.scope_key, {
+      scopeKey: item.scope_key,
+      accessLevel: item.access_level as PermissionGrantRecord["accessLevel"],
+      source: "role"
+    });
+  });
+  (userPermissionGrants ?? []).forEach((item) => {
+    permissionGrantMap.set(item.scope_key, {
+      scopeKey: item.scope_key,
+      accessLevel: item.access_level as PermissionGrantRecord["accessLevel"],
+      source: "user"
+    });
+  });
+
   return {
     id: profile.id,
     email: user.email ?? "",
@@ -668,7 +699,8 @@ export async function getCurrentUserProfile(): Promise<UserProfile | null> {
     roleName: role.name,
     active: Boolean(profile.active),
     moduleOnly: Boolean(profile.module_only),
-    accessibleModules
+    accessibleModules,
+    permissionGrants: [...permissionGrantMap.values()]
   };
 }
 
@@ -1946,6 +1978,9 @@ export async function getAdminPanelData() {
     profilesResponse,
     rolesResponse,
     settingsResponse,
+    permissionScopesResponse,
+    rolePermissionGrantsResponse,
+    userPermissionGrantsResponse,
     zonesResponse,
     chargeRoutesResponse,
     pricesResponse,
@@ -1996,6 +2031,17 @@ export async function getAdminPanelData() {
       .order("full_name", { ascending: true }),
     supabase.from("roles").select("id, key"),
     supabase.from("app_settings").select("key, value"),
+    supabase
+      .from("permission_scopes")
+      .select("key, module_key, scope_type, parent_key, label, description, sort_order, active")
+      .eq("active", true)
+      .order("sort_order", { ascending: true }),
+    supabase
+      .from("role_permission_grants")
+      .select("id, role_id, scope_key, access_level"),
+    supabase
+      .from("user_permission_grants")
+      .select("id, user_profile_id, scope_key, access_level"),
     supabase
       .from("zones")
       .select("id, name, active")
@@ -2191,7 +2237,53 @@ export async function getAdminPanelData() {
       allowCamerasFlag: Boolean(item.allow_cameras_flag)
     })),
     workplaces,
-    workplacePositions
+    workplacePositions,
+    roles: (rolesResponse.data ?? []).map((item) => ({
+      id: item.id,
+      key: item.key,
+      name:
+        item.key === "super-admin"
+          ? "Super Admin"
+          : item.key === "control"
+            ? "Control"
+            : item.key === "supervisor"
+              ? "Supervisor"
+              : item.key === "capturador"
+                ? "Capturador"
+                : item.key === "visual"
+                  ? "Visual"
+                  : item.key === "comunicacion"
+                    ? "Comunicacion"
+                    : item.key === "escaleras"
+                      ? "Escaleras"
+                      : item.key
+    })),
+    permissionScopes: (permissionScopesResponse.data ?? []).map((item) => ({
+      key: item.key,
+      moduleKey: item.module_key ?? null,
+      scopeType: item.scope_type as PermissionScopeRecord["scopeType"],
+      parentKey: item.parent_key ?? null,
+      label: item.label,
+      description: item.description ?? null,
+      sortOrder: item.sort_order ?? 0,
+      active: Boolean(item.active)
+    })),
+    rolePermissionGrants: (rolePermissionGrantsResponse.data ?? []).map((item) => ({
+      id: item.id,
+      subjectType: "role" as const,
+      subjectId: item.role_id,
+      subjectLabel: (rolesResponse.data ?? []).find((role) => role.id === item.role_id)?.key ?? item.role_id,
+      scopeKey: item.scope_key,
+      accessLevel: item.access_level as StoredPermissionGrantRecord["accessLevel"]
+    })),
+    userPermissionGrants: (userPermissionGrantsResponse.data ?? []).map((item) => ({
+      id: item.id,
+      subjectType: "user" as const,
+      subjectId: item.user_profile_id,
+      subjectLabel: namesMap.get(item.user_profile_id) ?? item.user_profile_id,
+      scopeKey: item.scope_key,
+      accessLevel: item.access_level as StoredPermissionGrantRecord["accessLevel"]
+    }))
   };
 
   return {

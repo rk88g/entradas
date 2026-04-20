@@ -7,7 +7,7 @@ import {
   getInternos,
   getVisitas
 } from "@/lib/supabase/queries";
-import { canAccessCoreSystem } from "@/lib/utils";
+import { canAccessCoreSystem, canAccessScope } from "@/lib/utils";
 
 export default async function SistemaPage() {
   const [profile, summary, internos, visitas, moduleCounts, escaleras] = await Promise.all([
@@ -23,11 +23,37 @@ export default async function SistemaPage() {
     redirect(`/sistema/${profile.accessibleModules[0].moduleKey}`);
   }
 
-  if (profile && !canAccessCoreSystem(profile.roleKey, profile.moduleOnly)) {
+  if (
+    profile &&
+    !canAccessScope(
+      profile.roleKey,
+      profile.permissionGrants,
+      "inicio",
+      canAccessCoreSystem(profile.roleKey, profile.moduleOnly)
+    )
+  ) {
     redirect("/sistema/escaleras");
   }
 
   const canSeeCore = canAccessCoreSystem(profile?.roleKey ?? "capturador", profile?.moduleOnly ?? false);
+  const canSeeVisual = canAccessScope(
+    profile?.roleKey ?? "capturador",
+    profile?.permissionGrants ?? [],
+    "visual",
+    profile?.roleKey === "super-admin" || profile?.accessibleModules.some((item) => item.moduleKey === "visual") || false
+  );
+  const canSeeComunicacion = canAccessScope(
+    profile?.roleKey ?? "capturador",
+    profile?.permissionGrants ?? [],
+    "comunicacion",
+    profile?.roleKey === "super-admin" || profile?.accessibleModules.some((item) => item.moduleKey === "comunicacion") || false
+  );
+  const canSeeEscaleras = canAccessScope(
+    profile?.roleKey ?? "capturador",
+    profile?.permissionGrants ?? [],
+    "escaleras",
+    profile?.roleKey === "super-admin" || profile?.accessibleModules.some((item) => item.moduleKey === "escaleras") || false
+  );
   const visibleStats = [
     ...(profile?.roleKey === "super-admin" || canSeeCore
       ? [
@@ -37,18 +63,9 @@ export default async function SistemaPage() {
           { label: "En espera", value: summary.waitingPassCount }
         ]
       : []),
-    ...(profile?.roleKey === "super-admin" ||
-    profile?.accessibleModules.some((item) => item.moduleKey === "visual")
-      ? [{ label: "Visual", value: moduleCounts.visual }]
-      : []),
-    ...(profile?.roleKey === "super-admin" ||
-    profile?.accessibleModules.some((item) => item.moduleKey === "comunicacion")
-      ? [{ label: "Comunicacion", value: moduleCounts.comunicacion }]
-      : []),
-    ...(profile?.roleKey === "super-admin" ||
-    profile?.accessibleModules.some((item) => item.moduleKey === "escaleras")
-      ? [{ label: "Escaleras", value: escaleras.length }]
-      : [])
+    ...(canSeeVisual ? [{ label: "Visual", value: moduleCounts.visual }] : []),
+    ...(canSeeComunicacion ? [{ label: "Comunicacion", value: moduleCounts.comunicacion }] : []),
+    ...(canSeeEscaleras ? [{ label: "Escaleras", value: escaleras.length }] : [])
   ];
 
   return (

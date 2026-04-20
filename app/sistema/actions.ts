@@ -868,6 +868,138 @@ export async function forceCloseUserSessionsAction(
   }
 }
 
+export async function saveRolePermissionGrantAction(
+  _prevState: MutationState,
+  formData: FormData
+): Promise<MutationState> {
+  try {
+    const profile = await requireProfile();
+    if (profile.roleKey !== "super-admin") {
+      return failure("Solo super-admin puede administrar permisos.");
+    }
+
+    const supabase = await createServerSupabaseClient();
+    const roleId = String(formData.get("role_id") ?? "").trim();
+    const scopeKey = String(formData.get("scope_key") ?? "").trim();
+    const accessLevel = String(formData.get("access_level") ?? "").trim();
+
+    if (!roleId || !scopeKey) {
+      return failure("Debes elegir el rol y el alcance.");
+    }
+
+    if (!["inherit", "none", "view", "manage"].includes(accessLevel)) {
+      return failure("El nivel de acceso no es valido.");
+    }
+
+    if (accessLevel === "inherit") {
+      const { error } = await supabase
+        .from("role_permission_grants")
+        .delete()
+        .eq("role_id", roleId)
+        .eq("scope_key", scopeKey);
+
+      if (error) {
+        return failure(error.message || "No se pudo limpiar el permiso del rol.");
+      }
+    } else {
+      const { error } = await supabase.from("role_permission_grants").upsert(
+        {
+          role_id: roleId,
+          scope_key: scopeKey,
+          access_level: accessLevel,
+          created_by: profile.id
+        },
+        { onConflict: "role_id,scope_key" }
+      );
+
+      if (error) {
+        return failure(error.message || "No se pudo guardar el permiso del rol.");
+      }
+    }
+
+    await auditAction({
+      userId: profile.id,
+      moduleKey: "admin",
+      sectionKey: "permisos",
+      actionKey: "save-role-permission",
+      entityType: "role_permission",
+      entityId: `${roleId}:${scopeKey}`,
+      afterData: { roleId, scopeKey, accessLevel }
+    });
+
+    revalidatePath("/sistema/admin");
+    return success("Permiso de rol guardado.");
+  } catch (error) {
+    return failure(error instanceof Error ? error.message : "No se pudo guardar el permiso del rol.");
+  }
+}
+
+export async function saveUserPermissionGrantAction(
+  _prevState: MutationState,
+  formData: FormData
+): Promise<MutationState> {
+  try {
+    const profile = await requireProfile();
+    if (profile.roleKey !== "super-admin") {
+      return failure("Solo super-admin puede administrar permisos.");
+    }
+
+    const supabase = await createServerSupabaseClient();
+    const userId = String(formData.get("user_id") ?? "").trim();
+    const scopeKey = String(formData.get("scope_key") ?? "").trim();
+    const accessLevel = String(formData.get("access_level") ?? "").trim();
+
+    if (!userId || !scopeKey) {
+      return failure("Debes elegir el usuario y el alcance.");
+    }
+
+    if (!["inherit", "none", "view", "manage"].includes(accessLevel)) {
+      return failure("El nivel de acceso no es valido.");
+    }
+
+    if (accessLevel === "inherit") {
+      const { error } = await supabase
+        .from("user_permission_grants")
+        .delete()
+        .eq("user_profile_id", userId)
+        .eq("scope_key", scopeKey);
+
+      if (error) {
+        return failure(error.message || "No se pudo limpiar el permiso del usuario.");
+      }
+    } else {
+      const { error } = await supabase.from("user_permission_grants").upsert(
+        {
+          user_profile_id: userId,
+          scope_key: scopeKey,
+          access_level: accessLevel,
+          created_by: profile.id
+        },
+        { onConflict: "user_profile_id,scope_key" }
+      );
+
+      if (error) {
+        return failure(error.message || "No se pudo guardar el permiso del usuario.");
+      }
+    }
+
+    await auditAction({
+      userId: profile.id,
+      moduleKey: "admin",
+      sectionKey: "permisos",
+      actionKey: "save-user-permission",
+      entityType: "user_permission",
+      entityId: `${userId}:${scopeKey}`,
+      afterData: { userId, scopeKey, accessLevel }
+    });
+
+    revalidatePath("/sistema/admin");
+    return success("Permiso de usuario guardado.");
+  } catch (error) {
+    return failure(error instanceof Error ? error.message : "No se pudo guardar el permiso del usuario.");
+  }
+}
+
 export async function linkVisitorAction(
   _prevState: MutationState,
   formData: FormData

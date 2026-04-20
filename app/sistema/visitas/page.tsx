@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { VisitorManager } from "@/components/visitor-manager";
 import { getCurrentUserProfile, getVisitasPage } from "@/lib/supabase/queries";
-import { canAccessCoreSystem } from "@/lib/utils";
+import { canAccessCoreSystem, canAccessScope } from "@/lib/utils";
 
 export default async function VisitasPage({
   searchParams
@@ -24,7 +24,15 @@ export default async function VisitasPage({
     redirect(`/sistema/${profile.accessibleModules[0].moduleKey}`);
   }
 
-  if (profile && !canAccessCoreSystem(profile.roleKey, profile.moduleOnly)) {
+  if (
+    profile &&
+    !canAccessScope(
+      profile.roleKey,
+      profile.permissionGrants,
+      "visitas",
+      canAccessCoreSystem(profile.roleKey, profile.moduleOnly)
+    )
+  ) {
     redirect("/sistema/escaleras");
   }
 
