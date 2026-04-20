@@ -1494,13 +1494,23 @@ export async function assignModuleDeviceAction(
       insertPayload.zone_id = zoneId;
     }
 
-    const { error } = await supabase.from("internal_devices").insert(insertPayload);
+    let insertError: { code?: string; message?: string | null; details?: string | null } | null = null;
 
-    if (error) {
-      if (error.code === "23503") {
+    const initialInsert = await supabase.from("internal_devices").insert(insertPayload);
+    insertError = initialInsert.error;
+
+    if (insertError?.code === "23503" && zoneId) {
+      const retryPayload = { ...insertPayload };
+      delete retryPayload.zone_id;
+      const retryInsert = await supabase.from("internal_devices").insert(retryPayload);
+      insertError = retryInsert.error;
+    }
+
+    if (insertError) {
+      if (insertError.code === "23503") {
         return failure("No se pudo guardar el aparato porque el interno, la zona o el dispositivo ya no existen.");
       }
-      return failure(error.message || "No se pudo asignar el aparato.");
+      return failure(insertError.message || "No se pudo asignar el aparato.");
     }
 
     revalidatePath(`/sistema/${moduleKey}`);
