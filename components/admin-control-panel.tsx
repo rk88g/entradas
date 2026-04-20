@@ -11,11 +11,14 @@ import {
   saveModuleSettingsAction,
   saveUserPermissionGrantAction,
   saveWorkplacePositionAction,
-  updateAuthUserPasswordAction
+  updateInternalIdentityAction,
+  updateAuthUserPasswordAction,
+  updateVisitorIdentityAction
 } from "@/app/sistema/actions";
 import { LoadingButton } from "@/components/loading-button";
 import { MutationBanner } from "@/components/mutation-banner";
 import { RemoteInternalSearchField } from "@/components/remote-internal-search-field";
+import { RemoteVisitorSearchField } from "@/components/remote-visitor-search-field";
 import {
   ActionAuditRecord,
   AdminUserRecord,
@@ -23,7 +26,8 @@ import {
   DangerZoneConfigData,
   InternalSearchOption,
   ModuleKey,
-  MutationState
+  MutationState,
+  VisitorSearchOption
 } from "@/lib/types";
 import { formatLongDate } from "@/lib/utils";
 
@@ -79,14 +83,27 @@ export function AdminControlPanel({
   config: DangerZoneConfigData;
   adminConfigured: boolean;
 }) {
-  const [tab, setTab] = useState<"sesiones" | "acciones" | "usuarios" | "configuracion" | "permisos">("configuracion");
+  const [tab, setTab] = useState<"sesiones" | "acciones" | "usuarios" | "configuracion" | "permisos" | "correcciones">("configuracion");
   const [selectedModuleForRoute, setSelectedModuleForRoute] = useState<ModuleKey>("visual");
   const [selectedModuleForPrice, setSelectedModuleForPrice] = useState<ModuleKey>("visual");
   const [selectedWorkplaceInternal, setSelectedWorkplaceInternal] = useState<InternalSearchOption | null>(null);
+  const [selectedCorrectionInternal, setSelectedCorrectionInternal] = useState<InternalSearchOption | null>(null);
+  const [selectedCorrectionVisitor, setSelectedCorrectionVisitor] = useState<VisitorSearchOption | null>(null);
+  const [internalNamesForm, setInternalNamesForm] = useState({
+    nombres: "",
+    apellidoPat: "",
+    apellidoMat: "",
+    ubicacion: ""
+  });
+  const [visitorNameForm, setVisitorNameForm] = useState({
+    nombreCompleto: ""
+  });
   const [passwordState, passwordAction, passwordPending] = useActionState(updateAuthUserPasswordAction, mutationInitialState);
   const [forceState, forceAction, forcePending] = useActionState(forceCloseUserSessionsAction, mutationInitialState);
   const [rolePermissionState, rolePermissionAction, rolePermissionPending] = useActionState(saveRolePermissionGrantAction, mutationInitialState);
   const [userPermissionState, userPermissionAction, userPermissionPending] = useActionState(saveUserPermissionGrantAction, mutationInitialState);
+  const [internalIdentityState, internalIdentityAction, internalIdentityPending] = useActionState(updateInternalIdentityAction, mutationInitialState);
+  const [visitorIdentityState, visitorIdentityAction, visitorIdentityPending] = useActionState(updateVisitorIdentityAction, mutationInitialState);
   const [cutoffState, cutoffAction, cutoffPending] = useActionState(saveModuleSettingsAction, mutationInitialState);
   const [zoneState, zoneAction, zonePending] = useActionState(createModuleZoneAction, mutationInitialState);
   const [routeState, routeAction, routePending] = useActionState(createModuleChargeRouteAction, mutationInitialState);
@@ -98,12 +115,53 @@ export function AdminControlPanel({
     () => config.deviceTypes.filter((item) => item.moduleKey === selectedModuleForPrice),
     [config.deviceTypes, selectedModuleForPrice]
   );
+  const assignableScopes = useMemo(
+    () => config.permissionScopes.filter((scope) => !scope.key.startsWith("danger-zone")),
+    [config.permissionScopes]
+  );
 
   useEffect(() => {
     if (positionState.success) {
       setSelectedWorkplaceInternal(null);
     }
   }, [positionState.success]);
+
+  useEffect(() => {
+    if (!selectedCorrectionInternal) {
+      setInternalNamesForm({
+        nombres: "",
+        apellidoPat: "",
+        apellidoMat: "",
+        ubicacion: ""
+      });
+      return;
+    }
+
+    setInternalNamesForm({
+      nombres: selectedCorrectionInternal.nombres,
+      apellidoPat: selectedCorrectionInternal.apellidoPat,
+      apellidoMat: selectedCorrectionInternal.apellidoMat,
+      ubicacion: selectedCorrectionInternal.ubicacion
+    });
+  }, [selectedCorrectionInternal]);
+
+  useEffect(() => {
+    setVisitorNameForm({
+      nombreCompleto: selectedCorrectionVisitor?.fullName ?? ""
+    });
+  }, [selectedCorrectionVisitor]);
+
+  useEffect(() => {
+    if (internalIdentityState.success) {
+      setSelectedCorrectionInternal(null);
+    }
+  }, [internalIdentityState.success]);
+
+  useEffect(() => {
+    if (visitorIdentityState.success) {
+      setSelectedCorrectionVisitor(null);
+    }
+  }, [visitorIdentityState.success]);
 
   return (
     <section className="module-panel danger-zone-panel">
@@ -113,6 +171,9 @@ export function AdminControlPanel({
         </button>
         <button type="button" className={`button-secondary listing-toggle ${tab === "usuarios" ? "active" : ""}`} onClick={() => setTab("usuarios")}>
           Usuarios
+        </button>
+        <button type="button" className={`button-secondary listing-toggle ${tab === "correcciones" ? "active" : ""}`} onClick={() => setTab("correcciones")}>
+          Correcciones
         </button>
         <button type="button" className={`button-secondary listing-toggle ${tab === "permisos" ? "active" : ""}`} onClick={() => setTab("permisos")}>
           Permisos
@@ -536,7 +597,7 @@ export function AdminControlPanel({
                 <div className="field">
                   <select name="scope_key" defaultValue="">
                     <option value="" disabled>Modulo o seccion</option>
-                    {config.permissionScopes.map((scope) => (
+                    {assignableScopes.map((scope) => (
                       <option key={scope.key} value={scope.key}>
                         {scope.scopeType === "section" ? `${scope.label} (${scope.key})` : scope.label}
                       </option>
@@ -602,7 +663,7 @@ export function AdminControlPanel({
                 <div className="field">
                   <select name="scope_key" defaultValue="">
                     <option value="" disabled>Modulo o seccion</option>
-                    {config.permissionScopes.map((scope) => (
+                    {assignableScopes.map((scope) => (
                       <option key={scope.key} value={scope.key}>
                         {scope.scopeType === "section" ? `${scope.label} (${scope.key})` : scope.label}
                       </option>
@@ -646,6 +707,107 @@ export function AdminControlPanel({
                   </tbody>
                 </table>
               </div>
+            </div>
+          </details>
+        </section>
+      ) : null}
+
+      {tab === "correcciones" ? (
+        <section className="collapse-stack" style={{ marginTop: "1rem" }}>
+          <details className="data-card section-collapse">
+            <summary>
+              <span>Corregir interno</span>
+              <span>Nombre y ubicacion</span>
+            </summary>
+            <div className="section-collapse-body">
+              <MutationBanner state={internalIdentityState} />
+              <form action={internalIdentityAction} className="field-grid" autoComplete="off">
+                <RemoteInternalSearchField
+                  name="interno_id"
+                  selected={selectedCorrectionInternal}
+                  onSelect={setSelectedCorrectionInternal}
+                  placeholder="Buscar interno por nombre o ubicacion"
+                />
+                <div className="field">
+                  <input
+                    name="nombres"
+                    placeholder="Nombres"
+                    autoComplete="off"
+                    value={internalNamesForm.nombres}
+                    onChange={(event) =>
+                      setInternalNamesForm((current) => ({ ...current, nombres: event.target.value }))
+                    }
+                  />
+                </div>
+                <div className="field">
+                  <input
+                    name="apellido_pat"
+                    placeholder="Apellido paterno"
+                    autoComplete="off"
+                    value={internalNamesForm.apellidoPat}
+                    onChange={(event) =>
+                      setInternalNamesForm((current) => ({ ...current, apellidoPat: event.target.value }))
+                    }
+                  />
+                </div>
+                <div className="field">
+                  <input
+                    name="apellido_mat"
+                    placeholder="Apellido materno"
+                    autoComplete="off"
+                    value={internalNamesForm.apellidoMat}
+                    onChange={(event) =>
+                      setInternalNamesForm((current) => ({ ...current, apellidoMat: event.target.value }))
+                    }
+                  />
+                </div>
+                <div className="field">
+                  <input
+                    name="ubicacion"
+                    placeholder="Ubicacion"
+                    autoComplete="off"
+                    value={internalNamesForm.ubicacion}
+                    onChange={(event) =>
+                      setInternalNamesForm((current) => ({ ...current, ubicacion: event.target.value }))
+                    }
+                  />
+                </div>
+                <div className="actions-row">
+                  <LoadingButton pending={internalIdentityPending} label="Guardar interno" loadingLabel="Loading..." className="button" />
+                </div>
+              </form>
+            </div>
+          </details>
+
+          <details className="data-card section-collapse">
+            <summary>
+              <span>Corregir visita</span>
+              <span>Nombre completo</span>
+            </summary>
+            <div className="section-collapse-body">
+              <MutationBanner state={visitorIdentityState} />
+              <form action={visitorIdentityAction} className="field-grid" autoComplete="off">
+                <RemoteVisitorSearchField
+                  name="visita_id"
+                  selected={selectedCorrectionVisitor}
+                  onSelect={setSelectedCorrectionVisitor}
+                  placeholder="Buscar visita por nombre"
+                />
+                <div className="field">
+                  <input
+                    name="nombreCompleto"
+                    placeholder="Nombre completo"
+                    autoComplete="off"
+                    value={visitorNameForm.nombreCompleto}
+                    onChange={(event) =>
+                      setVisitorNameForm({ nombreCompleto: event.target.value })
+                    }
+                  />
+                </div>
+                <div className="actions-row">
+                  <LoadingButton pending={visitorIdentityPending} label="Guardar visita" loadingLabel="Loading..." className="button-secondary" />
+                </div>
+              </form>
             </div>
           </details>
         </section>

@@ -44,6 +44,7 @@ import {
   RoleKey,
   StoredPermissionGrantRecord,
   UserProfile,
+  VisitorSearchOption,
   VisitorHistoryEntry,
   ZoneRecord,
   VisitorRecord,
@@ -238,6 +239,9 @@ function mapInternalSearchOption(item: {
   return {
     id: item.id,
     fullName: fullNameFromParts(item.nombres, item.apellido_pat, item.apellido_mat),
+    nombres: item.nombres,
+    apellidoPat: item.apellido_pat,
+    apellidoMat: item.apellido_mat ?? "",
     ubicacion: String(item.ubicacion),
     estatus: item.estatus ?? "activo"
   };
@@ -780,6 +784,64 @@ export async function searchInternals(
     .map(mapInternalSearchOption)
     .sort((a, b) => compareInternalLocations(a.ubicacion, b.ubicacion))
     .slice(0, limit);
+}
+
+export async function searchVisitors(
+  query: string,
+  options?: {
+    limit?: number;
+  }
+): Promise<VisitorSearchOption[]> {
+  const normalized = query.trim();
+  if (!normalized) {
+    return [];
+  }
+
+  const supabase = await createServerSupabaseClient();
+  const limit = Math.max(1, Math.min(options?.limit ?? 8, 20));
+  const searchPattern = `%${normalized}%`;
+
+  const { data, error } = await supabase
+    .from("visitas")
+    .select("id, nombreCompleto, parentesco, betada")
+    .ilike("nombreCompleto", searchPattern)
+    .order("created_at", { ascending: false })
+    .limit(limit);
+
+  if (error || !data || data.length === 0) {
+    return [];
+  }
+
+  const visitorIds = data.map((item) => item.id);
+  const { data: relations } = await supabase
+    .from("interno_visitas")
+    .select("visita_id, interno_id")
+    .in("visita_id", visitorIds);
+
+  const currentRelations = new Map<string, string>();
+  (relations ?? []).forEach((item) => {
+    if (!currentRelations.has(item.visita_id)) {
+      currentRelations.set(item.visita_id, item.interno_id);
+    }
+  });
+
+  const internalIds = [...new Set([...currentRelations.values()])];
+  const internalsMap = await getInternosMap(supabase, internalIds);
+
+  return data.map((item) => {
+    const currentInternal = currentRelations.get(item.id)
+      ? internalsMap.get(currentRelations.get(item.id)!)
+      : null;
+
+    return {
+      id: item.id,
+      fullName: item.nombreCompleto,
+      parentesco: item.parentesco,
+      currentInternalName: currentInternal?.fullName,
+      currentInternalLocation: currentInternal?.ubicacion,
+      betada: Boolean(item.betada)
+    };
+  });
 }
 
 export async function getVisitas(): Promise<VisitorRecord[]> {

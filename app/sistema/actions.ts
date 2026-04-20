@@ -517,6 +517,158 @@ export async function updateInternalStatusAction(
   }
 }
 
+export async function updateInternalIdentityAction(
+  _prevState: MutationState,
+  formData: FormData
+): Promise<MutationState> {
+  try {
+    const profile = await requireProfile();
+    if (profile.roleKey !== "super-admin") {
+      return failure("Solo super-admin puede modificar nombres o ubicacion.");
+    }
+
+    const supabase = await createServerSupabaseClient();
+    const internalId = String(formData.get("interno_id") ?? "").trim();
+    const nombres = String(formData.get("nombres") ?? "").trim();
+    const apellidoPat = String(formData.get("apellido_pat") ?? "").trim();
+    const apellidoMat = String(formData.get("apellido_mat") ?? "").trim();
+    const ubicacion = String(formData.get("ubicacion") ?? "").trim();
+
+    if (!internalId || !nombres || !apellidoPat || !ubicacion) {
+      return failure("Completa interno, nombres, apellido paterno y ubicacion.");
+    }
+
+    if (!isValidInternalLocation(ubicacion)) {
+      return failure("La ubicacion debe tener formato numero-numero.");
+    }
+
+    const { data: previousInternal, error: previousError } = await supabase
+      .from("internos")
+      .select("nombres, apellido_pat, apellido_mat, ubicacion")
+      .eq("id", internalId)
+      .maybeSingle();
+
+    if (previousError || !previousInternal) {
+      return failure("No se encontro el interno seleccionado.");
+    }
+
+    const { error } = await supabase
+      .from("internos")
+      .update({
+        nombres,
+        apellido_pat: apellidoPat,
+        apellido_mat: apellidoMat || null,
+        ubicacion
+      })
+      .eq("id", internalId);
+
+    if (error) {
+      return failure(error.message || "No se pudo actualizar el interno.");
+    }
+
+    await auditAction({
+      userId: profile.id,
+      moduleKey: "admin",
+      sectionKey: "correcciones-internos",
+      actionKey: "update",
+      entityType: "interno",
+      entityId: internalId,
+      beforeData: previousInternal,
+      afterData: {
+        nombres,
+        apellido_pat: apellidoPat,
+        apellido_mat: apellidoMat || null,
+        ubicacion
+      }
+    });
+
+    revalidatePath("/sistema/internos");
+    revalidatePath("/sistema/visitas");
+    revalidatePath("/sistema/listado");
+    revalidatePath("/sistema/admin");
+    return success("Interno actualizado.");
+  } catch (error) {
+    return failure(error instanceof Error ? error.message : "No se pudo actualizar el interno.");
+  }
+}
+
+export async function updateVisitorIdentityAction(
+  _prevState: MutationState,
+  formData: FormData
+): Promise<MutationState> {
+  try {
+    const profile = await requireProfile();
+    if (profile.roleKey !== "super-admin") {
+      return failure("Solo super-admin puede modificar nombres de visitas.");
+    }
+
+    const supabase = await createServerSupabaseClient();
+    const visitorId = String(formData.get("visita_id") ?? "").trim();
+    const nombreCompleto = normalizeFullName(String(formData.get("nombreCompleto") ?? ""));
+
+    if (!visitorId || !nombreCompleto) {
+      return failure("Debes elegir la visita y capturar el nombre completo.");
+    }
+
+    const { data: previousVisitor, error: previousError } = await supabase
+      .from("visitas")
+      .select("nombreCompleto")
+      .eq("id", visitorId)
+      .maybeSingle();
+
+    if (previousError || !previousVisitor) {
+      return failure("No se encontro la visita seleccionada.");
+    }
+
+    const { data: duplicateVisitor, error: duplicateError } = await supabase
+      .from("visitas")
+      .select("id")
+      .ilike("nombreCompleto", nombreCompleto)
+      .neq("id", visitorId)
+      .maybeSingle();
+
+    if (duplicateError) {
+      return failure(duplicateError.message || "No se pudo validar el nombre de la visita.");
+    }
+
+    if (duplicateVisitor) {
+      return failure(await buildExistingVisitorAssignmentMessage(supabase, nombreCompleto));
+    }
+
+    const { error } = await supabase
+      .from("visitas")
+      .update({ nombreCompleto })
+      .eq("id", visitorId);
+
+    if (error?.code === "23505") {
+      return failure(await buildExistingVisitorAssignmentMessage(supabase, nombreCompleto));
+    }
+
+    if (error) {
+      return failure(error.message || "No se pudo actualizar la visita.");
+    }
+
+    await auditAction({
+      userId: profile.id,
+      moduleKey: "admin",
+      sectionKey: "correcciones-visitas",
+      actionKey: "update",
+      entityType: "visita",
+      entityId: visitorId,
+      beforeData: previousVisitor,
+      afterData: { nombreCompleto }
+    });
+
+    revalidatePath("/sistema/internos");
+    revalidatePath("/sistema/visitas");
+    revalidatePath("/sistema/listado");
+    revalidatePath("/sistema/admin");
+    return success("Visita actualizada.");
+  } catch (error) {
+    return failure(error instanceof Error ? error.message : "No se pudo actualizar la visita.");
+  }
+}
+
 export async function createVisitorAction(
   _prevState: MutationState,
   formData: FormData
@@ -887,6 +1039,10 @@ export async function saveRolePermissionGrantAction(
       return failure("Debes elegir el rol y el alcance.");
     }
 
+    if (scopeKey.startsWith("danger-zone")) {
+      return failure("Danger Zone queda reservado exclusivamente para super-admin.");
+    }
+
     if (!["inherit", "none", "view", "manage"].includes(accessLevel)) {
       return failure("El nivel de acceso no es valido.");
     }
@@ -951,6 +1107,10 @@ export async function saveUserPermissionGrantAction(
 
     if (!userId || !scopeKey) {
       return failure("Debes elegir el usuario y el alcance.");
+    }
+
+    if (scopeKey.startsWith("danger-zone")) {
+      return failure("Danger Zone queda reservado exclusivamente para super-admin.");
     }
 
     if (!["inherit", "none", "view", "manage"].includes(accessLevel)) {

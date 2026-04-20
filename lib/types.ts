@@ -65,8 +65,20 @@ export interface InternalRecord {
 export interface InternalSearchOption {
   id: string;
   fullName: string;
+  nombres: string;
+  apellidoPat: string;
+  apellidoMat: string;
   ubicacion: string;
   estatus: string;
+}
+
+export interface VisitorSearchOption {
+  id: string;
+  fullName: string;
+  parentesco: string;
+  currentInternalName?: string;
+  currentInternalLocation?: string;
+  betada: boolean;
 }
 
 export interface InternalVisitorLink {
