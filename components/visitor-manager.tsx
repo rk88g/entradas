@@ -6,8 +6,9 @@ import { createVisitorAction, reassignVisitorAction } from "@/app/sistema/action
 import { FullscreenLoading } from "@/components/fullscreen-loading";
 import { LoadingButton } from "@/components/loading-button";
 import { MutationBanner } from "@/components/mutation-banner";
+import { RemoteInternalSearchField } from "@/components/remote-internal-search-field";
 import { StatusBadge } from "@/components/status-badge";
-import { InternalRecord, MutationState, RoleKey, VisitorRecord } from "@/lib/types";
+import { InternalSearchOption, MutationState, RoleKey, VisitorRecord } from "@/lib/types";
 import { formatLongDate, getVisitorAvailabilityLabel, maskValue } from "@/lib/utils";
 
 const mutationInitialState: MutationState = {
@@ -22,14 +23,12 @@ function formatHistoryDate(value: string) {
 
 export function VisitorManager({
   visitors,
-  internals,
   query,
   page,
   totalPages,
   roleKey
 }: {
   visitors: VisitorRecord[];
-  internals: InternalRecord[];
   query: string;
   page: number;
   totalPages: number;
@@ -46,9 +45,8 @@ export function VisitorManager({
     reasignacion: false,
     nueva: false
   });
-  const [internalSearch, setInternalSearch] = useState("");
-  const [createInternalSearch, setCreateInternalSearch] = useState("");
-  const [selectedInternalId, setSelectedInternalId] = useState("");
+  const [selectedReassignInternal, setSelectedReassignInternal] = useState<InternalSearchOption | null>(null);
+  const [selectedCreateInternal, setSelectedCreateInternal] = useState<InternalSearchOption | null>(null);
   const [screenLoading, setScreenLoading] = useState(false);
   const [createState, createAction, createPending] = useActionState(createVisitorAction, mutationInitialState);
   const [reassignState, reassignAction, reassignPending] = useActionState(reassignVisitorAction, mutationInitialState);
@@ -65,48 +63,17 @@ export function VisitorManager({
       ).size
     : 0;
 
-  const filteredInternalResults = useMemo(() => {
-    const normalized = internalSearch.trim().toLowerCase();
-    return internals.filter((internal) => {
-      if (!normalized) {
-        return true;
-      }
-
-      return (
-        internal.fullName.toLowerCase().includes(normalized) ||
-        internal.ubicacion.toLowerCase().includes(normalized)
-      );
-    });
-  }, [internalSearch, internals]);
-
-  const filteredCreateInternalResults = useMemo(() => {
-    const normalized = createInternalSearch.trim().toLowerCase();
-    return internals.filter((internal) => {
-      if (!normalized) {
-        return true;
-      }
-
-      return (
-        internal.fullName.toLowerCase().includes(normalized) ||
-        internal.ubicacion.toLowerCase().includes(normalized)
-      );
-    });
-  }, [createInternalSearch, internals]);
-
-  const selectedCreateInternal = internals.find((internal) => internal.id === selectedInternalId) ?? null;
-
   useEffect(() => {
     if (createState.success) {
       createFormRef.current?.reset();
-      setSelectedInternalId("");
-      setCreateInternalSearch("");
+      setSelectedCreateInternal(null);
       router.refresh();
     }
   }, [createState.success, router]);
 
   useEffect(() => {
     if (reassignState.success) {
-      setInternalSearch("");
+      setSelectedReassignInternal(null);
       router.refresh();
     }
   }, [reassignState.success, router]);
@@ -302,31 +269,23 @@ export function VisitorManager({
                     <form action={reassignAction} className="field-grid" autoComplete="off" onSubmitCapture={() => setScreenLoading(true)}>
                       <input type="hidden" name="visita_id" value={selectedVisitor.id} />
                       <div className="field">
-                        <input
-                          value={internalSearch}
-                          onChange={(event) => setInternalSearch(event.target.value)}
-                          placeholder="Buscar interno"
-                          autoComplete="off"
+                        <RemoteInternalSearchField
+                          name="interno_id"
+                          selected={selectedReassignInternal}
+                          onSelect={setSelectedReassignInternal}
+                          placeholder="Buscar interno por nombre o ubicacion"
+                          excludeIds={selectedVisitor.currentInternalId ? [selectedVisitor.currentInternalId] : []}
                         />
                       </div>
-                      <div className="inline-search-list">
-                        {filteredInternalResults
-                          .filter((internal) => internal.id !== selectedVisitor.currentInternalId)
-                          .slice(0, 8)
-                          .map((internal) => (
-                            <button
-                              key={internal.id}
-                              type="submit"
-                              name="interno_id"
-                              value={internal.id}
-                              className="inline-search-item"
-                            >
-                              <strong>{internal.fullName}</strong>
-                              <span className="muted">{internal.ubicacion}</span>
-                            </button>
-                          ))}
+                      <div className="actions-row">
+                        <LoadingButton
+                          pending={reassignPending}
+                          label="Reasignar visita"
+                          loadingLabel="Loading..."
+                          className="button"
+                          disabled={!selectedReassignInternal}
+                        />
                       </div>
-                      <span className="muted">Selecciona un interno para reasignar.</span>
                     </form>
                   </div>
                 ) : null}
@@ -346,35 +305,12 @@ export function VisitorManager({
             <div className="section-collapse-body">
               <MutationBanner state={createState} />
               <form ref={createFormRef} action={createAction} className="field-grid" autoComplete="off" onSubmitCapture={() => setScreenLoading(true)}>
-                <div className="field">
-                  <input
-                    value={createInternalSearch}
-                    onChange={(event) => setCreateInternalSearch(event.target.value)}
-                    placeholder="Buscar interno"
-                    autoComplete="off"
-                  />
-                </div>
-                <div className="inline-search-list">
-                  {filteredCreateInternalResults.slice(0, 8).map((internal) => (
-                    <button
-                      key={internal.id}
-                      type="button"
-                      className={`inline-search-item ${selectedInternalId === internal.id ? "active" : ""}`}
-                      onClick={() => setSelectedInternalId(internal.id)}
-                    >
-                      <strong>{internal.fullName}</strong>
-                      <span className="muted">{internal.ubicacion}</span>
-                    </button>
-                  ))}
-                </div>
-
-                <input type="hidden" name="interno_id" value={selectedInternalId} />
-                {selectedCreateInternal ? (
-                  <div className="record-pill">
-                    <strong>{selectedCreateInternal.fullName}</strong>
-                    <span>{selectedCreateInternal.ubicacion}</span>
-                  </div>
-                ) : null}
+                <RemoteInternalSearchField
+                  name="interno_id"
+                  selected={selectedCreateInternal}
+                  onSelect={setSelectedCreateInternal}
+                  placeholder="Buscar interno por nombre o ubicacion"
+                />
 
                 <div className="field" style={{ gridColumn: "1 / -1" }}><input name="nombreCompleto" placeholder="Nombre completo" autoComplete="off" required /></div>
                 <div className="field"><input name="fecha_nacimiento" type="date" autoComplete="off" required /></div>

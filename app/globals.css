@@ -964,6 +964,28 @@ tr:last-child td {
   background: color-mix(in srgb, var(--brand-soft) 65%, transparent);
 }
 
+.inline-search-empty {
+  padding: 0.85rem 0.9rem;
+  color: var(--muted);
+}
+
+.remote-search-field {
+  display: grid;
+  gap: 0.55rem;
+}
+
+.record-pill-inline {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.8rem;
+}
+
+.record-pill-inline strong,
+.record-pill-inline span {
+  display: block;
+}
+
 .alert-box,
 .note-box {
   padding: 1rem;

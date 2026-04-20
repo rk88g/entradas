@@ -19,6 +19,7 @@ import {
   InternalDeviceRecord,
   InternalHistoryPayload,
   InternalVisitorLink,
+  InternalSearchOption,
   ListingBuilderData,
   ListingRecord,
   ModuleDeviceType,
@@ -189,6 +190,22 @@ function mapInternalRecord(item: {
     updatedAt: item.updated_at,
     expediente: item.expediente,
     observaciones: item.observaciones ?? undefined
+  };
+}
+
+function mapInternalSearchOption(item: {
+  id: string;
+  nombres: string;
+  apellido_pat: string;
+  apellido_mat: string | null;
+  ubicacion: string | number;
+  estatus: string;
+}): InternalSearchOption {
+  return {
+    id: item.id,
+    fullName: fullNameFromParts(item.nombres, item.apellido_pat, item.apellido_mat),
+    ubicacion: String(item.ubicacion),
+    estatus: item.estatus ?? "activo"
   };
 }
 
@@ -664,6 +681,43 @@ export async function getInternos(includeAll = false): Promise<InternalRecord[]>
   }
 
   return data.map(mapInternalRecord).sort((a, b) => compareInternalLocations(a.ubicacion, b.ubicacion));
+}
+
+export async function searchInternals(
+  query: string,
+  options?: {
+    includeInactive?: boolean;
+    limit?: number;
+  }
+): Promise<InternalSearchOption[]> {
+  const normalized = query.trim();
+  if (!normalized) {
+    return [];
+  }
+
+  const supabase = await createServerSupabaseClient();
+  const limit = Math.max(1, Math.min(options?.limit ?? 8, 20));
+  let request = supabase
+    .from("internos")
+    .select("id, nombres, apellido_pat, apellido_mat, ubicacion, estatus")
+    .order("ubicacion", { ascending: true })
+    .limit(limit * 3);
+
+  request = applyInternalSearch(request, normalized);
+
+  if (!options?.includeInactive) {
+    request = request.eq("estatus", "activo");
+  }
+
+  const { data, error } = await request;
+  if (error || !data) {
+    return [];
+  }
+
+  return data
+    .map(mapInternalSearchOption)
+    .sort((a, b) => compareInternalLocations(a.ubicacion, b.ubicacion))
+    .slice(0, limit);
 }
 
 export async function getVisitas(): Promise<VisitorRecord[]> {
@@ -1867,8 +1921,7 @@ export async function getAdminPanelData() {
     pricesResponse,
     deviceTypesResponse,
     workplacesResponse,
-    workplacePositionsResponse,
-    internals
+    workplacePositionsResponse
   ] = await Promise.all([
     fetchAllRows<{
       id: string;
@@ -1939,8 +1992,7 @@ export async function getAdminPanelData() {
     supabase
       .from("workplace_positions")
       .select("id, title, salary, assigned_internal_id, active, workplaces!inner(id, name, type)")
-      .order("title", { ascending: true }),
-    getInternos(true)
+      .order("title", { ascending: true })
   ]);
 
   const roleMap = new Map((rolesResponse.data ?? []).map((item) => [item.id, item.key]));
@@ -2039,10 +2091,19 @@ export async function getAdminPanelData() {
     type: item.type,
     active: Boolean(item.active)
   }));
-  const internalMap = new Map(internals.map((item) => [item.id, item]));
+  const assignedInternalIds = [
+    ...new Set(
+      (workplacePositionsResponse.data ?? [])
+        .map((item) => item.assigned_internal_id)
+        .filter(Boolean)
+    )
+  ] as string[];
+  const assignedInternalsMap = await getInternosMap(supabase, assignedInternalIds);
   const workplacePositions: WorkplacePositionRecord[] = (workplacePositionsResponse.data ?? []).map((item) => {
     const workplace = getFirstRelation(item.workplaces);
-    const assignedInternal = item.assigned_internal_id ? internalMap.get(item.assigned_internal_id) : null;
+    const assignedInternal = item.assigned_internal_id
+      ? assignedInternalsMap.get(item.assigned_internal_id)
+      : null;
     return {
       id: item.id,
       workplaceId: workplace?.id ?? "",
@@ -2101,11 +2162,6 @@ export async function getAdminPanelData() {
     connectionLogs,
     actionLogs,
     users: assignableUsers,
-    config,
-    internals: internals.map((item) => ({
-      id: item.id,
-      fullName: item.fullName,
-      ubicacion: item.ubicacion
-    }))
+    config
   };
 }

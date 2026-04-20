@@ -18,7 +18,6 @@ export default async function AdminPage() {
       actionLogs={data.actionLogs}
       users={data.users}
       config={data.config}
-      internals={data.internals}
       adminConfigured={isSupabaseAdminConfigured()}
     />
   );

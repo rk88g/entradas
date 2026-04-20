@@ -8,7 +8,9 @@ import {
 } from "@/app/sistema/actions";
 import { LoadingButton } from "@/components/loading-button";
 import { MutationBanner } from "@/components/mutation-banner";
+import { RemoteInternalSearchField } from "@/components/remote-internal-search-field";
 import {
+  InternalSearchOption,
   InternalDeviceRecord,
   ModuleAccess,
   ModulePanelData,
@@ -55,22 +57,19 @@ function getDeviceWeeklyCharge(
 
 export function IntegratedModulePanel({
   data,
-  internals,
   roleKey,
   accesses
 }: {
   data: ModulePanelData;
-  internals: Array<{ id: string; fullName: string; ubicacion: string }>;
   roleKey: RoleKey;
   accesses: ModuleAccess[];
 }) {
   const [tab, setTab] = useState<ModuleTab>("resumen");
   const [selectedInternalId, setSelectedInternalId] = useState<string | null>(null);
-  const [selectedEntryInternalId, setSelectedEntryInternalId] = useState("");
+  const [selectedEntryInternal, setSelectedEntryInternal] = useState<InternalSearchOption | null>(null);
   const [selectedChargeInternalId, setSelectedChargeInternalId] = useState("");
   const [selectedZoneFilter, setSelectedZoneFilter] = useState("");
   const [selectedDeviceTypeId, setSelectedDeviceTypeId] = useState("");
-  const [entryInternalSearch, setEntryInternalSearch] = useState("");
   const [chargeInternalSearch, setChargeInternalSearch] = useState("");
   const [deviceState, deviceAction, devicePending] = useActionState(assignModuleDeviceAction, mutationInitialState);
   const [paymentState, paymentAction, paymentPending] = useActionState(registerModulePaymentAction, mutationInitialState);
@@ -143,18 +142,6 @@ export function IntegratedModulePanel({
     );
   });
 
-  const filteredEntryInternals = internals.filter((internal) => {
-    const normalized = entryInternalSearch.trim().toLowerCase();
-    if (!normalized) {
-      return true;
-    }
-
-    return (
-      internal.fullName.toLowerCase().includes(normalized) ||
-      internal.ubicacion.toLowerCase().includes(normalized)
-    );
-  });
-
   const filteredChargeInternals = filteredInternalsForZone.filter((internal) => {
     const normalized = chargeInternalSearch.trim().toLowerCase();
     if (!normalized) {
@@ -188,8 +175,7 @@ export function IntegratedModulePanel({
   useEffect(() => {
     if (deviceState.success) {
       setSelectedDeviceTypeId("");
-      setSelectedEntryInternalId("");
-      setEntryInternalSearch("");
+      setSelectedEntryInternal(null);
     }
   }, [deviceState.success]);
 
@@ -335,30 +321,13 @@ export function IntegratedModulePanel({
                 <MutationBanner state={deviceState} />
                 <form action={deviceAction} className="field-grid" autoComplete="off">
                 <input type="hidden" name="module_key" value={data.moduleKey} />
-                <div className="field">
-                  <input
-                    value={entryInternalSearch}
-                    onChange={(event) => setEntryInternalSearch(event.target.value)}
-                    placeholder="Buscar interno"
-                    autoComplete="off"
-                    disabled={!canManageEntries || data.weekClosed}
-                  />
-                  <input type="hidden" name="internal_id" value={selectedEntryInternalId} />
-                  <div className="inline-search-list">
-                    {filteredEntryInternals.slice(0, 8).map((internal) => (
-                      <button
-                        key={internal.id}
-                        type="button"
-                        className={`inline-search-item ${selectedEntryInternalId === internal.id ? "active" : ""}`}
-                        onClick={() => setSelectedEntryInternalId(internal.id)}
-                        disabled={!canManageEntries || data.weekClosed}
-                      >
-                        <strong>{internal.fullName}</strong>
-                        <span className="muted">{internal.ubicacion}</span>
-                      </button>
-                    ))}
-                  </div>
-                </div>
+                <RemoteInternalSearchField
+                  name="internal_id"
+                  selected={selectedEntryInternal}
+                  onSelect={setSelectedEntryInternal}
+                  placeholder="Buscar interno por nombre o ubicacion"
+                  disabled={!canManageEntries || data.weekClosed}
+                />
                 <div className="field">
                   <select
                     name="device_type_id"
@@ -404,7 +373,7 @@ export function IntegratedModulePanel({
                   <textarea name="notes" placeholder="Notas" autoComplete="off" disabled={!canManageEntries || data.weekClosed} />
                 </div>
                 <div className="actions-row">
-                  <LoadingButton pending={devicePending} label="Guardar aparato" loadingLabel="Loading..." className="button" disabled={!canManageEntries || data.weekClosed} />
+                  <LoadingButton pending={devicePending} label="Guardar aparato" loadingLabel="Loading..." className="button" disabled={!canManageEntries || data.weekClosed || !selectedEntryInternal} />
                 </div>
                 </form>
               </div>

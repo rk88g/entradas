@@ -1,6 +1,6 @@
 import { redirect } from "next/navigation";
 import { VisitorManager } from "@/components/visitor-manager";
-import { getCurrentUserProfile, getInternos, getVisitasPage } from "@/lib/supabase/queries";
+import { getCurrentUserProfile, getVisitasPage } from "@/lib/supabase/queries";
 import { canAccessCoreSystem } from "@/lib/utils";
 
 export default async function VisitasPage({
@@ -19,7 +19,6 @@ export default async function VisitasPage({
       pageSize: 20
     })
   ]);
-  const internals = await getInternos(profile?.roleKey === "super-admin");
 
   if (profile?.moduleOnly && profile.accessibleModules.length > 0) {
     redirect(`/sistema/${profile.accessibleModules[0].moduleKey}`);
@@ -32,7 +31,6 @@ export default async function VisitasPage({
   return (
     <VisitorManager
       visitors={visitorsPage.items}
-      internals={internals}
       query={query}
       page={visitorsPage.page}
       totalPages={Math.max(1, Math.ceil(visitorsPage.total / visitorsPage.pageSize))}

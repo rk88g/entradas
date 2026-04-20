@@ -1,6 +1,6 @@
 "use client";
 
-import { useActionState, useMemo, useState } from "react";
+import { useActionState, useEffect, useMemo, useState } from "react";
 import {
   createModuleZoneAction,
   createModuleChargeRouteAction,
@@ -12,11 +12,13 @@ import {
 } from "@/app/sistema/actions";
 import { LoadingButton } from "@/components/loading-button";
 import { MutationBanner } from "@/components/mutation-banner";
+import { RemoteInternalSearchField } from "@/components/remote-internal-search-field";
 import {
   ActionAuditRecord,
   AdminUserRecord,
   ConnectionLogRecord,
   DangerZoneConfigData,
+  InternalSearchOption,
   ModuleKey,
   MutationState
 } from "@/lib/types";
@@ -61,21 +63,18 @@ export function AdminControlPanel({
   actionLogs,
   users,
   config,
-  internals,
   adminConfigured
 }: {
   connectionLogs: ConnectionLogRecord[];
   actionLogs: ActionAuditRecord[];
   users: AdminUserRecord[];
   config: DangerZoneConfigData;
-  internals: Array<{ id: string; fullName: string; ubicacion: string }>;
   adminConfigured: boolean;
 }) {
   const [tab, setTab] = useState<"sesiones" | "acciones" | "usuarios" | "configuracion">("configuracion");
   const [selectedModuleForRoute, setSelectedModuleForRoute] = useState<ModuleKey>("visual");
   const [selectedModuleForPrice, setSelectedModuleForPrice] = useState<ModuleKey>("visual");
-  const [workplaceInternalSearch, setWorkplaceInternalSearch] = useState("");
-  const [selectedWorkplaceInternalId, setSelectedWorkplaceInternalId] = useState("");
+  const [selectedWorkplaceInternal, setSelectedWorkplaceInternal] = useState<InternalSearchOption | null>(null);
   const [passwordState, passwordAction, passwordPending] = useActionState(updateAuthUserPasswordAction, mutationInitialState);
   const [cutoffState, cutoffAction, cutoffPending] = useActionState(saveModuleSettingsAction, mutationInitialState);
   const [zoneState, zoneAction, zonePending] = useActionState(createModuleZoneAction, mutationInitialState);
@@ -88,17 +87,12 @@ export function AdminControlPanel({
     () => config.deviceTypes.filter((item) => item.moduleKey === selectedModuleForPrice),
     [config.deviceTypes, selectedModuleForPrice]
   );
-  const filteredInternals = useMemo(() => {
-    const normalized = workplaceInternalSearch.trim().toLowerCase();
-    if (!normalized) {
-      return internals;
-    }
 
-    return internals.filter((internal) => (
-      internal.fullName.toLowerCase().includes(normalized) ||
-      internal.ubicacion.toLowerCase().includes(normalized)
-    ));
-  }, [internals, workplaceInternalSearch]);
+  useEffect(() => {
+    if (positionState.success) {
+      setSelectedWorkplaceInternal(null);
+    }
+  }, [positionState.success]);
 
   return (
     <section className="module-panel danger-zone-panel">
@@ -372,35 +366,13 @@ export function AdminControlPanel({
               </div>
               <div className="field"><input name="title" placeholder="Puesto" autoComplete="off" /></div>
               <div className="field"><input name="salary" type="number" step="0.01" placeholder="Sueldo" autoComplete="off" /></div>
-              <div className="field">
-                <input
-                  value={workplaceInternalSearch}
-                  onChange={(event) => setWorkplaceInternalSearch(event.target.value)}
-                  placeholder="Buscar interno o dejar vacante"
-                  autoComplete="off"
-                />
-                <input type="hidden" name="assigned_internal_id" value={selectedWorkplaceInternalId} />
-                <div className="inline-search-list">
-                  <button
-                    type="button"
-                    className={`inline-search-item ${selectedWorkplaceInternalId === "" ? "active" : ""}`}
-                    onClick={() => setSelectedWorkplaceInternalId("")}
-                  >
-                    <strong>Vacante</strong>
-                  </button>
-                  {filteredInternals.slice(0, 8).map((internal) => (
-                    <button
-                      key={internal.id}
-                      type="button"
-                      className={`inline-search-item ${selectedWorkplaceInternalId === internal.id ? "active" : ""}`}
-                      onClick={() => setSelectedWorkplaceInternalId(internal.id)}
-                    >
-                      <strong>{internal.fullName}</strong>
-                      <span className="muted">{internal.ubicacion}</span>
-                    </button>
-                  ))}
-                </div>
-              </div>
+              <RemoteInternalSearchField
+                name="assigned_internal_id"
+                selected={selectedWorkplaceInternal}
+                onSelect={setSelectedWorkplaceInternal}
+                placeholder="Buscar interno o dejar vacante"
+                showEmptySelection
+              />
               <div className="actions-row">
                 <LoadingButton pending={positionPending} label="Guardar puesto" loadingLabel="Loading..." className="button-secondary" />
               </div>

@@ -60,6 +60,13 @@ export interface InternalRecord {
   observaciones?: string;
 }
 
+export interface InternalSearchOption {
+  id: string;
+  fullName: string;
+  ubicacion: string;
+  estatus: string;
+}
+
 export interface InternalVisitorLink {
   id: string;
   internoId: string;
