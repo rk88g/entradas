@@ -28,8 +28,19 @@ async function getRequestMeta() {
     ipAddress:
       requestHeaders.get("x-forwarded-for")?.split(",")[0]?.trim() ??
       requestHeaders.get("x-real-ip") ??
+      requestHeaders.get("cf-connecting-ip") ??
       null,
-    userAgent: requestHeaders.get("user-agent") ?? null
+    userAgent: requestHeaders.get("user-agent") ?? null,
+    country:
+      requestHeaders.get("x-vercel-ip-country") ??
+      requestHeaders.get("cf-ipcountry") ??
+      null,
+    region:
+      requestHeaders.get("x-vercel-ip-country-region") ??
+      null,
+    city:
+      requestHeaders.get("x-vercel-ip-city") ??
+      null
   };
 }
 
@@ -47,7 +58,10 @@ export async function logConnectionEvent(payload: ConnectionLogPayload) {
       success: payload.success,
       failure_reason: payload.failureReason ?? null,
       ip_address: meta.ipAddress,
-      user_agent: meta.userAgent
+      user_agent: meta.userAgent,
+      country: meta.country,
+      region: meta.region,
+      city: meta.city
     });
   } catch {
     // Silent by design: audit logging should not block auth flow.

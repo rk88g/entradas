@@ -5,6 +5,7 @@ import {
   createModuleZoneAction,
   createModuleChargeRouteAction,
   createWorkplaceAction,
+  forceCloseUserSessionsAction,
   saveModulePriceAction,
   saveModuleSettingsAction,
   saveWorkplacePositionAction,
@@ -58,6 +59,11 @@ function formatDateTime(value: string) {
   })}`;
 }
 
+function formatEstimatedLocation(log: ConnectionLogRecord) {
+  const parts = [log.city, log.region, log.country].filter(Boolean);
+  return parts.length > 0 ? parts.join(", ") : "Sin dato";
+}
+
 export function AdminControlPanel({
   connectionLogs,
   actionLogs,
@@ -76,6 +82,7 @@ export function AdminControlPanel({
   const [selectedModuleForPrice, setSelectedModuleForPrice] = useState<ModuleKey>("visual");
   const [selectedWorkplaceInternal, setSelectedWorkplaceInternal] = useState<InternalSearchOption | null>(null);
   const [passwordState, passwordAction, passwordPending] = useActionState(updateAuthUserPasswordAction, mutationInitialState);
+  const [forceState, forceAction, forcePending] = useActionState(forceCloseUserSessionsAction, mutationInitialState);
   const [cutoffState, cutoffAction, cutoffPending] = useActionState(saveModuleSettingsAction, mutationInitialState);
   const [zoneState, zoneAction, zonePending] = useActionState(createModuleZoneAction, mutationInitialState);
   const [routeState, routeAction, routePending] = useActionState(createModuleChargeRouteAction, mutationInitialState);
@@ -153,7 +160,7 @@ export function AdminControlPanel({
               </div>
               </form>
 
-              <div className="table-wrap compact-table" style={{ marginTop: "0.8rem" }}>
+              <div className="table-wrap compact-table responsive-mobile-table" style={{ marginTop: "0.8rem" }}>
                 <table>
                   <thead>
                     <tr>
@@ -169,8 +176,8 @@ export function AdminControlPanel({
                     ) : (
                       config.zones.map((zone) => (
                         <tr key={zone.id}>
-                          <td>{zone.name}</td>
-                          <td>{zone.active ? "Si" : "No"}</td>
+                          <td data-label="Zona">{zone.name}</td>
+                          <td data-label="Activo">{zone.active ? "Si" : "No"}</td>
                         </tr>
                       ))
                     )}
@@ -227,7 +234,7 @@ export function AdminControlPanel({
                 </div>
               </form>
 
-              <div className="table-wrap compact-table" style={{ marginTop: "0.8rem" }}>
+              <div className="table-wrap compact-table responsive-mobile-table" style={{ marginTop: "0.8rem" }}>
                 <table>
                   <thead>
                     <tr>
@@ -244,9 +251,9 @@ export function AdminControlPanel({
                     ) : (
                       config.chargeRoutes.map((route) => (
                         <tr key={route.id}>
-                          <td>{route.moduleKey}</td>
-                          <td>{route.zoneName}</td>
-                          <td>{weekdayOptions.find((item) => Number(item.value) === route.chargeWeekday)?.label ?? route.chargeWeekday}</td>
+                          <td data-label="Bloque">{route.moduleKey}</td>
+                          <td data-label="Zona">{route.zoneName}</td>
+                          <td data-label="Dia">{weekdayOptions.find((item) => Number(item.value) === route.chargeWeekday)?.label ?? route.chargeWeekday}</td>
                         </tr>
                       ))
                     )}
@@ -299,7 +306,7 @@ export function AdminControlPanel({
                 </div>
               </form>
 
-              <div className="table-wrap compact-table" style={{ marginTop: "0.8rem" }}>
+              <div className="table-wrap compact-table responsive-mobile-table" style={{ marginTop: "0.8rem" }}>
                 <table>
                   <thead>
                     <tr>
@@ -317,10 +324,10 @@ export function AdminControlPanel({
                     ) : (
                       config.prices.map((price) => (
                         <tr key={price.id}>
-                          <td>{price.moduleKey}</td>
-                          <td>{price.deviceTypeName}</td>
-                          <td>${price.weeklyPrice.toFixed(2)}</td>
-                          <td>${price.activationPrice.toFixed(2)}</td>
+                          <td data-label="Bloque">{price.moduleKey}</td>
+                          <td data-label="Aparato">{price.deviceTypeName}</td>
+                          <td data-label="Semanal">${price.weeklyPrice.toFixed(2)}</td>
+                          <td data-label="Alta">${price.activationPrice.toFixed(2)}</td>
                         </tr>
                       ))
                     )}
@@ -378,7 +385,7 @@ export function AdminControlPanel({
               </div>
               </form>
 
-              <div className="table-wrap compact-table" style={{ marginTop: "0.8rem" }}>
+              <div className="table-wrap compact-table responsive-mobile-table" style={{ marginTop: "0.8rem" }}>
                 <table>
                   <thead>
                     <tr>
@@ -396,10 +403,10 @@ export function AdminControlPanel({
                     ) : (
                       config.workplacePositions.map((position) => (
                         <tr key={position.id}>
-                          <td>{position.workplaceName}</td>
-                          <td>{position.title}</td>
-                          <td>${position.salary.toFixed(2)}</td>
-                          <td>{position.assignedInternalName ?? "Vacante"}</td>
+                          <td data-label="Centro">{position.workplaceName}</td>
+                          <td data-label="Puesto">{position.title}</td>
+                          <td data-label="Sueldo">${position.salary.toFixed(2)}</td>
+                          <td data-label="Interno">{position.assignedInternalName ?? "Vacante"}</td>
                         </tr>
                       ))
                     )}
@@ -421,6 +428,7 @@ export function AdminControlPanel({
             <div className="section-collapse-body">
               {!adminConfigured ? <div className="alert-box">Falta configurar `SUPABASE_SERVICE_ROLE_KEY`.</div> : null}
               <MutationBanner state={passwordState} />
+              <MutationBanner state={forceState} />
               <form action={passwordAction} className="field-grid" autoComplete="off">
               <div className="field">
                 <select name="user_id" defaultValue="">
@@ -450,7 +458,7 @@ export function AdminControlPanel({
               <span>{users.length} registros</span>
             </summary>
             <div className="section-collapse-body">
-              <div className="table-wrap compact-table">
+              <div className="table-wrap compact-table responsive-mobile-table">
               <table>
                 <thead>
                   <tr>
@@ -458,20 +466,37 @@ export function AdminControlPanel({
                     <th>Correo</th>
                     <th>Rol</th>
                     <th>Perfil</th>
+                    <th>Seguridad</th>
                   </tr>
                 </thead>
                 <tbody>
                   {users.length === 0 ? (
                     <tr>
-                      <td colSpan={4}>Sin usuarios.</td>
+                      <td colSpan={5}>Sin usuarios.</td>
                     </tr>
                   ) : (
                     users.map((user) => (
                       <tr key={user.id}>
-                        <td>{user.fullName}</td>
-                        <td>{user.email || "-"}</td>
-                        <td>{user.roleKey}</td>
-                        <td>{user.hasProfile ? "Listo" : "Sin perfil"}</td>
+                        <td data-label="Usuario">{user.fullName}</td>
+                        <td data-label="Correo">{user.email || "-"}</td>
+                        <td data-label="Rol">{user.roleKey}</td>
+                        <td data-label="Perfil">{user.hasProfile ? "Listo" : "Sin perfil"}</td>
+                        <td data-label="Seguridad">
+                          {user.roleKey === "super-admin" ? (
+                            <span className="status-pill warning">Protegido</span>
+                          ) : (
+                            <form action={forceAction}>
+                              <input type="hidden" name="user_id" value={user.id} />
+                              <LoadingButton
+                                pending={forcePending}
+                                label="Cerrar sesiones"
+                                loadingLabel="Loading..."
+                                className="button-secondary"
+                                disabled={!adminConfigured}
+                              />
+                            </form>
+                          )}
+                        </td>
                       </tr>
                     ))
                   )}
@@ -490,7 +515,7 @@ export function AdminControlPanel({
             <span>{connectionLogs.length} registros</span>
           </summary>
           <div className="section-collapse-body">
-            <div className="table-wrap compact-table">
+            <div className="table-wrap compact-table responsive-mobile-table">
             <table>
               <thead>
                 <tr>
@@ -499,21 +524,23 @@ export function AdminControlPanel({
                   <th>Correo</th>
                   <th>Resultado</th>
                   <th>IP</th>
+                  <th>Ubicacion estimada</th>
                 </tr>
               </thead>
               <tbody>
                 {connectionLogs.length === 0 ? (
                   <tr>
-                    <td colSpan={5}>Sin logs.</td>
+                    <td colSpan={6}>Sin logs.</td>
                   </tr>
                 ) : (
                   connectionLogs.map((log) => (
                     <tr key={log.id}>
-                      <td>{formatDateTime(log.createdAt)}</td>
-                      <td>{log.userName ?? "-"}</td>
-                      <td>{log.email}</td>
-                      <td>{log.success ? "Correcto" : log.failureReason ?? "Fallido"}</td>
-                      <td>{log.ipAddress ?? "-"}</td>
+                      <td data-label="Fecha">{formatDateTime(log.createdAt)}</td>
+                      <td data-label="Usuario">{log.userName ?? "-"}</td>
+                      <td data-label="Correo">{log.email}</td>
+                      <td data-label="Resultado">{log.success ? "Correcto" : log.failureReason ?? "Fallido"}</td>
+                      <td data-label="IP">{log.ipAddress ?? "-"}</td>
+                      <td data-label="Ubicacion">{formatEstimatedLocation(log)}</td>
                     </tr>
                   ))
                 )}
@@ -531,7 +558,7 @@ export function AdminControlPanel({
             <span>{actionLogs.length} registros</span>
           </summary>
           <div className="section-collapse-body">
-            <div className="table-wrap compact-table">
+            <div className="table-wrap compact-table responsive-mobile-table">
             <table>
               <thead>
                 <tr>
@@ -551,12 +578,12 @@ export function AdminControlPanel({
                 ) : (
                   actionLogs.map((log) => (
                     <tr key={log.id}>
-                      <td>{formatDateTime(log.createdAt)}</td>
-                      <td>{log.userName ?? "-"}</td>
-                      <td>{log.moduleKey}</td>
-                      <td>{log.sectionKey}</td>
-                      <td>{log.actionKey}</td>
-                      <td>{`${log.entityType}${log.entityId ? ` (${log.entityId})` : ""}`}</td>
+                      <td data-label="Fecha">{formatDateTime(log.createdAt)}</td>
+                      <td data-label="Usuario">{log.userName ?? "-"}</td>
+                      <td data-label="Modulo">{log.moduleKey}</td>
+                      <td data-label="Seccion">{log.sectionKey}</td>
+                      <td data-label="Accion">{log.actionKey}</td>
+                      <td data-label="Elemento">{`${log.entityType}${log.entityId ? ` (${log.entityId})` : ""}`}</td>
                     </tr>
                   ))
                 )}

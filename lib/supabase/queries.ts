@@ -1961,11 +1961,14 @@ export async function getAdminPanelData() {
       failure_reason: string | null;
       ip_address: string | null;
       user_agent: string | null;
+      country: string | null;
+      region: string | null;
+      city: string | null;
       created_at: string;
     }>((from, to) =>
       supabase
         .from("connection_logs")
-        .select("id, user_profile_id, email, success, failure_reason, ip_address, user_agent, created_at")
+        .select("id, user_profile_id, email, success, failure_reason, ip_address, user_agent, country, region, city, created_at")
         .order("created_at", { ascending: false })
         .range(from, to)
     ),
@@ -2063,6 +2066,9 @@ export async function getAdminPanelData() {
     failureReason: item.failure_reason ?? null,
     ipAddress: item.ip_address ?? null,
     userAgent: item.user_agent ?? null,
+    country: item.country ?? null,
+    region: item.region ?? null,
+    city: item.city ?? null,
     createdAt: item.created_at
   }));
 

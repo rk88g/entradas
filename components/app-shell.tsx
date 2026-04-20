@@ -1,7 +1,8 @@
 "use client";
 
 import { usePathname, useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
+import { signOutAction } from "@/app/auth/actions";
 import { LogoutButton } from "@/components/logout-button";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { UserProfile } from "@/lib/types";
@@ -31,10 +32,13 @@ export function AppShell({
   title: string;
   user: UserProfile;
 }) {
+  const IDLE_TIMEOUT_MS = 5 * 60 * 1000;
   const pathname = usePathname();
   const router = useRouter();
   const [open, setOpen] = useState(false);
   const [loadingHref, setLoadingHref] = useState<string | null>(null);
+  const idleLogoutFormRef = useRef<HTMLFormElement | null>(null);
+  const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const visibleNavItems = [
     ...(canAccessCoreSystem(user.roleKey, user.moduleOnly) ? coreNavItems : []),
     ...(user.roleKey === "super-admin"
@@ -46,6 +50,33 @@ export function AppShell({
   useEffect(() => {
     setLoadingHref(null);
   }, [pathname]);
+
+  useEffect(() => {
+    if (user.roleKey === "super-admin") {
+      return;
+    }
+
+    const resetIdleTimer = () => {
+      if (idleTimerRef.current) {
+        clearTimeout(idleTimerRef.current);
+      }
+
+      idleTimerRef.current = setTimeout(() => {
+        idleLogoutFormRef.current?.requestSubmit();
+      }, IDLE_TIMEOUT_MS);
+    };
+
+    const events: Array<keyof WindowEventMap> = ["pointerdown", "keydown", "scroll", "touchstart"];
+    events.forEach((eventName) => window.addEventListener(eventName, resetIdleTimer, { passive: true }));
+    resetIdleTimer();
+
+    return () => {
+      if (idleTimerRef.current) {
+        clearTimeout(idleTimerRef.current);
+      }
+      events.forEach((eventName) => window.removeEventListener(eventName, resetIdleTimer));
+    };
+  }, [pathname, user.roleKey]);
 
   function handleNavigate(href: string) {
     if (href === pathname) {
@@ -102,6 +133,7 @@ export function AppShell({
         </aside>
 
         <main className="app-main">
+          {user.roleKey !== "super-admin" ? <form action={signOutAction} ref={idleLogoutFormRef} hidden /> : null}
           <section className="app-panel hide-print">
             <div className="app-header-bar">
               <strong className="module-title">Sistema Cumplido desde 2020</strong>

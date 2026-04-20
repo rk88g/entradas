@@ -1,5 +1,6 @@
 "use server";
 
+import { randomBytes } from "node:crypto";
 import { revalidatePath } from "next/cache";
 import { logAuditEvent } from "@/lib/audit";
 import { createSupabaseAdminClient } from "@/lib/supabase/admin";
@@ -56,6 +57,10 @@ function buildBirthDateFromAge(age: number) {
 
 function buildInternalExpediente() {
   return `INT-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
+}
+
+function buildForcedPassword() {
+  return `${randomBytes(24).toString("base64url")}!Aa9`;
 }
 
 function normalizeFullName(value: string) {
@@ -793,6 +798,73 @@ export async function updateAuthUserPasswordAction(
     return success("Contrasena actualizada.");
   } catch (error) {
     return failure(error instanceof Error ? error.message : "No se pudo actualizar la contrasena.");
+  }
+}
+
+export async function forceCloseUserSessionsAction(
+  _prevState: MutationState,
+  formData: FormData
+): Promise<MutationState> {
+  try {
+    const profile = await requireProfile();
+    if (profile.roleKey !== "super-admin") {
+      return failure("Solo super-admin puede forzar cierre de sesiones.");
+    }
+
+    if (!isSupabaseAdminConfigured()) {
+      return failure("Falta configurar SUPABASE_SERVICE_ROLE_KEY en el entorno.");
+    }
+
+    const userId = String(formData.get("user_id") ?? "").trim();
+    if (!userId) {
+      return failure("Debes elegir un usuario.");
+    }
+
+    const supabase = await createServerSupabaseClient();
+    const { data: targetProfile } = await supabase
+      .from("user_profiles")
+      .select("id, role_id")
+      .eq("id", userId)
+      .maybeSingle();
+
+    if (targetProfile?.role_id) {
+      const { data: role } = await supabase
+        .from("roles")
+        .select("key")
+        .eq("id", targetProfile.role_id)
+        .maybeSingle();
+
+      if (role?.key === "super-admin") {
+        return failure("No puedes forzar cierre de sesiones para un super-admin.");
+      }
+    }
+
+    const admin = createSupabaseAdminClient();
+    const forcedPassword = buildForcedPassword();
+    const { error } = await admin.auth.admin.updateUserById(userId, {
+      password: forcedPassword
+    });
+
+    if (error) {
+      return failure(error.message || "No se pudo forzar el cierre de sesiones.");
+    }
+
+    await auditAction({
+      userId: profile.id,
+      moduleKey: "admin",
+      sectionKey: "usuarios",
+      actionKey: "force-close-sessions",
+      entityType: "auth_user",
+      entityId: userId,
+      afterData: {
+        forcedSessionReset: true
+      }
+    });
+
+    revalidatePath("/sistema/admin");
+    return success("Sesiones cerradas. Se asigno una contrasena aleatoria segura.");
+  } catch (error) {
+    return failure(error instanceof Error ? error.message : "No se pudo forzar el cierre de sesiones.");
   }
 }
 

@@ -262,8 +262,20 @@ create table if not exists public.connection_logs (
   failure_reason text,
   ip_address text,
   user_agent text,
+  country text,
+  region text,
+  city text,
   created_at timestamptz not null default timezone('utc', now())
 );
+
+alter table public.connection_logs
+  add column if not exists country text;
+
+alter table public.connection_logs
+  add column if not exists region text;
+
+alter table public.connection_logs
+  add column if not exists city text;
 
 create table if not exists public.action_audit_logs (
   id uuid primary key default gen_random_uuid(),

@@ -460,6 +460,9 @@ export interface ConnectionLogRecord {
   failureReason?: string | null;
   ipAddress?: string | null;
   userAgent?: string | null;
+  country?: string | null;
+  region?: string | null;
+  city?: string | null;
   createdAt: string;
 }
 
