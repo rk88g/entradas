@@ -524,7 +524,7 @@ export async function getInternos(includeAll = false): Promise<InternalRecord[]>
 export async function getVisitas(): Promise<VisitorRecord[]> {
   const supabase = await createServerSupabaseClient();
   const { historyMap, detailedHistoryMap } = await getVisitorHistoryData(supabase);
-  const [{ data, error }, { data: currentRelations, error: relationError }, internals] = await Promise.all([
+  const [{ data, error }, { data: currentRelations, error: relationError }] = await Promise.all([
     supabase
       .from("visitas")
       .select(
@@ -533,19 +533,19 @@ export async function getVisitas(): Promise<VisitorRecord[]> {
       .order("updated_at", { ascending: false }),
     supabase
       .from("interno_visitas")
-      .select("visita_id, interno_id"),
-    getInternos(true)
+      .select("visita_id, interno_id")
   ]);
 
   if (error || !data) {
     return [];
   }
 
-  const internalMap = new Map(internals.map((internal) => [internal.id, internal]));
+  const relationInternalIds = [...new Set((currentRelations ?? []).map((item) => item.interno_id))];
+  const relationInternalsMap = await getInternosMap(supabase, relationInternalIds);
   const currentRelationMap = new Map<string, { internoId: string; internoName: string }>();
   if (!relationError) {
     (currentRelations ?? []).forEach((item) => {
-      const interno = internalMap.get(item.interno_id);
+      const interno = relationInternalsMap.get(item.interno_id);
       if (!interno) {
         return;
       }
