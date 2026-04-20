@@ -10,11 +10,13 @@ import {
 } from "@/app/sistema/actions";
 import { LoadingButton } from "@/components/loading-button";
 import { MutationBanner } from "@/components/mutation-banner";
+import { StatusBadge } from "@/components/status-badge";
 import { DateRecord, InternalProfile, ModuleDeviceType, MutationState, RoleKey } from "@/lib/types";
 import {
   canManageMentions,
   formatLongDate,
   getDefaultDateStatusForRole,
+  getInternalStatusMeta,
   maskValue
 } from "@/lib/utils";
 
@@ -55,6 +57,14 @@ function getPassForDate(
 
 function compactMoney(value?: number | null) {
   return `$${Number(value ?? 0).toFixed(2)}`;
+}
+
+function getPassBadge(passExists: boolean) {
+  return passExists ? (
+    <StatusBadge variant="warn">Con pase</StatusBadge>
+  ) : (
+    <StatusBadge variant="ok">Sin pase</StatusBadge>
+  );
 }
 
 export function InternalBrowser({
@@ -230,7 +240,11 @@ export function InternalBrowser({
                       <td>
                         <div className="record-title">
                           <strong>{profile.fullName}</strong>
-                          <span>{profile.estatus}</span>
+                          <span>
+                            <StatusBadge variant={getInternalStatusMeta(profile.estatus).variant}>
+                              {getInternalStatusMeta(profile.estatus).label}
+                            </StatusBadge>
+                          </span>
                         </div>
                       </td>
                       <td>{profile.ubicacion}</td>
@@ -314,47 +328,28 @@ export function InternalBrowser({
             </div>
 
             <section className="collapse-stack" style={{ marginTop: "1rem" }}>
-              <details className="data-card section-collapse">
-                <summary>
-                  <span>Resumen</span>
-                  <span>{selectedPass ? "Con pase" : "Sin pase"}</span>
-                </summary>
-                <div className="section-collapse-body">
-                  <div className="mini-list">
-                    <div className="mini-row"><span>Estatus</span><strong>{selected.estatus}</strong></div>
-                    <div className="mini-row"><span>Laborando</span><strong>{selected.laborando ? "Si" : "No"}</strong></div>
-                    <div className="mini-row"><span>Telefono</span><strong>{maskValue(selected.telefono || "No aplica", canViewSensitiveData)}</strong></div>
-                    <div className="mini-row"><span>Visitas</span><strong>{selected.visitors.length}</strong></div>
-                    <div className="mini-row"><span>Aparatos</span><strong>{selected.devices.length}</strong></div>
-                    <div className="mini-row"><span>Pagos semanales</span><strong>{selected.weeklyPayments.length}</strong></div>
-                    <div className="mini-row"><span>Fecha elegida</span><strong>{selectedDateValue ? formatLongDate(selectedDateValue) : "Sin fecha"}</strong></div>
+              <article className="data-card">
+                <div className="mini-list">
+                  <div className="mini-row">
+                    <span>Estatus</span>
+                    <strong>
+                      <StatusBadge variant={getInternalStatusMeta(selected.estatus).variant}>
+                        {getInternalStatusMeta(selected.estatus).label}
+                      </StatusBadge>
+                    </strong>
                   </div>
+                  <div className="mini-row">
+                    <span>Pase</span>
+                    <strong>{getPassBadge(Boolean(selectedPass))}</strong>
+                  </div>
+                  <div className="mini-row"><span>Fecha</span><strong>{selectedDateValue ? formatLongDate(selectedDateValue) : "Sin fecha"}</strong></div>
+                  <div className="mini-row"><span>Laborando</span><strong>{selected.laborando ? "Si" : "No"}</strong></div>
+                  <div className="mini-row"><span>Telefono</span><strong>{maskValue(selected.telefono || "No aplica", canViewSensitiveData)}</strong></div>
+                  <div className="mini-row"><span>Visitas</span><strong>{selected.visitors.length}</strong></div>
+                  <div className="mini-row"><span>Aparatos</span><strong>{selected.devices.length}</strong></div>
+                  <div className="mini-row"><span>Pagos</span><strong>{selected.weeklyPayments.length}</strong></div>
                 </div>
-              </details>
-
-              {roleKey === "super-admin" ? (
-                <details className="data-card section-collapse">
-                  <summary>
-                    <span>Cambiar estatus</span>
-                    <span>{selected.estatus}</span>
-                  </summary>
-                  <div className="section-collapse-body">
-                    <MutationBanner state={statusState} />
-                    <form action={statusAction} className="actions-row" autoComplete="off">
-                      <input type="hidden" name="interno_id" value={selected.id} />
-                      <div className="field" style={{ flex: 1 }}>
-                        <select name="estatus" defaultValue={selected.estatus}>
-                          <option value="activo">Activo</option>
-                          <option value="150">150</option>
-                          <option value="retenido">Retenido</option>
-                          <option value="baja">Baja</option>
-                        </select>
-                      </div>
-                      <LoadingButton pending={statusPending} label="Guardar estatus" loadingLabel="Loading..." className="button-soft" />
-                    </form>
-                  </div>
-                </details>
-              ) : null}
+              </article>
 
               {selectedPass ? (
                 <MutationBanner state={{ success: null, error: `Ese interno ya tiene pase para ${formatLongDate(selectedPass.fechaVisita)}.` }} />
@@ -364,99 +359,79 @@ export function InternalBrowser({
                 <MutationBanner state={{ success: null, error: "Debes incluir al menos un adulto en el pase." }} />
               ) : null}
 
-              <details className="data-card section-collapse">
-                <summary>
-                  <span>No vendran</span>
-                  <span>{availableVisitors.length}</span>
-                </summary>
-                <div className="section-collapse-body">
-                  <div className="record-stack">
-                    {availableVisitors.length === 0 ? <span className="muted">Sin registros.</span> : availableVisitors.map((item) => (
-                      <button key={item.id} type="button" className="inline-search-item" onClick={() => toggleVisitor(item.visitaId)}>
-                        <strong>{item.visitor.fullName}</strong>
-                        <span className="muted">{maskValue(item.visitor.edad, canViewSensitiveData)} años</span>
-                      </button>
-                    ))}
-                  </div>
+              <article className="data-card">
+                <strong style={{ display: "block", marginBottom: "0.7rem" }}>No vendran</strong>
+                <div className="record-stack">
+                  {availableVisitors.length === 0 ? <span className="muted">Sin registros.</span> : availableVisitors.map((item) => (
+                    <button key={item.id} type="button" className="inline-search-item" onClick={() => toggleVisitor(item.visitaId)}>
+                      <strong>{item.visitor.fullName}</strong>
+                      <span className="muted">{maskValue(item.visitor.edad, canViewSensitiveData)} años</span>
+                    </button>
+                  ))}
                 </div>
-              </details>
+              </article>
 
-              <details className="data-card section-collapse">
-                <summary>
-                  <span>Vendran</span>
-                  <span>{selectedVisitors.length}</span>
-                </summary>
-                <div className="section-collapse-body">
-                  <div className="record-stack">
-                    {selectedVisitors.length === 0 ? <span className="muted">Sin registros.</span> : selectedVisitors.map((item) => (
-                      <button key={item.id} type="button" className="inline-search-item active" onClick={() => toggleVisitor(item.visitaId)}>
-                        <strong>{item.visitor.fullName}</strong>
-                        <span className="muted">{maskValue(item.visitor.edad, canViewSensitiveData)} años</span>
-                      </button>
-                    ))}
-                  </div>
+              <article className="data-card">
+                <strong style={{ display: "block", marginBottom: "0.7rem" }}>Vendran</strong>
+                <div className="record-stack">
+                  {selectedVisitors.length === 0 ? <span className="muted">Sin registros.</span> : selectedVisitors.map((item) => (
+                    <button key={item.id} type="button" className="inline-search-item active" onClick={() => toggleVisitor(item.visitaId)}>
+                      <strong>{item.visitor.fullName}</strong>
+                      <span className="muted">{maskValue(item.visitor.edad, canViewSensitiveData)} años</span>
+                    </button>
+                  ))}
                 </div>
-              </details>
+              </article>
 
-              <details className="data-card section-collapse">
-                <summary>
-                  <span>Nueva visita</span>
-                  <span>Asignar al interno</span>
-                </summary>
-                <div className="section-collapse-body">
-                  <MutationBanner state={visitorState} />
-                  <form
-                    key={`visitor-form-${selected.id}-${formSeed}`}
-                    ref={visitorFormRef}
-                    action={visitorAction}
-                    className="field-grid"
-                    autoComplete="off"
-                  >
-                    <input type="hidden" name="interno_id" value={selected.id} />
-                    <div className="field"><input name="nombres" placeholder="Nombres" autoComplete="off" required /></div>
-                    <div className="field"><input name="apellido_pat" placeholder="Apellido paterno" autoComplete="off" required /></div>
-                    <div className="field"><input name="apellido_mat" placeholder="Apellido materno" autoComplete="off" required /></div>
-                    <div className="field"><input name="fecha_nacimiento" type="date" autoComplete="off" required /></div>
+              <article className="data-card">
+                <strong style={{ display: "block", marginBottom: "0.7rem" }}>Nueva visita</strong>
+                <MutationBanner state={visitorState} />
+                <form
+                  key={`visitor-form-${selected.id}-${formSeed}`}
+                  ref={visitorFormRef}
+                  action={visitorAction}
+                  className="field-grid"
+                  autoComplete="off"
+                >
+                  <input type="hidden" name="interno_id" value={selected.id} />
+                  <div className="field"><input name="nombres" placeholder="Nombres" autoComplete="off" required /></div>
+                  <div className="field"><input name="apellido_pat" placeholder="Apellido paterno" autoComplete="off" required /></div>
+                  <div className="field"><input name="apellido_mat" placeholder="Apellido materno" autoComplete="off" required /></div>
+                  <div className="field"><input name="fecha_nacimiento" type="date" autoComplete="off" required /></div>
+                  <div className="field">
+                    <select name="sexo" defaultValue="" required>
+                      <option value="" disabled>Sexo</option>
+                      <option value="hombre">Hombre</option>
+                      <option value="mujer">Mujer</option>
+                    </select>
+                  </div>
+                  <div className="field"><input name="parentesco" placeholder="Parentesco" autoComplete="off" required /></div>
+                  {canManageVisitorAvailability ? (
                     <div className="field">
-                      <select name="sexo" defaultValue="" required>
-                        <option value="" disabled>Sexo</option>
-                        <option value="hombre">Hombre</option>
-                        <option value="mujer">Mujer</option>
+                      <select name="betada" defaultValue="false">
+                        <option value="false">Activo</option>
+                        <option value="true">No disponible</option>
                       </select>
                     </div>
-                    <div className="field"><input name="parentesco" placeholder="Parentesco" autoComplete="off" required /></div>
-                    <div className="field"><input name="telefono" placeholder="Telefono" autoComplete="off" /></div>
-                    {canManageVisitorAvailability ? (
-                      <div className="field">
-                        <select name="betada" defaultValue="false">
-                          <option value="false">Activo</option>
-                          <option value="true">No disponible</option>
-                        </select>
-                      </div>
-                    ) : null}
-                    <div className="field" style={{ gridColumn: "1 / -1" }}>
-                      <textarea name="notas" placeholder="Notas" autoComplete="off" />
-                    </div>
-                    <div className="actions-row">
-                      <LoadingButton pending={visitorPending} label="Guardar visita" loadingLabel="Loading..." className="button-secondary" />
-                    </div>
-                  </form>
-                </div>
-              </details>
+                  ) : null}
+                  <div className="field" style={{ gridColumn: "1 / -1" }}>
+                    <textarea name="notas" placeholder="Notas" autoComplete="off" />
+                  </div>
+                  <div className="actions-row">
+                    <LoadingButton pending={visitorPending} label="Guardar visita" loadingLabel="Loading..." className="button-secondary" />
+                  </div>
+                </form>
+              </article>
 
-              <details className="data-card section-collapse">
-                <summary>
-                  <span>Crear pase</span>
-                  <span>{selectedDateValue ? formatLongDate(selectedDateValue) : "Sin fecha"}</span>
-                </summary>
-                <div className="section-collapse-body">
-                  <MutationBanner state={passState} />
-                  <form
-                    key={`pass-form-${selected.id}-${formSeed}`}
-                    action={passAction}
-                    className="field-grid"
-                    autoComplete="off"
-                  >
+              <article className="data-card">
+                <strong style={{ display: "block", marginBottom: "0.7rem" }}>Crear pase</strong>
+                <MutationBanner state={passState} />
+                <form
+                  key={`pass-form-${selected.id}-${formSeed}`}
+                  action={passAction}
+                  className="field-grid"
+                  autoComplete="off"
+                >
                     <input type="hidden" name="interno_id" value={selected.id} />
                     <input type="hidden" name="fecha_visita" value={selectedDateValue} />
                     {selectedVisitorIds.map((visitorId) => (
@@ -477,10 +452,10 @@ export function InternalBrowser({
                     {canManageMentions(roleKey) ? (
                       <>
                         <div className="field" style={{ gridColumn: "1 / -1" }}>
-                          <textarea name="menciones" placeholder="Peticiones basicas" autoComplete="off" />
+                          <textarea name="menciones" placeholder="Peticiones basicas" autoComplete="off" style={{ borderColor: "#d97706", boxShadow: "0 0 0 3px rgba(217,119,6,0.10)" }} />
                         </div>
                         <div className="field" style={{ gridColumn: "1 / -1" }}>
-                          <textarea name="especiales" placeholder="Peticiones especiales" autoComplete="off" />
+                          <textarea name="especiales" placeholder="Peticiones especiales" autoComplete="off" style={{ borderColor: "#c23030", boxShadow: "0 0 0 3px rgba(194,48,48,0.10)" }} />
                         </div>
                         <div className="field" style={{ gridColumn: "1 / -1" }}>
                           <label>Articulos</label>
@@ -502,8 +477,7 @@ export function InternalBrowser({
                       </div>
                     ) : null}
                   </form>
-                </div>
-              </details>
+              </article>
 
               {roleKey === "super-admin" && historyOpen ? (
                 <section className="profile-history-stack">
@@ -642,6 +616,30 @@ export function InternalBrowser({
                     );
                   })}
                 </section>
+              ) : null}
+
+              {roleKey === "super-admin" ? (
+                <details className="data-card section-collapse">
+                  <summary>
+                    <span>Cambiar estatus</span>
+                    <span>{getInternalStatusMeta(selected.estatus).label}</span>
+                  </summary>
+                  <div className="section-collapse-body">
+                    <MutationBanner state={statusState} />
+                    <form action={statusAction} className="actions-row" autoComplete="off">
+                      <input type="hidden" name="interno_id" value={selected.id} />
+                      <div className="field" style={{ flex: 1 }}>
+                        <select name="estatus" defaultValue={selected.estatus}>
+                          <option value="activo">Activo</option>
+                          <option value="150">150</option>
+                          <option value="retenido">Retenido</option>
+                          <option value="baja">Baja</option>
+                        </select>
+                      </div>
+                      <LoadingButton pending={statusPending} label="Guardar estatus" loadingLabel="Loading..." className="button-soft" />
+                    </form>
+                  </div>
+                </details>
               ) : null}
             </section>
           </div>

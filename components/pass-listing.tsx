@@ -159,7 +159,7 @@ function renderSeparatedPasses(pass: ListingRecord) {
   return sections.map((section) => (
     <article key={`${pass.id}-${section.key}`} className="pass-card apoyo-pass-card">
       <div className="apoyo-pass-header">
-        <div>
+        <div className="apoyo-pass-headline">
           <div className="apoyo-pass-kicker">{section.label}</div>
           <div className="apoyo-pass-date">{formatLongDate(pass.fechaVisita)}</div>
         </div>
@@ -209,7 +209,7 @@ function renderMentionPass(pass: ListingRecord) {
   return (
     <article key={pass.id} className="pass-card apoyo-pass-card mention-pass-card">
       <div className="apoyo-pass-header">
-        <div>
+        <div className="apoyo-pass-headline">
           <div className="apoyo-pass-kicker">Menciones</div>
           <div className="apoyo-pass-date">{formatLongDate(pass.fechaVisita)}</div>
         </div>
@@ -259,9 +259,13 @@ export function PassListing({
   printDate: string;
 }) {
   const [printMode, setPrintMode] = useState<PrintMode>("listado");
+  const [query, setQuery] = useState("");
 
   const filtered = useMemo(() => {
-    const byDate = listings.filter((item) => item.fechaVisita === printDate);
+    const normalized = query.trim().toLowerCase();
+    const byDate = listings
+      .filter((item) => item.fechaVisita === printDate)
+      .filter((item) => !normalized || item.internoNombre.toLowerCase().includes(normalized));
     const sorted = sortListingsForPrint(byDate);
     if (printMode === "menciones") {
       return sorted.filter(
@@ -314,6 +318,14 @@ export function PassListing({
           >
             Imprimir
           </button>
+        </div>
+        <div className="field" style={{ marginTop: "0.8rem" }}>
+          <input
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder="Buscar pase por interno"
+            autoComplete="off"
+          />
         </div>
       </div>
 

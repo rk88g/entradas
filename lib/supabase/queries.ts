@@ -50,6 +50,7 @@ import {
   getAgeFromDate,
   getAllowedModuleDeviceNames,
   getModuleDisplayName,
+  normalizeDeviceTypeName,
   getStatsFromListings,
   getTodayDate,
   getWeekRangeFromCutoff,
@@ -1170,7 +1171,7 @@ export async function getModulePanelData(moduleKey: ModuleKey, includeInactiveIn
   }));
   const allowedDeviceNames = getAllowedModuleDeviceNames(moduleKey);
   const visibleDeviceTypes = allowedDeviceNames
-    ? deviceTypes.filter((item) => allowedDeviceNames.has(item.name))
+    ? deviceTypes.filter((item) => allowedDeviceNames.has(normalizeDeviceTypeName(item.name)))
     : deviceTypes;
   const visibleDeviceTypeIds = new Set(visibleDeviceTypes.map((item) => item.id));
 
@@ -1205,8 +1206,7 @@ export async function getModulePanelData(moduleKey: ModuleKey, includeInactiveIn
 
   const internalMap = new Map(internals.map((item) => [item.id, item]));
   const zoneMap = new Map(zones.map((item) => [item.id, item]));
-  const moduleZoneIds = new Set(chargeRoutes.map((item) => item.zoneId));
-  const visibleZones = zones.filter((item) => moduleZoneIds.has(item.id));
+  const visibleZones = zones.filter((item) => item.active);
   const cycleId = cyclesResponse.data?.id ?? null;
   const paymentMap = new Map(
     (paymentsResponse.data ?? [])
@@ -1499,7 +1499,7 @@ export async function getIntegratedModuleCounts() {
       const typeName = getFirstRelation(item.module_device_types)?.name;
       if (
         (moduleKey === "visual" || moduleKey === "comunicacion") &&
-        (!allowedNames || (typeName ? allowedNames.has(typeName) : false))
+        (!allowedNames || (typeName ? allowedNames.has(normalizeDeviceTypeName(typeName)) : false))
       ) {
         acc[moduleKey] += 1;
       }

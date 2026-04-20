@@ -27,18 +27,6 @@ export default async function ListadoPage() {
     <>
       <section className="quick-grid hide-print">
         <article className="quick-card">
-          <h3>Mañana</h3>
-          <div className="mini-list">
-            <div className="mini-row">
-              <strong>{builderData.openDate ? formatLongDate(builderData.openDate.fechaCompleta) : "Sin fecha"}</strong>
-            </div>
-            <div className="mini-row">
-              <span>Pases</span>
-              <strong>{currentPrintListings.length}</strong>
-            </div>
-          </div>
-        </article>
-        <article className="quick-card">
           <h3>En espera</h3>
           <div className="mini-list">
             <div className="mini-row">
@@ -47,6 +35,18 @@ export default async function ListadoPage() {
             <div className="mini-row">
               <span>Pases</span>
               <strong>{waitingListings.length}</strong>
+            </div>
+          </div>
+        </article>
+        <article className="quick-card">
+          <h3>Mañana</h3>
+          <div className="mini-list">
+            <div className="mini-row">
+              <strong>{builderData.openDate ? formatLongDate(builderData.openDate.fechaCompleta) : "Sin fecha"}</strong>
+            </div>
+            <div className="mini-row">
+              <span>Pases</span>
+              <strong>{currentPrintListings.length}</strong>
             </div>
           </div>
         </article>

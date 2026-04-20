@@ -165,7 +165,7 @@ export function VisitorManager({
                       </div>
                     </td>
                     <td>{visitor.currentInternalName ?? "-"}</td>
-                    <td>{visitor.edad}</td>
+                    <td>{maskValue(visitor.edad, canViewSensitiveData)}</td>
                     <td>
                       <StatusBadge variant={visitor.betada ? "danger" : "ok"}>
                         {getVisitorAvailabilityLabel(visitor.betada)}
@@ -211,7 +211,7 @@ export function VisitorManager({
                     <div className="mini-row"><span>Parentesco</span><strong>{selectedVisitor.parentesco}</strong></div>
                     <div className="mini-row"><span>Telefono</span><strong>{maskValue(selectedVisitor.telefono ?? "No aplica", canViewSensitiveData)}</strong></div>
                     <div className="mini-row"><span>Nacimiento</span><strong>{formatHistoryDate(selectedVisitor.fechaNacimiento)}</strong></div>
-                    <div className="mini-row"><span>Edad</span><strong>{selectedVisitor.edad}</strong></div>
+                    <div className="mini-row"><span>Edad</span><strong>{maskValue(selectedVisitor.edad, canViewSensitiveData)}</strong></div>
                     <div className="mini-row">
                       <span>Estatus</span>
                       <StatusBadge variant={selectedVisitor.betada ? "danger" : "ok"}>

@@ -15,7 +15,8 @@ import {
   MutationState,
   RoleKey
 } from "@/lib/types";
-import { canManageModuleFunction, compareInternalLocations, formatLongDate } from "@/lib/utils";
+import { StatusBadge } from "@/components/status-badge";
+import { canManageModuleFunction, compareInternalLocations, formatLongDate, getDeviceStatusMeta } from "@/lib/utils";
 
 const mutationInitialState: MutationState = {
   success: null,
@@ -273,7 +274,11 @@ export function IntegratedModulePanel({
                           <td>{device.internalName}</td>
                           <td>{device.internalLocation}</td>
                           <td>{`${device.quantity} ${device.deviceTypeName}`}</td>
-                          <td>{device.status}</td>
+                          <td>
+                            <StatusBadge variant={getDeviceStatusMeta(device.status).variant}>
+                              {getDeviceStatusMeta(device.status).label}
+                            </StatusBadge>
+                          </td>
                         </tr>
                       ))
                     )}
@@ -491,7 +496,11 @@ export function IntegratedModulePanel({
                       <tr key={device.id}>
                         <td>{`${device.quantity} ${device.deviceTypeName}`}</td>
                         <td>{[device.brand, device.model].filter(Boolean).join(" / ") || "Sin detalle"}</td>
-                        <td>{device.status}</td>
+                        <td>
+                          <StatusBadge variant={getDeviceStatusMeta(device.status).variant}>
+                            {getDeviceStatusMeta(device.status).label}
+                          </StatusBadge>
+                        </td>
                         <td>{device.zoneName ?? "-"}</td>
                       </tr>
                     ))

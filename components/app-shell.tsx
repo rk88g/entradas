@@ -1,9 +1,9 @@
 "use client";
 
-import Link from "next/link";
-import { usePathname } from "next/navigation";
-import { useState } from "react";
+import { usePathname, useRouter } from "next/navigation";
+import { useEffect, useState } from "react";
 import { LogoutButton } from "@/components/logout-button";
+import { ThemeToggle } from "@/components/theme-toggle";
 import { UserProfile } from "@/lib/types";
 import { canAccessCoreSystem, canAccessModule } from "@/lib/utils";
 
@@ -31,7 +31,9 @@ export function AppShell({
   user: UserProfile;
 }) {
   const pathname = usePathname();
+  const router = useRouter();
   const [open, setOpen] = useState(false);
+  const [loadingHref, setLoadingHref] = useState<string | null>(null);
   const visibleNavItems = [
     ...(canAccessCoreSystem(user.roleKey, user.moduleOnly) ? coreNavItems : []),
     ...(user.roleKey === "super-admin"
@@ -39,6 +41,21 @@ export function AppShell({
       : []),
     ...moduleNavItems.filter((item) => canAccessModule(user.roleKey, user.accessibleModules, item.moduleKey))
   ];
+
+  useEffect(() => {
+    setLoadingHref(null);
+  }, [pathname]);
+
+  function handleNavigate(href: string) {
+    if (href === pathname) {
+      setOpen(false);
+      return;
+    }
+
+    setLoadingHref(href);
+    setOpen(false);
+    router.push(href);
+  }
 
   return (
     <div className="page-bg">
@@ -62,15 +79,14 @@ export function AppShell({
                 {visibleNavItems.map((item) => {
                   const active = pathname === item.href;
                   return (
-                    <Link
+                    <button
                       key={item.href}
-                      href={item.href}
                       className={`nav-link ${active ? "active" : ""} ${"danger" in item && item.danger ? "danger-link" : ""}`}
-                      onClick={() => setOpen(false)}
+                      onClick={() => handleNavigate(item.href)}
                     >
                       <span className="icon-pill">{item.icon}</span>
                       {item.label}
-                    </Link>
+                    </button>
                   );
                 })}
               </nav>
@@ -85,10 +101,19 @@ export function AppShell({
 
         <main className="app-main">
           <section className="app-panel hide-print">
-            <div className="record-title">
+            <div className="record-title app-header-bar">
               <strong className="module-title">Sistema Cumplido desde 2020</strong>
+              <ThemeToggle />
             </div>
           </section>
+          {loadingHref ? (
+            <div className="page-loading-scrim hide-print">
+              <div className="page-loading-card">
+                <span className="loading-spinner" />
+                <strong>Loading...</strong>
+              </div>
+            </div>
+          ) : null}
           {children}
         </main>
       </div>

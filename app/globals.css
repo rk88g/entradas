@@ -88,21 +88,25 @@ button {
 }
 
 .theme-toggle {
-  position: fixed;
-  right: 1.25rem;
-  top: 1.15rem;
-  z-index: 150;
   border: 1px solid var(--line-strong);
   background: var(--surface);
   color: var(--text);
   border-radius: 999px;
-  min-width: 112px;
-  min-height: 52px;
-  padding: 0.7rem 1.1rem;
+  width: 44px;
+  height: 44px;
+  min-width: 44px;
+  min-height: 44px;
+  padding: 0;
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  box-shadow: var(--shadow);
+  box-shadow: none;
+  flex: 0 0 auto;
+}
+
+.theme-toggle-icon {
+  font-size: 1.2rem;
+  line-height: 1;
 }
 
 .glass-panel {
@@ -497,6 +501,10 @@ html[data-theme="dark"] .segmented-button {
   border-radius: 16px;
   color: var(--muted);
   font-weight: 700;
+  border: none;
+  width: 100%;
+  text-align: left;
+  background: transparent;
 }
 
 .nav-link.active {
@@ -592,6 +600,35 @@ html[data-theme="dark"] .role-badge {
 .app-main {
   display: grid;
   gap: 1rem;
+  position: relative;
+}
+
+.app-header-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.page-loading-scrim {
+  position: fixed;
+  inset: 0;
+  background: rgba(15, 23, 42, 0.24);
+  display: grid;
+  place-items: center;
+  z-index: 140;
+  pointer-events: none;
+}
+
+.page-loading-card {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.8rem;
+  padding: 0.85rem 1.1rem;
+  border-radius: 999px;
+  background: var(--surface-strong);
+  border: 1px solid var(--line);
+  box-shadow: var(--shadow);
 }
 
 .app-panel,
@@ -1165,7 +1202,7 @@ html[data-theme="dark"] .note-box {
 
 .apoyo-pass-card {
   display: grid;
-  gap: 0.55rem;
+  gap: 0.3rem;
   background: #fffefa;
   border: 1px solid #e4d1ad;
 }
@@ -1182,7 +1219,7 @@ html[data-theme="dark"] .note-box {
   align-items: baseline;
   justify-content: flex-start;
   flex-wrap: wrap;
-  gap: 0.9rem;
+  gap: 0.55rem;
   align-content: start;
 }
 
@@ -1195,7 +1232,7 @@ html[data-theme="dark"] .note-box {
 }
 
 .apoyo-pass-date {
-  font-size: 0.92rem;
+  font-size: 0.84rem;
   color: var(--muted);
   text-align: left;
 }
@@ -1260,20 +1297,20 @@ html[data-theme="dark"] .danger-zone-panel .section-collapse summary {
 .apoyo-pass-footer,
 .numbers-print-list {
   display: grid;
-  gap: 0.35rem;
+  gap: 0.18rem;
 }
 
 .apoyo-pass-meta {
-  font-size: 0.92rem;
+  font-size: 0.84rem;
 }
 
 .apoyo-pass-section strong {
-  font-size: 0.9rem;
+  font-size: 0.82rem;
 }
 
 .apoyo-pass-line {
-  font-size: 0.92rem;
-  line-height: 1.15;
+  font-size: 0.84rem;
+  line-height: 1.05;
 }
 
 .apoyo-pass-line.warning {
@@ -1293,14 +1330,14 @@ html[data-theme="dark"] .danger-zone-panel .section-collapse summary {
 }
 
 .support-note-list {
-  padding-top: 0.35rem;
+  padding-top: 0.18rem;
   border-top: 1px dashed #d7bf98;
 }
 
 .support-note-block {
   display: grid;
-  gap: 0.18rem;
-  padding-top: 0.35rem;
+  gap: 0.12rem;
+  padding-top: 0.18rem;
   border-top: 1px dashed #d7bf98;
 }
 
@@ -1631,18 +1668,18 @@ html[data-theme="dark"] .danger-zone-panel .section-collapse summary {
   }
 
   .apoyo-pass-header {
-    margin-bottom: 0.05cm;
+    margin-bottom: 0.03cm;
   }
 
   .apoyo-pass-kicker {
-    font-size: 0.68rem;
+    font-size: 0.62rem;
   }
 
   .apoyo-pass-date,
   .apoyo-pass-meta,
   .apoyo-pass-line,
   .apoyo-pass-section strong {
-    font-size: 0.72rem;
+    font-size: 0.66rem;
   }
 
   .apoyo-pass-number {
@@ -1653,7 +1690,7 @@ html[data-theme="dark"] .danger-zone-panel .section-collapse summary {
   .apoyo-pass-section,
   .apoyo-pass-meta,
   .apoyo-pass-footer {
-    gap: 0.08cm;
+    gap: 0.04cm;
   }
 
   .apoyo-print-grid .visits-section {

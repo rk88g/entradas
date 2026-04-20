@@ -1,5 +1,4 @@
 import type { Metadata } from "next";
-import { ThemeToggle } from "@/components/theme-toggle";
 import { UiRuntime } from "@/components/ui-runtime";
 import "./globals.css";
 
@@ -17,7 +16,6 @@ export default function RootLayout({
     <html lang="es">
       <body>
         <UiRuntime />
-        <ThemeToggle />
         {children}
       </body>
     </html>

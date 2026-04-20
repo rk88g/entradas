@@ -22,6 +22,7 @@ import {
   getDateOffset,
   isValidInternalLocation,
   getWeekRangeFromCutoff,
+  normalizeDeviceTypeName,
   nextPassNumber
 } from "@/lib/utils";
 
@@ -1384,7 +1385,7 @@ export async function assignModuleDeviceAction(
       return failure(typeError?.message || "No se encontro el tipo de aparato.");
     }
 
-    if (allowedDeviceNames && !allowedDeviceNames.has(selectedType.name)) {
+    if (allowedDeviceNames && !allowedDeviceNames.has(normalizeDeviceTypeName(selectedType.name))) {
       return failure(`Ese aparato no corresponde al bloque ${moduleKey}.`);
     }
 
@@ -1507,7 +1508,7 @@ export async function registerModulePaymentAction(
       const typeName = Array.isArray(deviceTypeRelation)
         ? deviceTypeRelation[0]?.name
         : deviceTypeRelation?.name;
-      return !allowedDeviceNames || (typeName ? allowedDeviceNames.has(typeName) : false);
+      return !allowedDeviceNames || (typeName ? allowedDeviceNames.has(normalizeDeviceTypeName(typeName)) : false);
     });
 
     if (filteredTargetDevices.length === 0) {
@@ -1652,7 +1653,7 @@ export async function closeModuleWeekAction(
     const activeDeviceIds = (devices ?? [])
       .filter((item) => {
         const typeName = item.module_device_types?.[0]?.name;
-        if (allowedDeviceNames && (!typeName || !allowedDeviceNames.has(typeName))) {
+        if (allowedDeviceNames && (!typeName || !allowedDeviceNames.has(normalizeDeviceTypeName(typeName)))) {
           return false;
         }
 

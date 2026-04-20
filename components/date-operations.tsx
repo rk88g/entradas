@@ -42,8 +42,8 @@ export function DateOperations({
 
         <div className="calendar-grid" style={{ marginTop: "1rem" }}>
           {[
-            { label: "MAÑANA", dateValue: tomorrowValue, record: tomorrowDate },
-            { label: "EN ESPERA", dateValue: waitingValue, record: waitingDate }
+            { label: "EN ESPERA", dateValue: waitingValue, record: waitingDate },
+            { label: "MAÑANA", dateValue: tomorrowValue, record: tomorrowDate }
           ].map((slot) => (
             <article key={slot.dateValue} className="calendar-card date-slot-card">
               <span className="eyebrow">{slot.label}</span>
@@ -76,19 +76,25 @@ export function DateOperations({
                   {registeredDates.length === 0 ? (
                     <tr><td colSpan={3}>Sin fechas registradas.</td></tr>
                   ) : (
-                    registeredDates.map((date) => (
-                      <tr key={date.id}>
-                        <td>{formatLongDate(date.fechaCompleta)}</td>
-                        <td>
-                          {date.fechaCompleta === tomorrowValue
-                            ? "MAÑANA"
-                            : date.fechaCompleta === waitingValue
-                              ? "EN ESPERA"
-                              : "Registrada"}
-                        </td>
-                        <td>{date.cierre ? "Cerrada" : "Disponible"}</td>
-                      </tr>
-                    ))
+                    registeredDates.map((date) => {
+                      const concluded = date.fechaCompleta < tomorrowValue;
+                      const type = concluded
+                        ? "CONCLUIDA"
+                        : date.fechaCompleta === tomorrowValue
+                          ? "MAÑANA"
+                          : date.fechaCompleta === waitingValue
+                            ? "EN ESPERA"
+                            : "Registrada";
+                      const status = concluded ? "CONCLUIDA" : date.cierre ? "Cerrada" : "Disponible";
+
+                      return (
+                        <tr key={date.id}>
+                          <td>{formatLongDate(date.fechaCompleta)}</td>
+                          <td>{type}</td>
+                          <td>{status}</td>
+                        </tr>
+                      );
+                    })
                   )}
                 </tbody>
               </table>

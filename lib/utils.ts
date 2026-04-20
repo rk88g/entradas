@@ -200,6 +200,44 @@ export function getEscaleraStatusLabel(status: EscaleraEntryStatus) {
   return "Pendiente";
 }
 
+export function getEscaleraStatusMeta(status: EscaleraEntryStatus) {
+  if (status === "entregado") {
+    return { label: "Entregado", variant: "ok" as const };
+  }
+
+  if (status === "retenido") {
+    return { label: "Retenido", variant: "danger" as const };
+  }
+
+  if (status === "rechazado") {
+    return { label: "No entregado", variant: "off" as const };
+  }
+
+  return { label: "Pendiente", variant: "warn" as const };
+}
+
+export function getDeviceStatusMeta(status: string) {
+  const normalized = String(status ?? "").trim().toLowerCase();
+
+  if (normalized === "activo") {
+    return { label: "Activo", variant: "ok" as const };
+  }
+
+  if (normalized === "pendiente") {
+    return { label: "Pendiente", variant: "warn" as const };
+  }
+
+  if (normalized === "retenido") {
+    return { label: "Retenido", variant: "danger" as const };
+  }
+
+  if (normalized === "reparacion") {
+    return { label: "Mantenimiento", variant: "off" as const };
+  }
+
+  return { label: "Baja", variant: "off" as const };
+}
+
 export function getStatsFromListings(listings: ListingRecord[]) {
   const totalVisitors = listings.reduce((sum, item) => sum + item.visitantes.length, 0);
   const minors = listings.reduce(
@@ -270,16 +308,46 @@ export function canManageModuleFunction(
   );
 }
 
+export function normalizeDeviceTypeName(value?: string | null) {
+  return String(value ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .trim()
+    .toLowerCase();
+}
+
 export function getAllowedModuleDeviceNames(moduleKey: ModuleKey) {
   if (moduleKey === "visual") {
-    return new Set(["Pantalla", "Consola", "Sonido"]);
+    return new Set(["pantalla", "pantallas", "consola", "consolas", "sonido"]);
   }
 
   if (moduleKey === "comunicacion") {
-    return new Set(["Banda ancha", "Celular", "Internet", "Laptop", "Satelital", "Tablet"]);
+    return new Set(["banda ancha", "celular", "telefono", "internet", "laptop", "satelital", "tablet"]);
   }
 
   return null;
+}
+
+export function getInternalStatusMeta(status?: string | null) {
+  const normalized = String(status ?? "").trim().toLowerCase();
+
+  if (normalized === "activo") {
+    return { label: "Activo", variant: "ok" as const };
+  }
+
+  if (normalized === "retenido") {
+    return { label: "Retenido", variant: "danger" as const };
+  }
+
+  if (normalized === "baja") {
+    return { label: "Baja", variant: "off" as const };
+  }
+
+  if (normalized === "150") {
+    return { label: "150", variant: "warn" as const };
+  }
+
+  return { label: status || "Sin estatus", variant: "off" as const };
 }
 
 export function getWeekRange(reference = new Date()) {

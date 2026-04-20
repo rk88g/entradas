@@ -19,6 +19,8 @@ export function ThemeToggle() {
     <button
       type="button"
       className="theme-toggle hide-print"
+      aria-label={theme === "dark" ? "Cambiar a tema claro" : "Cambiar a tema oscuro"}
+      title={theme === "dark" ? "Tema claro" : "Tema oscuro"}
       onClick={() => {
         window.dispatchEvent(new Event("codex-theme-toggle"));
         requestAnimationFrame(() => {
@@ -26,7 +28,7 @@ export function ThemeToggle() {
         });
       }}
     >
-      {theme === "dark" ? "Claro" : "Oscuro"}
+      <span aria-hidden="true" className="theme-toggle-icon">{theme === "dark" ? "☾" : "☀"}</span>
     </button>
   );
 }

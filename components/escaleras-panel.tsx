@@ -4,8 +4,9 @@ import { useActionState, useEffect, useMemo, useState } from "react";
 import { addEscaleraItemAction, saveEscaleraEntryAction } from "@/app/sistema/actions";
 import { LoadingButton } from "@/components/loading-button";
 import { MutationBanner } from "@/components/mutation-banner";
+import { StatusBadge } from "@/components/status-badge";
 import { EscaleraRecord, MutationState, RoleKey } from "@/lib/types";
-import { formatLongDate, getEscaleraStatusLabel } from "@/lib/utils";
+import { formatLongDate, getEscaleraStatusMeta } from "@/lib/utils";
 
 const mutationInitialState: MutationState = {
   success: null,
@@ -94,7 +95,11 @@ export function EscalerasPanel({
                         <td>{record.internalName}</td>
                         <td>{record.laborando ? "Si" : "No"}</td>
                         <td>{record.off8Aplica ? "Aplica" : "No"}</td>
-                        <td>{getEscaleraStatusLabel(record.status)}</td>
+                        <td>
+                          <StatusBadge variant={getEscaleraStatusMeta(record.status).variant}>
+                            {getEscaleraStatusMeta(record.status).label}
+                          </StatusBadge>
+                        </td>
                       </tr>
                     ))
                   )}
@@ -175,7 +180,7 @@ export function EscalerasPanel({
               <details className="data-card section-collapse">
                 <summary>
                   <span>Cierre del registro</span>
-                  <span>{getEscaleraStatusLabel(selectedRecord.status)}</span>
+                  <span>{getEscaleraStatusMeta(selectedRecord.status).label}</span>
                 </summary>
                 <div className="section-collapse-body">
                   <MutationBanner state={entryState} />
