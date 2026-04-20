@@ -871,10 +871,30 @@ export async function getInternalProfiles(options?: {
   ] =
       await Promise.all([
         internalIds.length
-          ? supabase
-              .from("interno_visitas")
-              .select("id, interno_id, visita_id, parentesco, titular")
-              .in("interno_id", internalIds)
+          ? (async () => {
+              const rows: Array<{
+                id: string;
+                interno_id: string;
+                visita_id: string;
+                parentesco: string | null;
+                titular: boolean | null;
+              }> = [];
+
+              for (const chunk of splitIntoChunks(internalIds)) {
+                const { data, error } = await supabase
+                  .from("interno_visitas")
+                  .select("id, interno_id, visita_id, parentesco, titular")
+                  .in("interno_id", chunk);
+
+                if (error) {
+                  return { data: null, error };
+                }
+
+                rows.push(...(data ?? []));
+              }
+
+              return { data: rows, error: null };
+            })()
           : Promise.resolve({ data: [], error: null }),
         getListado()
         ,

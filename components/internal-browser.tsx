@@ -215,6 +215,13 @@ export function InternalBrowser({
               id="internal-search"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Escape") {
+                  event.preventDefault();
+                  setQuery("");
+                  setPage(1);
+                }
+              }}
               placeholder="Buscar por nombre o ubicacion"
               autoComplete="off"
             />
@@ -356,7 +363,7 @@ export function InternalBrowser({
                 <MutationBanner state={{ success: null, error: "Debes incluir al menos un adulto en el pase." }} />
               ) : null}
 
-              <article className="data-card">
+              <article className="data-card two-column-card">
                 <strong style={{ display: "block", marginBottom: "0.7rem" }}>No vendran</strong>
                 <div className="visitor-choice-grid">
                   {availableVisitors.length === 0 ? <span className="muted">Sin registros.</span> : availableVisitors.map((item) => (
@@ -368,7 +375,7 @@ export function InternalBrowser({
                 </div>
               </article>
 
-              <article className="data-card">
+              <article className="data-card two-column-card">
                 <strong style={{ display: "block", marginBottom: "0.7rem" }}>Vendran</strong>
                 <div className="visitor-choice-grid">
                   {selectedVisitors.length === 0 ? <span className="muted">Sin registros.</span> : selectedVisitors.map((item) => (
@@ -379,6 +386,7 @@ export function InternalBrowser({
                   ))}
                 </div>
               </article>
+
 
               <article className="data-card">
                 <strong style={{ display: "block", marginBottom: "0.7rem" }}>Nueva visita</strong>

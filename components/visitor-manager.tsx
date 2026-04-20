@@ -137,7 +137,19 @@ export function VisitorManager({
         </div>
 
         <div className="field" style={{ marginBottom: "0.8rem" }}>
-          <input value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Buscar visita o interno" autoComplete="off" />
+          <input
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === "Escape") {
+                event.preventDefault();
+                setQuery("");
+                setPage(1);
+              }
+            }}
+            placeholder="Buscar visita o interno"
+            autoComplete="off"
+          />
         </div>
 
         <div className="table-wrap compact-table">

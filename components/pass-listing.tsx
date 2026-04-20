@@ -320,12 +320,18 @@ export function PassListing({
           </button>
         </div>
         <div className="field" style={{ marginTop: "0.8rem" }}>
-          <input
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
-            placeholder="Buscar pase por interno"
-            autoComplete="off"
-          />
+              <input
+                value={query}
+                onChange={(event) => setQuery(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Escape") {
+                    event.preventDefault();
+                    setQuery("");
+                  }
+                }}
+                placeholder="Buscar pase por interno"
+                autoComplete="off"
+              />
         </div>
       </div>
 
