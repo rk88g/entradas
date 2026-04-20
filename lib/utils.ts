@@ -185,6 +185,14 @@ export function canCloseMexicoCityDate(reference = new Date()) {
 }
 
 export function getEscaleraStatusLabel(status: EscaleraEntryStatus) {
+  if (status === "pagado") {
+    return "Pagado";
+  }
+
+  if (status === "enviado") {
+    return "Enviado";
+  }
+
   if (status === "entregado") {
     return "Entregado";
   }
@@ -201,6 +209,14 @@ export function getEscaleraStatusLabel(status: EscaleraEntryStatus) {
 }
 
 export function getEscaleraStatusMeta(status: EscaleraEntryStatus) {
+  if (status === "pagado") {
+    return { label: "Pagado", variant: "ok" as const };
+  }
+
+  if (status === "enviado") {
+    return { label: "Enviado", variant: "warn" as const };
+  }
+
   if (status === "entregado") {
     return { label: "Entregado", variant: "ok" as const };
   }

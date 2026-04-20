@@ -372,8 +372,8 @@ export interface InternalSeizureRecord {
   notes?: string;
 }
 
-export type EscaleraEntryStatus = "pendiente" | "entregado" | "retenido" | "rechazado";
-export type EscaleraOff8Type = "fijo" | "porcentual";
+export type EscaleraEntryStatus = "pendiente" | "enviado" | "entregado" | "pagado" | "retenido" | "rechazado";
+export type EscaleraOff8Type = "fijo" | "porcentual" | "libre";
 
 export interface EscaleraManualItem {
   id: string;
@@ -405,6 +405,7 @@ export interface EscaleraRecord {
   fechaVisita: string;
   off8Aplica: boolean;
   off8Type?: EscaleraOff8Type | null;
+  off8Percent?: number | null;
   off8Value?: number | null;
   ticketAmount?: number | null;
   status: EscaleraEntryStatus;
@@ -415,6 +416,12 @@ export interface EscaleraRecord {
   passDeviceItems: PassDeviceItem[];
   authorizedDevices: EscaleraAuthorizedDevice[];
   manualItems: EscaleraManualItem[];
+}
+
+export interface AduanaRecord extends EscaleraRecord {
+  confirmedAt?: string | null;
+  paidAt?: string | null;
+  paidAmount?: number | null;
 }
 
 export interface ConnectionLogRecord {

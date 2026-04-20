@@ -475,10 +475,11 @@ returns trigger
 language plpgsql
 as $$
 begin
-  select module_key
-  into new.module_key
-  from public.module_device_types
-  where id = new.device_type_id;
+  new.module_key := (
+    select t.module_key
+    from public.module_device_types t
+    where t.id = new.device_type_id
+  );
 
   return new;
 end;
@@ -575,16 +576,46 @@ create table if not exists public.escalera_entries (
   internal_id uuid not null references public.internos (id) on delete cascade,
   fecha_visita date not null,
   off8_aplica boolean not null default false,
-  off8_type text check (off8_type in ('fijo', 'porcentual')),
+  off8_type text check (off8_type in ('fijo', 'porcentual', 'libre')),
+  off8_percent numeric(5,2),
   off8_value numeric(10,2),
   ticket_amount numeric(10,2),
-  status text not null default 'pendiente' check (status in ('pendiente', 'entregado', 'retenido', 'rechazado')),
+  status text not null default 'pendiente' check (status in ('pendiente', 'enviado', 'entregado', 'pagado', 'retenido', 'rechazado')),
   comentarios text,
   retenciones text,
+  confirmed_at timestamptz,
+  paid_at timestamptz,
+  paid_amount numeric(10,2),
   created_by uuid references public.user_profiles (id),
   created_at timestamptz not null default timezone('utc', now()),
   updated_at timestamptz not null default timezone('utc', now())
 );
+
+alter table public.escalera_entries
+  add column if not exists off8_percent numeric(5,2);
+
+alter table public.escalera_entries
+  add column if not exists confirmed_at timestamptz;
+
+alter table public.escalera_entries
+  add column if not exists paid_at timestamptz;
+
+alter table public.escalera_entries
+  add column if not exists paid_amount numeric(10,2);
+
+alter table public.escalera_entries
+  drop constraint if exists escalera_entries_off8_type_check;
+
+alter table public.escalera_entries
+  add constraint escalera_entries_off8_type_check
+  check (off8_type in ('fijo', 'porcentual', 'libre'));
+
+alter table public.escalera_entries
+  drop constraint if exists escalera_entries_status_check;
+
+alter table public.escalera_entries
+  add constraint escalera_entries_status_check
+  check (status in ('pendiente', 'enviado', 'entregado', 'pagado', 'retenido', 'rechazado'));
 
 create table if not exists public.escalera_entry_items (
   id uuid primary key default gen_random_uuid(),

@@ -74,6 +74,8 @@ export function AdminControlPanel({
   const [tab, setTab] = useState<"sesiones" | "acciones" | "usuarios" | "configuracion">("configuracion");
   const [selectedModuleForRoute, setSelectedModuleForRoute] = useState<ModuleKey>("visual");
   const [selectedModuleForPrice, setSelectedModuleForPrice] = useState<ModuleKey>("visual");
+  const [workplaceInternalSearch, setWorkplaceInternalSearch] = useState("");
+  const [selectedWorkplaceInternalId, setSelectedWorkplaceInternalId] = useState("");
   const [passwordState, passwordAction, passwordPending] = useActionState(updateAuthUserPasswordAction, mutationInitialState);
   const [cutoffState, cutoffAction, cutoffPending] = useActionState(saveModuleSettingsAction, mutationInitialState);
   const [zoneState, zoneAction, zonePending] = useActionState(createModuleZoneAction, mutationInitialState);
@@ -86,6 +88,17 @@ export function AdminControlPanel({
     () => config.deviceTypes.filter((item) => item.moduleKey === selectedModuleForPrice),
     [config.deviceTypes, selectedModuleForPrice]
   );
+  const filteredInternals = useMemo(() => {
+    const normalized = workplaceInternalSearch.trim().toLowerCase();
+    if (!normalized) {
+      return internals;
+    }
+
+    return internals.filter((internal) => (
+      internal.fullName.toLowerCase().includes(normalized) ||
+      internal.ubicacion.toLowerCase().includes(normalized)
+    ));
+  }, [internals, workplaceInternalSearch]);
 
   return (
     <section className="module-panel danger-zone-panel">
@@ -360,14 +373,33 @@ export function AdminControlPanel({
               <div className="field"><input name="title" placeholder="Puesto" autoComplete="off" /></div>
               <div className="field"><input name="salary" type="number" step="0.01" placeholder="Sueldo" autoComplete="off" /></div>
               <div className="field">
-                <select name="assigned_internal_id" defaultValue="">
-                  <option value="">Vacante</option>
-                  {internals.map((internal) => (
-                    <option key={internal.id} value={internal.id}>
-                      {internal.ubicacion} - {internal.fullName}
-                    </option>
+                <input
+                  value={workplaceInternalSearch}
+                  onChange={(event) => setWorkplaceInternalSearch(event.target.value)}
+                  placeholder="Buscar interno o dejar vacante"
+                  autoComplete="off"
+                />
+                <input type="hidden" name="assigned_internal_id" value={selectedWorkplaceInternalId} />
+                <div className="inline-search-list">
+                  <button
+                    type="button"
+                    className={`inline-search-item ${selectedWorkplaceInternalId === "" ? "active" : ""}`}
+                    onClick={() => setSelectedWorkplaceInternalId("")}
+                  >
+                    <strong>Vacante</strong>
+                  </button>
+                  {filteredInternals.slice(0, 8).map((internal) => (
+                    <button
+                      key={internal.id}
+                      type="button"
+                      className={`inline-search-item ${selectedWorkplaceInternalId === internal.id ? "active" : ""}`}
+                      onClick={() => setSelectedWorkplaceInternalId(internal.id)}
+                    >
+                      <strong>{internal.fullName}</strong>
+                      <span className="muted">{internal.ubicacion}</span>
+                    </button>
                   ))}
-                </select>
+                </div>
               </div>
               <div className="actions-row">
                 <LoadingButton pending={positionPending} label="Guardar puesto" loadingLabel="Loading..." className="button-secondary" />

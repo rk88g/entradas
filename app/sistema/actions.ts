@@ -914,6 +914,7 @@ export async function createPassAction(
       const { data: articleTypes, error: articleTypeError } = await supabase
         .from("module_device_types")
         .select("id, name")
+        .eq("active", true)
         .in(
           "id",
           articlePayload.map((item) => item.deviceTypeId)
@@ -992,6 +993,7 @@ export async function createPassAction(
       const { data: articleTypes, error: articleTypeError } = await supabase
         .from("module_device_types")
         .select("id, module_key")
+        .eq("active", true)
         .in(
           "id",
           articlePayload.map((item) => item.deviceTypeId)
@@ -1724,14 +1726,55 @@ export async function saveEscaleraEntryAction(
     const fechaVisita = String(formData.get("fecha_visita") ?? "").trim();
     const off8Aplica = String(formData.get("off8_aplica") ?? "") === "on";
     const off8Type = String(formData.get("off8_type") ?? "").trim() || null;
+    const off8Percent = Number(formData.get("off8_percent") ?? 0);
     const off8Value = Number(formData.get("off8_value") ?? 0);
     const ticketAmount = Number(formData.get("ticket_amount") ?? 0);
-    const status = String(formData.get("status") ?? "pendiente").trim();
+    const requestedStatus = String(formData.get("status") ?? "pendiente").trim();
     const comentarios = String(formData.get("comentarios") ?? "").trim() || null;
     const retenciones = String(formData.get("retenciones") ?? "").trim() || null;
 
     if (!listadoId || !internalId || !fechaVisita) {
       return failure("Faltan datos del registro de Escaleras.");
+    }
+
+    const { data: currentEntry } = await supabase
+      .from("escalera_entries")
+      .select("id")
+      .eq("listado_id", listadoId)
+      .maybeSingle();
+
+    const entryId = currentEntry?.id ?? null;
+    const itemCheck = entryId
+      ? await supabase
+          .from("escalera_entry_items")
+          .select("id", { count: "exact", head: true })
+          .eq("escalera_entry_id", entryId)
+      : null;
+    const manualItemCount = Number(itemCheck?.count ?? 0);
+
+    let resolvedStatus = requestedStatus;
+    let resolvedOff8Type = off8Aplica ? off8Type : null;
+    let resolvedTicketAmount = Number.isFinite(ticketAmount) && ticketAmount > 0 ? ticketAmount : null;
+    let resolvedOff8Percent = off8Aplica && resolvedOff8Type === "porcentual" && Number.isFinite(off8Percent) && off8Percent > 0
+      ? Math.max(1, Math.min(100, off8Percent))
+      : null;
+    let resolvedOff8Value = off8Aplica && Number.isFinite(off8Value) && off8Value > 0 ? off8Value : null;
+
+    if (resolvedOff8Type === "libre") {
+      resolvedStatus = "entregado";
+      resolvedTicketAmount = null;
+      resolvedOff8Percent = null;
+      resolvedOff8Value = 0;
+    } else if (off8Aplica && resolvedOff8Type === "porcentual" && resolvedTicketAmount) {
+      resolvedOff8Value = Number(((resolvedTicketAmount * (resolvedOff8Percent ?? 0)) / 100).toFixed(2));
+    }
+
+    if (off8Aplica && resolvedOff8Type !== "libre" && requestedStatus !== "pendiente") {
+      resolvedStatus = "enviado";
+    }
+
+    if (resolvedStatus !== "pendiente" && manualItemCount === 0) {
+      return failure("Debes capturar primero el listado de articulos antes de cerrar el registro.");
     }
 
     const { error } = await supabase.from("escalera_entries").upsert(
@@ -1740,10 +1783,11 @@ export async function saveEscaleraEntryAction(
         internal_id: internalId,
         fecha_visita: fechaVisita,
         off8_aplica: off8Aplica,
-        off8_type: off8Aplica ? off8Type : null,
-        off8_value: off8Aplica && Number.isFinite(off8Value) ? off8Value : null,
-        ticket_amount: off8Aplica && Number.isFinite(ticketAmount) ? ticketAmount : null,
-        status,
+        off8_type: resolvedOff8Type,
+        off8_percent: resolvedOff8Percent,
+        off8_value: off8Aplica ? resolvedOff8Value : null,
+        ticket_amount: resolvedTicketAmount,
+        status: resolvedStatus,
         comentarios,
         retenciones,
         created_by: profile.id
@@ -1757,10 +1801,11 @@ export async function saveEscaleraEntryAction(
 
     const logLines = [
       off8Aplica ? `Off8: ${off8Type === "porcentual" ? "Porcentual" : "Fijo"} ${Number.isFinite(off8Value) ? off8Value : 0}` : null,
-      Number.isFinite(ticketAmount) && ticketAmount > 0 ? `Ticket: $${ticketAmount.toFixed(2)}` : null,
+      resolvedOff8Type === "libre" ? "Off8: Libre" : null,
+      Number.isFinite(resolvedTicketAmount ?? 0) && (resolvedTicketAmount ?? 0) > 0 ? `Ticket: $${(resolvedTicketAmount ?? 0).toFixed(2)}` : null,
       retenciones ? `Retenciones: ${retenciones}` : null,
       comentarios ? `Comentarios: ${comentarios}` : null,
-      `Estatus: ${status}`
+      `Estatus: ${resolvedStatus}`
     ].filter(Boolean);
 
     if (logLines.length > 0) {
@@ -1789,10 +1834,11 @@ export async function saveEscaleraEntryAction(
         internalId,
         fechaVisita,
         off8Aplica,
-        off8Type,
-        off8Value,
-        ticketAmount,
-        status,
+        off8Type: resolvedOff8Type,
+        off8Percent: resolvedOff8Percent,
+        off8Value: resolvedOff8Value,
+        ticketAmount: resolvedTicketAmount,
+        status: resolvedStatus,
         comentarios,
         retenciones
       }
@@ -1881,6 +1927,60 @@ export async function addEscaleraItemAction(
     return success("Articulo agregado.");
   } catch (error) {
     return failure(error instanceof Error ? error.message : "No se pudo guardar el articulo.");
+  }
+}
+
+export async function payAduanaEntryAction(
+  _prevState: MutationState,
+  formData: FormData
+): Promise<MutationState> {
+  try {
+    const profile = await requireProfile();
+    if (!["super-admin", "escaleras"].includes(profile.roleKey)) {
+      return failure("Tu rol no puede operar Aduana.");
+    }
+
+    const supabase = await createServerSupabaseClient();
+    const entryId = String(formData.get("entry_id") ?? "").trim();
+    const paidAmount = Number(formData.get("paid_amount") ?? 0);
+    const comments = String(formData.get("comments") ?? "").trim() || null;
+
+    if (!entryId) {
+      return failure("No se encontro el registro de Aduana.");
+    }
+
+    const { error } = await supabase
+      .from("escalera_entries")
+      .update({
+        status: "pagado",
+        paid_at: new Date().toISOString(),
+        paid_amount: Number.isFinite(paidAmount) ? paidAmount : 0,
+        comentarios: comments
+      })
+      .eq("id", entryId);
+
+    if (error) {
+      return failure(error.message || "No se pudo registrar el pago en Aduana.");
+    }
+
+    revalidatePath("/sistema/aduana");
+    revalidatePath("/sistema/escaleras");
+    await auditAction({
+      userId: profile.id,
+      moduleKey: "escaleras",
+      sectionKey: "aduana",
+      actionKey: "update",
+      entityType: "escalera_entry",
+      entityId: entryId,
+      afterData: {
+        status: "pagado",
+        paidAmount,
+        comments
+      }
+    });
+    return success("Pago registrado en Aduana.");
+  } catch (error) {
+    return failure(error instanceof Error ? error.message : "No se pudo registrar el pago.");
   }
 }
 

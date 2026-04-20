@@ -92,10 +92,10 @@ button {
   background: var(--surface);
   color: var(--text);
   border-radius: 999px;
-  width: 44px;
-  height: 44px;
-  min-width: 44px;
-  min-height: 44px;
+  width: 38px;
+  height: 38px;
+  min-width: 38px;
+  min-height: 38px;
   padding: 0;
   display: inline-flex;
   align-items: center;
@@ -105,7 +105,7 @@ button {
 }
 
 .theme-toggle-icon {
-  font-size: 1.2rem;
+  font-size: 1rem;
   line-height: 1;
 }
 
@@ -608,10 +608,11 @@ html[data-theme="dark"] .role-badge {
   align-items: center;
   justify-content: space-between;
   gap: 1rem;
+  min-height: 38px;
 }
 
 .app-main > .app-panel.hide-print {
-  padding: 0.85rem 1.15rem;
+  padding: 0.7rem 1rem;
 }
 
 .app-header-bar .module-title {
@@ -709,7 +710,9 @@ html[data-theme="dark"] .role-badge {
 
 .compact-table th,
 .compact-table td {
-  padding: 0.72rem 0.8rem;
+  padding: 0.46rem 0.72rem;
+  line-height: 1.1;
+  white-space: nowrap;
 }
 
 table {
@@ -744,6 +747,18 @@ tr:last-child td {
 .record-title {
   display: grid;
   gap: 0.15rem;
+}
+
+.record-title.inline {
+  display: flex;
+  align-items: center;
+  gap: 0.45rem;
+  flex-wrap: nowrap;
+}
+
+.record-title.inline strong,
+.record-title.inline span {
+  white-space: nowrap;
 }
 
 .record-title strong {
@@ -868,6 +883,39 @@ tr:last-child td {
 .record-stack {
   display: grid;
   gap: 0.55rem;
+}
+
+.visitor-choice-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.8rem;
+}
+
+.visitor-choice-item {
+  width: 100%;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 0.5rem 0.65rem;
+  background: rgba(148, 163, 184, 0.08);
+  color: var(--text);
+  text-align: left;
+}
+
+.visitor-choice-item strong,
+.visitor-choice-item span {
+  display: block;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.visitor-choice-item.available {
+  opacity: 0.56;
+}
+
+.visitor-choice-item.selected {
+  background: rgba(21, 128, 61, 0.12);
+  border-color: rgba(21, 128, 61, 0.3);
 }
 
 .record-pill {
@@ -1002,7 +1050,7 @@ html[data-theme="dark"] .note-box {
 
 .mini-list {
   display: grid;
-  gap: 0.7rem;
+  gap: 0.3rem;
 }
 
 .mini-row {
@@ -1010,7 +1058,7 @@ html[data-theme="dark"] .note-box {
   align-items: center;
   justify-content: space-between;
   gap: 0.8rem;
-  padding: 0.8rem 0;
+  padding: 0.28rem 0;
   border-bottom: 1px solid #e8edf5;
 }
 
@@ -1305,20 +1353,20 @@ html[data-theme="dark"] .danger-zone-panel .section-collapse summary {
 .apoyo-pass-footer,
 .numbers-print-list {
   display: grid;
-  gap: 0.18rem;
+  gap: 0.08rem;
 }
 
 .apoyo-pass-meta {
-  font-size: 0.84rem;
+  font-size: 0.78rem;
 }
 
 .apoyo-pass-section strong {
-  font-size: 0.82rem;
+  font-size: 0.76rem;
 }
 
 .apoyo-pass-line {
-  font-size: 0.84rem;
-  line-height: 1.05;
+  font-size: 0.76rem;
+  line-height: 1;
 }
 
 .apoyo-pass-line.warning {
@@ -1505,6 +1553,10 @@ html[data-theme="dark"] .danger-zone-panel .section-collapse summary {
     grid-template-columns: 1fr;
   }
 
+  .visitor-choice-grid {
+    grid-template-columns: 1fr;
+  }
+
   th,
   td {
     padding: 0.85rem 0.75rem;
@@ -1654,9 +1706,9 @@ html[data-theme="dark"] .danger-zone-panel .section-collapse summary {
   }
 
   .apoyo-secondary-grid .apoyo-pass-card {
-    min-height: 4.75cm;
-    height: 4.75cm;
-    padding: 0.24cm 0.28cm;
+    min-height: 3.65cm;
+    height: 3.65cm;
+    padding: 0.18cm 0.24cm;
     border-radius: 0;
     box-shadow: none;
     break-inside: avoid;
@@ -1665,7 +1717,7 @@ html[data-theme="dark"] .danger-zone-panel .section-collapse summary {
 
   .apoyo-secondary-grid .apoyo-pass-list {
     column-count: 2;
-    column-gap: 0.18cm;
+    column-gap: 0.12cm;
   }
 
   .apoyo-secondary-grid .apoyo-pass-line {
@@ -1687,7 +1739,7 @@ html[data-theme="dark"] .danger-zone-panel .section-collapse summary {
   .apoyo-pass-meta,
   .apoyo-pass-line,
   .apoyo-pass-section strong {
-    font-size: 0.66rem;
+    font-size: 0.6rem;
   }
 
   .apoyo-pass-number {
@@ -1698,7 +1750,7 @@ html[data-theme="dark"] .danger-zone-panel .section-collapse summary {
   .apoyo-pass-section,
   .apoyo-pass-meta,
   .apoyo-pass-footer {
-    gap: 0.04cm;
+    gap: 0.02cm;
   }
 
   .apoyo-print-grid .visits-section {

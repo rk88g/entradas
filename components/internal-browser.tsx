@@ -238,7 +238,7 @@ export function InternalBrowser({
                   paginated.map((profile) => (
                     <tr key={profile.id} onClick={() => openInternalModal(profile)} style={{ cursor: "pointer" }}>
                       <td>
-                        <div className="record-title">
+                        <div className="record-title inline">
                           <strong>{profile.fullName}</strong>
                           <span>
                             <StatusBadge variant={getInternalStatusMeta(profile.estatus).variant}>
@@ -345,9 +345,6 @@ export function InternalBrowser({
                   <div className="mini-row"><span>Fecha</span><strong>{selectedDateValue ? formatLongDate(selectedDateValue) : "Sin fecha"}</strong></div>
                   <div className="mini-row"><span>Laborando</span><strong>{selected.laborando ? "Si" : "No"}</strong></div>
                   <div className="mini-row"><span>Telefono</span><strong>{maskValue(selected.telefono || "No aplica", canViewSensitiveData)}</strong></div>
-                  <div className="mini-row"><span>Visitas</span><strong>{selected.visitors.length}</strong></div>
-                  <div className="mini-row"><span>Aparatos</span><strong>{selected.devices.length}</strong></div>
-                  <div className="mini-row"><span>Pagos</span><strong>{selected.weeklyPayments.length}</strong></div>
                 </div>
               </article>
 
@@ -361,9 +358,9 @@ export function InternalBrowser({
 
               <article className="data-card">
                 <strong style={{ display: "block", marginBottom: "0.7rem" }}>No vendran</strong>
-                <div className="record-stack">
+                <div className="visitor-choice-grid">
                   {availableVisitors.length === 0 ? <span className="muted">Sin registros.</span> : availableVisitors.map((item) => (
-                    <button key={item.id} type="button" className="inline-search-item" onClick={() => toggleVisitor(item.visitaId)}>
+                    <button key={item.id} type="button" className="visitor-choice-item available" onClick={() => toggleVisitor(item.visitaId)}>
                       <strong>{item.visitor.fullName}</strong>
                       <span className="muted">{maskValue(item.visitor.edad, canViewSensitiveData)} años</span>
                     </button>
@@ -373,9 +370,9 @@ export function InternalBrowser({
 
               <article className="data-card">
                 <strong style={{ display: "block", marginBottom: "0.7rem" }}>Vendran</strong>
-                <div className="record-stack">
+                <div className="visitor-choice-grid">
                   {selectedVisitors.length === 0 ? <span className="muted">Sin registros.</span> : selectedVisitors.map((item) => (
-                    <button key={item.id} type="button" className="inline-search-item active" onClick={() => toggleVisitor(item.visitaId)}>
+                    <button key={item.id} type="button" className="visitor-choice-item selected" onClick={() => toggleVisitor(item.visitaId)}>
                       <strong>{item.visitor.fullName}</strong>
                       <span className="muted">{maskValue(item.visitor.edad, canViewSensitiveData)} años</span>
                     </button>

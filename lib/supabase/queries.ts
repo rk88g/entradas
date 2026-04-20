@@ -739,9 +739,9 @@ export async function getInternalProfiles(options?: {
         internalIds.length
           ? supabase
               .from("internal_devices")
-              .select(
-                "id, internal_id, module_key, device_type_id, zone_id, brand, model, characteristics, imei, chip_number, cameras_allowed, quantity, status, paid_through, weekly_price_override, discount_override, assigned_manually, notes, module_device_types!inner(name), zones(name)"
-              )
+      .select(
+        "id, internal_id, module_key, device_type_id, zone_id, brand, model, characteristics, imei, chip_number, cameras_allowed, quantity, status, paid_through, weekly_price_override, discount_override, assigned_manually, notes, module_device_types!inner(name,module_key), zones(name)"
+      )
               .in("internal_id", internalIds)
               .neq("status", "baja")
           : Promise.resolve({ data: [] }),
@@ -749,7 +749,7 @@ export async function getInternalProfiles(options?: {
           ? supabase
               .from("device_payments")
               .select(
-                "id, amount, status, paid_at, notes, internal_devices!inner(internal_id, module_key, module_device_types!inner(name))"
+                "id, amount, status, paid_at, notes, internal_devices!inner(internal_id, module_key, module_device_types!inner(name,module_key))"
               )
               .in("internal_devices.internal_id", internalIds)
           : Promise.resolve({ data: [] }),
@@ -865,7 +865,7 @@ export async function getInternalProfiles(options?: {
       internalId: item.internal_id,
       internalName: internos.find((interno) => interno.id === item.internal_id)?.fullName ?? "Interno",
       internalLocation: internos.find((interno) => interno.id === item.internal_id)?.ubicacion ?? "",
-      moduleKey: ensureModuleKey(item.module_key),
+      moduleKey: ensureModuleKey(getFirstRelation(item.module_device_types)?.module_key ?? item.module_key),
       deviceTypeId: item.device_type_id,
       deviceTypeName: getFirstRelation(item.module_device_types)?.name ?? "Aparato",
       zoneId: item.zone_id ?? undefined,
@@ -896,7 +896,7 @@ export async function getInternalProfiles(options?: {
     const current = paymentMap.get(internalId) ?? [];
     current.push({
       id: item.id,
-      moduleKey: ensureModuleKey(internalDevice?.module_key),
+      moduleKey: ensureModuleKey(getFirstRelation(internalDevice?.module_device_types)?.module_key ?? internalDevice?.module_key),
       amount: Number(item.amount ?? 0),
       status: item.status,
       paidAt: item.paid_at ?? null,
@@ -1360,13 +1360,12 @@ export async function getEscalerasPanelData(includeInactiveInternals = false): P
   const [{ data: entryRows }, { data: authorizedDeviceRows }] = await Promise.all([
     supabase
       .from("escalera_entries")
-      .select("id, listado_id, internal_id, fecha_visita, off8_aplica, off8_type, off8_value, ticket_amount, status, comentarios, retenciones")
+      .select("id, listado_id, internal_id, fecha_visita, off8_aplica, off8_type, off8_percent, off8_value, ticket_amount, status, comentarios, retenciones, confirmed_at, paid_at, paid_amount")
       .in("listado_id", passIds),
     supabase
       .from("internal_devices")
-      .select("id, internal_id, quantity, brand, model, module_key, module_device_types!inner(name)")
+      .select("id, internal_id, quantity, brand, model, module_key, module_device_types!inner(name,module_key)")
       .in("internal_id", internalIds)
-      .in("module_key", ["visual", "comunicacion"])
       .neq("status", "baja")
   ]);
   const escaleraEntryIds = (entryRows ?? []).map((item) => item.id);
@@ -1398,12 +1397,17 @@ export async function getEscalerasPanelData(includeInactiveInternals = false): P
 
   const authorizedDevicesMap = new Map<string, EscaleraAuthorizedDevice[]>();
   (authorizedDeviceRows ?? []).forEach((item) => {
+    const resolvedModuleKey = ensureModuleKey(item.module_device_types?.[0]?.module_key ?? item.module_key);
+    if (resolvedModuleKey !== "visual" && resolvedModuleKey !== "comunicacion") {
+      return;
+    }
+
     const current = authorizedDevicesMap.get(item.internal_id) ?? [];
     current.push({
       id: item.id,
       name: item.module_device_types?.[0]?.name ?? "Aparato",
       quantity: item.quantity ?? 1,
-      moduleKey: ensureModuleKey(item.module_key),
+      moduleKey: resolvedModuleKey,
       brand: item.brand ?? undefined,
       model: item.model ?? undefined
     });
@@ -1428,6 +1432,7 @@ export async function getEscalerasPanelData(includeInactiveInternals = false): P
         fechaVisita: pass.fechaVisita,
         off8Aplica: Boolean(entry?.off8_aplica),
         off8Type: (entry?.off8_type as EscaleraRecord["off8Type"]) ?? null,
+        off8Percent: entry?.off8_percent ?? null,
         off8Value: entry?.off8_value ?? null,
         ticketAmount: entry?.ticket_amount ?? null,
         status: (entry?.status as EscaleraRecord["status"]) ?? "pendiente",
@@ -1443,6 +1448,13 @@ export async function getEscalerasPanelData(includeInactiveInternals = false): P
     .filter((item): item is EscaleraRecord => item !== null);
 
   return records.sort((a, b) => compareInternalLocations(a.internalLocation, b.internalLocation));
+}
+
+export async function getAduanaPanelData(includeInactiveInternals = false): Promise<EscaleraRecord[]> {
+  const records = await getEscalerasPanelData(includeInactiveInternals);
+  return records
+    .filter((item) => item.status === "enviado" || item.status === "pagado")
+    .sort((a, b) => compareInternalLocations(a.internalLocation, b.internalLocation));
 }
 
 export async function getDashboardSummary() {

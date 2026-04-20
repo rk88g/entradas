@@ -28,7 +28,9 @@ export function ThemeToggle() {
         });
       }}
     >
-      <span aria-hidden="true" className="theme-toggle-icon">{theme === "dark" ? "☾" : "☀"}</span>
+      <span aria-hidden="true" className="theme-toggle-icon">
+        {theme === "dark" ? "☾" : "☀"}
+      </span>
     </button>
   );
 }

@@ -18,7 +18,8 @@ const coreNavItems = [
 const moduleNavItems = [
   { href: "/sistema/visual", icon: "VI", label: "Visual", moduleKey: "visual" as const },
   { href: "/sistema/comunicacion", icon: "CO", label: "Comunicacion", moduleKey: "comunicacion" as const },
-  { href: "/sistema/escaleras", icon: "ES", label: "Escaleras", moduleKey: "escaleras" as const }
+  { href: "/sistema/escaleras", icon: "ES", label: "Escaleras", moduleKey: "escaleras" as const },
+  { href: "/sistema/aduana", icon: "AD", label: "Aduana", moduleKey: "escaleras" as const }
 ];
 
 export function AppShell({
@@ -102,7 +103,7 @@ export function AppShell({
 
         <main className="app-main">
           <section className="app-panel hide-print">
-            <div className="record-title app-header-bar">
+            <div className="app-header-bar">
               <strong className="module-title">Sistema Cumplido desde 2020</strong>
               <ThemeToggle />
             </div>

@@ -1,9 +1,9 @@
 import { redirect } from "next/navigation";
-import { EscalerasPanel } from "@/components/escaleras-panel";
-import { getCurrentUserProfile, getEscalerasPanelData } from "@/lib/supabase/queries";
+import { AduanaPanel } from "@/components/escaleras-panel";
+import { getAduanaPanelData, getCurrentUserProfile } from "@/lib/supabase/queries";
 import { canAccessModule } from "@/lib/utils";
 
-export default async function EscalerasPage() {
+export default async function AduanaPage() {
   const profile = await getCurrentUserProfile();
 
   if (!profile?.active || !canAccessModule(profile.roleKey, profile.accessibleModules, "escaleras")) {
@@ -11,7 +11,7 @@ export default async function EscalerasPage() {
   }
 
   const includeInactive = profile.roleKey === "super-admin";
-  const data = await getEscalerasPanelData(includeInactive);
+  const data = await getAduanaPanelData(includeInactive);
 
-  return <EscalerasPanel records={data} />;
+  return <AduanaPanel records={data} />;
 }

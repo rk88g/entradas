@@ -159,7 +159,7 @@ export function VisitorManager({
                 paginated.map((visitor) => (
                   <tr key={visitor.id} onClick={() => setSelectedVisitorId(visitor.id)} style={{ cursor: "pointer" }}>
                     <td>
-                      <div className="record-title">
+                      <div className="record-title inline">
                         <strong>{visitor.fullName}</strong>
                         <span>{visitor.parentesco}</span>
                       </div>
@@ -237,7 +237,7 @@ export function VisitorManager({
                       selectedVisitor.historial.map((entry) => (
                         <div key={entry.id} className="record-pill">
                           <strong>{entry.internalName}</strong>
-                          <span>{formatHistoryDate(entry.date)}</span>
+                          <span>{entry.type === "reasignacion" ? "Reasignacion" : "Visita"} · {formatHistoryDate(entry.date)}</span>
                         </div>
                       ))
                     )}

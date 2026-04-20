@@ -66,9 +66,12 @@ export function IntegratedModulePanel({
 }) {
   const [tab, setTab] = useState<ModuleTab>("resumen");
   const [selectedInternalId, setSelectedInternalId] = useState<string | null>(null);
+  const [selectedEntryInternalId, setSelectedEntryInternalId] = useState("");
   const [selectedChargeInternalId, setSelectedChargeInternalId] = useState("");
   const [selectedZoneFilter, setSelectedZoneFilter] = useState("");
   const [selectedDeviceTypeId, setSelectedDeviceTypeId] = useState("");
+  const [entryInternalSearch, setEntryInternalSearch] = useState("");
+  const [chargeInternalSearch, setChargeInternalSearch] = useState("");
   const [deviceState, deviceAction, devicePending] = useActionState(assignModuleDeviceAction, mutationInitialState);
   const [paymentState, paymentAction, paymentPending] = useActionState(registerModulePaymentAction, mutationInitialState);
   const [closeState, closeAction, closePending] = useActionState(closeModuleWeekAction, mutationInitialState);
@@ -140,6 +143,30 @@ export function IntegratedModulePanel({
     );
   });
 
+  const filteredEntryInternals = internals.filter((internal) => {
+    const normalized = entryInternalSearch.trim().toLowerCase();
+    if (!normalized) {
+      return true;
+    }
+
+    return (
+      internal.fullName.toLowerCase().includes(normalized) ||
+      internal.ubicacion.toLowerCase().includes(normalized)
+    );
+  });
+
+  const filteredChargeInternals = filteredInternalsForZone.filter((internal) => {
+    const normalized = chargeInternalSearch.trim().toLowerCase();
+    if (!normalized) {
+      return true;
+    }
+
+    return (
+      internal.internalName.toLowerCase().includes(normalized) ||
+      internal.internalLocation.toLowerCase().includes(normalized)
+    );
+  });
+
   const selectedInternal = groupedInternals.find((item) => item.internalId === selectedInternalId) ?? null;
   const selectedChargeInternal = filteredInternalsForZone.find((item) => item.internalId === selectedChargeInternalId) ?? null;
 
@@ -161,6 +188,8 @@ export function IntegratedModulePanel({
   useEffect(() => {
     if (deviceState.success) {
       setSelectedDeviceTypeId("");
+      setSelectedEntryInternalId("");
+      setEntryInternalSearch("");
     }
   }, [deviceState.success]);
 
@@ -307,14 +336,28 @@ export function IntegratedModulePanel({
                 <form action={deviceAction} className="field-grid" autoComplete="off">
                 <input type="hidden" name="module_key" value={data.moduleKey} />
                 <div className="field">
-                  <select name="internal_id" defaultValue="" disabled={!canManageEntries || data.weekClosed}>
-                    <option value="" disabled>Interno</option>
-                    {internals.map((internal) => (
-                      <option key={internal.id} value={internal.id}>
-                        {internal.ubicacion} - {internal.fullName}
-                      </option>
+                  <input
+                    value={entryInternalSearch}
+                    onChange={(event) => setEntryInternalSearch(event.target.value)}
+                    placeholder="Buscar interno"
+                    autoComplete="off"
+                    disabled={!canManageEntries || data.weekClosed}
+                  />
+                  <input type="hidden" name="internal_id" value={selectedEntryInternalId} />
+                  <div className="inline-search-list">
+                    {filteredEntryInternals.slice(0, 8).map((internal) => (
+                      <button
+                        key={internal.id}
+                        type="button"
+                        className={`inline-search-item ${selectedEntryInternalId === internal.id ? "active" : ""}`}
+                        onClick={() => setSelectedEntryInternalId(internal.id)}
+                        disabled={!canManageEntries || data.weekClosed}
+                      >
+                        <strong>{internal.fullName}</strong>
+                        <span className="muted">{internal.ubicacion}</span>
+                      </button>
                     ))}
-                  </select>
+                  </div>
                 </div>
                 <div className="field">
                   <select
@@ -433,19 +476,28 @@ export function IntegratedModulePanel({
                 <input type="hidden" name="module_key" value={data.moduleKey} />
                 <input type="hidden" name="amount" value={selectedChargeInternal?.totalDue ?? 0} />
                 <div className="field">
-                  <select
-                    name="internal_id"
-                    value={selectedChargeInternalId}
-                    onChange={(event) => setSelectedChargeInternalId(event.target.value)}
+                  <input
+                    value={chargeInternalSearch}
+                    onChange={(event) => setChargeInternalSearch(event.target.value)}
+                    placeholder="Buscar interno"
+                    autoComplete="off"
                     disabled={!canManageCharges || data.weekClosed}
-                  >
-                    <option value="" disabled>Interno</option>
-                    {filteredInternalsForZone.map((internal) => (
-                      <option key={internal.internalId} value={internal.internalId}>
-                        {internal.internalLocation} - {internal.internalName}
-                      </option>
+                  />
+                  <input type="hidden" name="internal_id" value={selectedChargeInternalId} />
+                  <div className="inline-search-list">
+                    {filteredChargeInternals.slice(0, 8).map((internal) => (
+                      <button
+                        key={internal.internalId}
+                        type="button"
+                        className={`inline-search-item ${selectedChargeInternalId === internal.internalId ? "active" : ""}`}
+                        onClick={() => setSelectedChargeInternalId(internal.internalId)}
+                        disabled={!canManageCharges || data.weekClosed}
+                      >
+                        <strong>{internal.internalName}</strong>
+                        <span className="muted">{internal.internalLocation}</span>
+                      </button>
                     ))}
-                  </select>
+                  </div>
                 </div>
                 <div className="field">
                   <select name="zone_id" defaultValue={selectedZoneFilter} disabled={!canManageCharges || data.weekClosed}>
