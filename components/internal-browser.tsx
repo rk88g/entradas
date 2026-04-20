@@ -105,6 +105,7 @@ export function InternalBrowser({
   const [statusBannerStateKey, setStatusBannerStateKey] = useState(0);
   const [searchLoading, setSearchLoading] = useState(false);
   const [screenLoading, setScreenLoading] = useState(false);
+  const [recentCreatedPass, setRecentCreatedPass] = useState<{ internoId: string; fechaVisita: string } | null>(null);
   const [createState, createAction, createPending] = useActionState(createInternalAction, mutationInitialState);
   const [passState, passAction, passPending] = useActionState(createPassAction, mutationInitialState);
   const [visitorState, visitorAction, visitorPending] = useActionState(createVisitorAction, mutationInitialState);
@@ -132,13 +133,26 @@ export function InternalBrowser({
     selectedVisitors.length > 0 &&
     selectedAdults.length > 0 &&
     !selectedPass;
+  const shouldSuppressExistingPassAlert =
+    Boolean(
+      selected &&
+        selectedPass &&
+        recentCreatedPass &&
+        recentCreatedPass.internoId === selected.id &&
+        recentCreatedPass.fechaVisita === selectedPass.fechaVisita &&
+        passState.success
+    );
 
   useEffect(() => {
-    if (passState.success) {
+    if (passState.success && selected && selectedDateValue) {
+      setRecentCreatedPass({
+        internoId: selected.id,
+        fechaVisita: selectedDateValue
+      });
       setSelectedVisitorIds([]);
       router.refresh();
     }
-  }, [passState.success, router]);
+  }, [passState.success, router, selected, selectedDateValue]);
 
   useEffect(() => {
     if (visitorState.success) {
@@ -194,6 +208,7 @@ export function InternalBrowser({
     setHistorySections({});
     setFormSeed((current) => current + 1);
     setModalBannerResetKey((current) => current + 1);
+    setRecentCreatedPass(null);
   }
 
   function toggleVisitor(visitaId: string) {
@@ -439,7 +454,7 @@ export function InternalBrowser({
                 </div>
               </article>
 
-              {selectedPass ? (
+              {selectedPass && !shouldSuppressExistingPassAlert ? (
                 <MutationBanner state={{ success: null, error: `Ese interno ya tiene pase para ${formatLongDate(selectedPass.fechaVisita)}.` }} />
               ) : null}
 
