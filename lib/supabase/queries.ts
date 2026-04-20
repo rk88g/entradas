@@ -124,6 +124,16 @@ async function fetchAllRows<T>(
   return { data: rows, error: null as unknown };
 }
 
+function splitIntoChunks<T>(items: T[], chunkSize = 500) {
+  const chunks: T[][] = [];
+
+  for (let index = 0; index < items.length; index += chunkSize) {
+    chunks.push(items.slice(index, index + chunkSize));
+  }
+
+  return chunks;
+}
+
 function mapInternalRecord(item: {
   id: string;
   expediente: string;
@@ -305,18 +315,41 @@ async function getInternosMap(
     return new Map();
   }
 
-  const { data, error } = await supabase
-    .from("internos")
-    .select(
-      "id, expediente, nombres, apellido_pat, apellido_mat, nacimiento, llego, libre, ubicacion, telefono, ubi_filiacion, laborando, estatus, observaciones, created_at, updated_at"
-    )
-    .in("id", internalIds);
+  const rows: Array<{
+    id: string;
+    expediente: string;
+    nombres: string;
+    apellido_pat: string;
+    apellido_mat: string | null;
+    nacimiento: string;
+    llego: string;
+    libre: string | null;
+    ubicacion: string | number;
+    telefono: string | null;
+    ubi_filiacion: string;
+    laborando: boolean | null;
+    estatus: string;
+    observaciones: string | null;
+    created_at: string;
+    updated_at: string;
+  }> = [];
 
-  if (error || !data) {
-    return new Map();
+  for (const chunk of splitIntoChunks([...new Set(internalIds)])) {
+    const { data, error } = await supabase
+      .from("internos")
+      .select(
+        "id, expediente, nombres, apellido_pat, apellido_mat, nacimiento, llego, libre, ubicacion, telefono, ubi_filiacion, laborando, estatus, observaciones, created_at, updated_at"
+      )
+      .in("id", chunk);
+
+    if (error || !data) {
+      return new Map();
+    }
+
+    rows.push(...data);
   }
 
-  return new Map(data.map((item) => [item.id, mapInternalRecord(item)]));
+  return new Map(rows.map((item) => [item.id, mapInternalRecord(item)]));
 }
 
 async function getVisitorsMap(
@@ -327,22 +360,38 @@ async function getVisitorsMap(
     return new Map();
   }
 
-  const [{ historyMap, detailedHistoryMap }, { data, error }] = await Promise.all([
-    getVisitorHistoryData(supabase),
-    supabase
+  const { historyMap, detailedHistoryMap } = await getVisitorHistoryData(supabase);
+  const rows: Array<{
+    id: string;
+    nombreCompleto: string;
+    fecha_nacimiento: string;
+    edad: number | null;
+    menor: boolean | null;
+    sexo: string | null;
+    parentesco: string;
+    betada: boolean | null;
+    telefono: string | null;
+    created_at: string;
+    updated_at: string;
+  }> = [];
+
+  for (const chunk of splitIntoChunks([...new Set(visitorIds)])) {
+    const { data, error } = await supabase
       .from("visitas")
       .select(
         "id, \"nombreCompleto\", fecha_nacimiento, edad, menor, sexo, parentesco, betada, telefono, created_at, updated_at"
       )
-      .in("id", visitorIds)
-  ]);
+      .in("id", chunk);
 
-  if (error || !data) {
-    return new Map();
+    if (error || !data) {
+      return new Map();
+    }
+
+    rows.push(...data);
   }
 
   return new Map(
-    data.map((item) => [
+    rows.map((item) => [
       item.id,
       mapVisitorRecord(
         item,
@@ -1631,16 +1680,40 @@ export async function getAdminPanelData() {
     workplacePositionsResponse,
     internals
   ] = await Promise.all([
-    supabase
-      .from("connection_logs")
-      .select("id, user_profile_id, email, success, failure_reason, ip_address, user_agent, created_at")
-      .order("created_at", { ascending: false })
-      .limit(100),
-    supabase
-      .from("action_audit_logs")
-      .select("id, user_profile_id, module_key, section_key, action_key, entity_type, entity_id, before_data, after_data, created_at")
-      .order("created_at", { ascending: false })
-      .limit(200),
+    fetchAllRows<{
+      id: string;
+      user_profile_id: string | null;
+      email: string | null;
+      success: boolean;
+      failure_reason: string | null;
+      ip_address: string | null;
+      user_agent: string | null;
+      created_at: string;
+    }>((from, to) =>
+      supabase
+        .from("connection_logs")
+        .select("id, user_profile_id, email, success, failure_reason, ip_address, user_agent, created_at")
+        .order("created_at", { ascending: false })
+        .range(from, to)
+    ),
+    fetchAllRows<{
+      id: string;
+      user_profile_id: string | null;
+      module_key: string;
+      section_key: string | null;
+      action_key: string;
+      entity_type: string | null;
+      entity_id: string | null;
+      before_data: unknown;
+      after_data: unknown;
+      created_at: string;
+    }>((from, to) =>
+      supabase
+        .from("action_audit_logs")
+        .select("id, user_profile_id, module_key, section_key, action_key, entity_type, entity_id, before_data, after_data, created_at")
+        .order("created_at", { ascending: false })
+        .range(from, to)
+    ),
     supabase
       .from("user_profiles")
       .select("id, full_name, active, role_id")
@@ -1713,7 +1786,7 @@ export async function getAdminPanelData() {
     id: item.id,
     userId: item.user_profile_id,
     userName: item.user_profile_id ? namesMap.get(item.user_profile_id) ?? "Usuario" : null,
-    email: item.email,
+    email: item.email ?? "",
     success: Boolean(item.success),
     failureReason: item.failure_reason ?? null,
     ipAddress: item.ip_address ?? null,
@@ -1726,9 +1799,9 @@ export async function getAdminPanelData() {
     userId: item.user_profile_id,
     userName: item.user_profile_id ? namesMap.get(item.user_profile_id) ?? "Usuario" : null,
     moduleKey: item.module_key,
-    sectionKey: item.section_key,
+    sectionKey: item.section_key ?? "",
     actionKey: item.action_key,
-    entityType: item.entity_type,
+    entityType: item.entity_type ?? "",
     entityId: item.entity_id ?? null,
     beforeData:
       item.before_data === null ? null : JSON.stringify(item.before_data, null, 2),
