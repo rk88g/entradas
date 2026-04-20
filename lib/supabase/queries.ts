@@ -881,10 +881,19 @@ export async function getInternalProfiles(options?: {
               }> = [];
 
               for (const chunk of splitIntoChunks(internalIds)) {
-                const { data, error } = await supabase
-                  .from("interno_visitas")
-                  .select("id, interno_id, visita_id, parentesco, titular")
-                  .in("interno_id", chunk);
+                const { data, error } = await fetchAllRows<{
+                  id: string;
+                  interno_id: string;
+                  visita_id: string;
+                  parentesco: string | null;
+                  titular: boolean | null;
+                }>((from, to) =>
+                  supabase
+                    .from("interno_visitas")
+                    .select("id, interno_id, visita_id, parentesco, titular")
+                    .in("interno_id", chunk)
+                    .range(from, to)
+                );
 
                 if (error) {
                   return { data: null, error };
