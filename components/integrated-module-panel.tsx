@@ -68,6 +68,7 @@ export function IntegratedModulePanel({
   const [selectedInternalId, setSelectedInternalId] = useState<string | null>(null);
   const [selectedChargeInternalId, setSelectedChargeInternalId] = useState("");
   const [selectedZoneFilter, setSelectedZoneFilter] = useState("");
+  const [selectedDeviceTypeId, setSelectedDeviceTypeId] = useState("");
   const [deviceState, deviceAction, devicePending] = useActionState(assignModuleDeviceAction, mutationInitialState);
   const [paymentState, paymentAction, paymentPending] = useActionState(registerModulePaymentAction, mutationInitialState);
   const [closeState, closeAction, closePending] = useActionState(closeModuleWeekAction, mutationInitialState);
@@ -91,6 +92,8 @@ export function IntegratedModulePanel({
       ),
     [data.prices]
   );
+  const selectedDeviceType = data.deviceTypes.find((item) => item.id === selectedDeviceTypeId) ?? null;
+  const showInternalNumberField = selectedDeviceType?.key === "celular" || selectedDeviceType?.key === "tablet";
 
   const groupedInternals = useMemo(() => {
     const map = new Map<
@@ -154,6 +157,12 @@ export function IntegratedModulePanel({
     window.addEventListener("keydown", handleEscape);
     return () => window.removeEventListener("keydown", handleEscape);
   }, [selectedInternalId]);
+
+  useEffect(() => {
+    if (deviceState.success) {
+      setSelectedDeviceTypeId("");
+    }
+  }, [deviceState.success]);
 
   return (
     <>
@@ -308,7 +317,12 @@ export function IntegratedModulePanel({
                   </select>
                 </div>
                 <div className="field">
-                  <select name="device_type_id" defaultValue="" disabled={!canManageEntries || data.weekClosed}>
+                  <select
+                    name="device_type_id"
+                    value={selectedDeviceTypeId}
+                    onChange={(event) => setSelectedDeviceTypeId(event.target.value)}
+                    disabled={!canManageEntries || data.weekClosed}
+                  >
                     <option value="" disabled>Dispositivo</option>
                     {data.deviceTypes.map((deviceType) => (
                       <option key={deviceType.id} value={deviceType.id}>
@@ -329,9 +343,10 @@ export function IntegratedModulePanel({
                 </div>
                 <div className="field"><input name="brand" placeholder="Marca" autoComplete="off" disabled={!canManageEntries || data.weekClosed} /></div>
                 <div className="field"><input name="model" placeholder="Modelo" autoComplete="off" disabled={!canManageEntries || data.weekClosed} /></div>
-                <div className="field"><input name="imei" placeholder="IMEI" autoComplete="off" disabled={!canManageEntries || data.weekClosed} /></div>
-                <div className="field"><input name="chip_number" placeholder="Numero de chip" autoComplete="off" disabled={!canManageEntries || data.weekClosed} /></div>
-                <div className="field"><input name="quantity" type="number" min="1" defaultValue="1" autoComplete="off" disabled={!canManageEntries || data.weekClosed} /></div>
+                <div className="field"><input name="imei" placeholder="IMEI O NS" autoComplete="off" disabled={!canManageEntries || data.weekClosed} /></div>
+                {showInternalNumberField ? (
+                  <div className="field"><input name="chip_number" placeholder="Numero interno" autoComplete="off" disabled={!canManageEntries || data.weekClosed} /></div>
+                ) : null}
                 <div className="field field-switch">
                   <label className="switch-row">
                     <input type="checkbox" name="cameras_allowed" disabled={!canManageEntries || data.weekClosed} />

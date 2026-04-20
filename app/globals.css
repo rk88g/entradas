@@ -610,6 +610,14 @@ html[data-theme="dark"] .role-badge {
   gap: 1rem;
 }
 
+.app-main > .app-panel.hide-print {
+  padding: 0.85rem 1.15rem;
+}
+
+.app-header-bar .module-title {
+  margin: 0;
+}
+
 .page-loading-scrim {
   position: fixed;
   inset: 0;
@@ -617,7 +625,7 @@ html[data-theme="dark"] .role-badge {
   display: grid;
   place-items: center;
   z-index: 140;
-  pointer-events: none;
+  pointer-events: auto;
 }
 
 .page-loading-card {

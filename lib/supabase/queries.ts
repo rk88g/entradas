@@ -1123,9 +1123,8 @@ export async function getModulePanelData(moduleKey: ModuleKey, includeInactiveIn
     supabase
       .from("internal_devices")
       .select(
-        "id, internal_id, module_key, device_type_id, zone_id, brand, model, characteristics, imei, chip_number, cameras_allowed, quantity, status, paid_through, weekly_price_override, discount_override, assigned_manually, notes, module_device_types!inner(name), zones(name)"
+        "id, internal_id, module_key, device_type_id, zone_id, brand, model, characteristics, imei, chip_number, cameras_allowed, quantity, status, paid_through, weekly_price_override, discount_override, assigned_manually, notes, module_device_types!inner(name,module_key), zones(name)"
       )
-      .eq("module_key", moduleKey)
       .neq("status", "baja")
       .order("created_at", { ascending: false }),
     supabase
@@ -1218,14 +1217,15 @@ export async function getModulePanelData(moduleKey: ModuleKey, includeInactiveIn
     .map((item) => {
       const internal = internalMap.get(item.internal_id);
       const zone = item.zone_id ? zoneMap.get(item.zone_id) : undefined;
+      const typeRelation = getFirstRelation(item.module_device_types);
       return {
         id: item.id,
         internalId: item.internal_id,
         internalName: internal?.fullName ?? "Interno sin nombre",
         internalLocation: internal?.ubicacion ?? "",
-        moduleKey: ensureModuleKey(item.module_key),
+        moduleKey: ensureModuleKey(typeRelation?.module_key ?? item.module_key),
         deviceTypeId: item.device_type_id,
-        deviceTypeName: getFirstRelation(item.module_device_types)?.name ?? "Aparato",
+        deviceTypeName: typeRelation?.name ?? "Aparato",
         zoneId: item.zone_id ?? undefined,
         zoneName: zone?.name ?? getFirstRelation(item.zones)?.name ?? undefined,
         brand: item.brand ?? undefined,
@@ -1243,7 +1243,7 @@ export async function getModulePanelData(moduleKey: ModuleKey, includeInactiveIn
         notes: item.notes ?? undefined
       };
     })
-    .filter((item) => visibleDeviceTypeIds.has(item.deviceTypeId));
+    .filter((item) => item.moduleKey === moduleKey && visibleDeviceTypeIds.has(item.deviceTypeId));
 
   const userMap = new Map(
     (userProfilesResponse.data ?? []).map((item) => [item.id, item.full_name ?? "Usuario"])
@@ -1482,7 +1482,7 @@ export async function getIntegratedModuleCounts() {
   const supabase = await createServerSupabaseClient();
   const { data, error } = await supabase
     .from("internal_devices")
-    .select("module_key, module_device_types!inner(name)")
+    .select("module_key, module_device_types!inner(name,module_key)")
     .neq("status", "baja");
 
   if (error || !data) {
@@ -1494,9 +1494,10 @@ export async function getIntegratedModuleCounts() {
 
   return data.reduce(
     (acc, item) => {
-      const moduleKey = ensureModuleKey(item.module_key);
+      const relation = getFirstRelation(item.module_device_types);
+      const moduleKey = ensureModuleKey(relation?.module_key ?? item.module_key);
       const allowedNames = getAllowedModuleDeviceNames(moduleKey);
-      const typeName = getFirstRelation(item.module_device_types)?.name;
+      const typeName = relation?.name;
       if (
         (moduleKey === "visual" || moduleKey === "comunicacion") &&
         (!allowedNames || (typeName ? allowedNames.has(normalizeDeviceTypeName(typeName)) : false))

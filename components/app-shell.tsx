@@ -80,6 +80,7 @@ export function AppShell({
                   const active = pathname === item.href;
                   return (
                     <button
+                      type="button"
                       key={item.href}
                       className={`nav-link ${active ? "active" : ""} ${"danger" in item && item.danger ? "danger-link" : ""}`}
                       onClick={() => handleNavigate(item.href)}

@@ -1376,13 +1376,16 @@ export async function assignModuleDeviceAction(
     const allowedDeviceNames = getAllowedModuleDeviceNames(moduleKey as "visual" | "comunicacion" | "escaleras" | "rentas");
     const { data: selectedType, error: typeError } = await supabase
       .from("module_device_types")
-      .select("name")
+      .select("name, module_key")
       .eq("id", deviceTypeId)
-      .eq("module_key", moduleKey)
       .maybeSingle();
 
     if (typeError || !selectedType) {
       return failure(typeError?.message || "No se encontro el tipo de aparato.");
+    }
+
+    if (String(selectedType.module_key ?? "").trim() !== moduleKey) {
+      return failure(`Ese aparato no corresponde al bloque ${moduleKey}.`);
     }
 
     if (allowedDeviceNames && !allowedDeviceNames.has(normalizeDeviceTypeName(selectedType.name))) {
@@ -1391,7 +1394,7 @@ export async function assignModuleDeviceAction(
 
     const { error } = await supabase.from("internal_devices").insert({
       internal_id: internalId,
-      module_key: moduleKey,
+      module_key: selectedType.module_key,
       device_type_id: deviceTypeId,
       zone_id: zoneId,
       brand,

@@ -470,6 +470,33 @@ alter table public.internal_devices
   add constraint internal_devices_status_check
   check (status in ('pendiente', 'activo', 'retenido', 'reparacion', 'baja'));
 
+create or replace function public.sync_internal_device_module_key()
+returns trigger
+language plpgsql
+as $$
+begin
+  select module_key
+  into new.module_key
+  from public.module_device_types
+  where id = new.device_type_id;
+
+  return new;
+end;
+$$;
+
+drop trigger if exists internal_devices_sync_module_key on public.internal_devices;
+create trigger internal_devices_sync_module_key
+before insert or update of device_type_id
+on public.internal_devices
+for each row
+execute function public.sync_internal_device_module_key();
+
+update public.internal_devices d
+set module_key = t.module_key
+from public.module_device_types t
+where t.id = d.device_type_id
+  and d.module_key is distinct from t.module_key;
+
 create table if not exists public.workplaces (
   id uuid primary key default gen_random_uuid(),
   name text not null unique,
