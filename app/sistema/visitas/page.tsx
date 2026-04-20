@@ -1,12 +1,23 @@
 import { redirect } from "next/navigation";
 import { VisitorManager } from "@/components/visitor-manager";
-import { getCurrentUserProfile, getInternos, getVisitas } from "@/lib/supabase/queries";
+import { getCurrentUserProfile, getInternos, getVisitasPage } from "@/lib/supabase/queries";
 import { canAccessCoreSystem } from "@/lib/utils";
 
-export default async function VisitasPage() {
-  const [profile, visitors] = await Promise.all([
+export default async function VisitasPage({
+  searchParams
+}: {
+  searchParams?: Promise<{ q?: string; page?: string }>;
+}) {
+  const resolvedSearchParams = (await searchParams) ?? {};
+  const query = String(resolvedSearchParams.q ?? "").trim();
+  const page = Math.max(1, Number(resolvedSearchParams.page ?? "1") || 1);
+  const [profile, visitorsPage] = await Promise.all([
     getCurrentUserProfile(),
-    getVisitas()
+    getVisitasPage({
+      query,
+      page,
+      pageSize: 20
+    })
   ]);
   const internals = await getInternos(profile?.roleKey === "super-admin");
 
@@ -20,8 +31,11 @@ export default async function VisitasPage() {
 
   return (
     <VisitorManager
-      visitors={visitors}
+      visitors={visitorsPage.items}
       internals={internals}
+      query={query}
+      page={visitorsPage.page}
+      totalPages={Math.max(1, Math.ceil(visitorsPage.total / visitorsPage.pageSize))}
       roleKey={profile?.roleKey ?? "capturador"}
     />
   );

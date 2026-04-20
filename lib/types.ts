@@ -189,6 +189,28 @@ export interface ListingBuilderData {
   passArticles: ModuleDeviceType[];
 }
 
+export interface PaginatedResult<T> {
+  items: T[];
+  total: number;
+  page: number;
+  pageSize: number;
+  query: string;
+}
+
+export interface InternalHistoryPayload {
+  visitors: InternalVisitorLink[];
+  recentPasses: ListingRecord[];
+  devices: InternalDeviceRecord[];
+  weeklyPayments: InternalWeeklyPaymentRecord[];
+  escalerasHistory: EscaleraRecord[];
+  notes: InternalNoteRecord[];
+  staffAssignments: ModuleStaffAssignment[];
+  workplaceAssignments: WorkplacePositionRecord[];
+  equipmentMovements: InternalEquipmentMovementRecord[];
+  fines: InternalFineRecord[];
+  seizures: InternalSeizureRecord[];
+}
+
 export interface MutationState {
   success: string | null;
   error: string | null;

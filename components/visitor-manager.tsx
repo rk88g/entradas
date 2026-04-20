@@ -1,7 +1,7 @@
 "use client";
 
-import { useActionState, useEffect, useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useActionState, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { createVisitorAction, reassignVisitorAction } from "@/app/sistema/actions";
 import { FullscreenLoading } from "@/components/fullscreen-loading";
 import { LoadingButton } from "@/components/loading-button";
@@ -23,16 +23,22 @@ function formatHistoryDate(value: string) {
 export function VisitorManager({
   visitors,
   internals,
+  query,
+  page,
+  totalPages,
   roleKey
 }: {
   visitors: VisitorRecord[];
   internals: InternalRecord[];
+  query: string;
+  page: number;
+  totalPages: number;
   roleKey: RoleKey;
 }) {
-  const pageSize = 20;
   const router = useRouter();
-  const [query, setQuery] = useState("");
-  const [page, setPage] = useState(1);
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const [queryInput, setQueryInput] = useState(query);
   const [selectedVisitorId, setSelectedVisitorId] = useState<string | null>(visitors[0]?.id ?? null);
   const [sectionsOpen, setSectionsOpen] = useState<Record<string, boolean>>({
     perfil: false,
@@ -47,24 +53,9 @@ export function VisitorManager({
   const [createState, createAction, createPending] = useActionState(createVisitorAction, mutationInitialState);
   const [reassignState, reassignAction, reassignPending] = useActionState(reassignVisitorAction, mutationInitialState);
   const createFormRef = useRef<HTMLFormElement>(null);
+  const deferredQuery = useDeferredValue(queryInput);
 
-  const filteredVisitors = useMemo(() => {
-    const normalized = query.trim().toLowerCase();
-    if (!normalized) {
-      return visitors;
-    }
-
-    return visitors.filter((visitor) => {
-      return (
-        visitor.fullName.toLowerCase().includes(normalized) ||
-        (visitor.currentInternalName ?? "").toLowerCase().includes(normalized)
-      );
-    });
-  }, [query, visitors]);
-
-  const selectedVisitor = filteredVisitors.find((visitor) => visitor.id === selectedVisitorId) ?? visitors.find((visitor) => visitor.id === selectedVisitorId) ?? null;
-  const totalPages = Math.max(1, Math.ceil(filteredVisitors.length / pageSize));
-  const paginated = filteredVisitors.slice((page - 1) * pageSize, page * pageSize);
+  const selectedVisitor = visitors.find((visitor) => visitor.id === selectedVisitorId) ?? null;
   const canReassign = roleKey === "super-admin";
   const canManageAvailability = roleKey === "super-admin" || roleKey === "control";
   const canViewSensitiveData = roleKey === "super-admin";
@@ -121,8 +112,23 @@ export function VisitorManager({
   }, [reassignState.success, router]);
 
   useEffect(() => {
-    setPage(1);
+    setQueryInput(query);
   }, [query]);
+
+  useEffect(() => {
+    if (deferredQuery === query) {
+      return;
+    }
+
+    const params = new URLSearchParams(searchParams.toString());
+    if (deferredQuery.trim()) {
+      params.set("q", deferredQuery.trim());
+    } else {
+      params.delete("q");
+    }
+    params.delete("page");
+    router.replace(params.size ? `${pathname}?${params.toString()}` : pathname, { scroll: false });
+  }, [deferredQuery, pathname, query, router, searchParams]);
 
   useEffect(() => {
     if (!createPending && !reassignPending) {
@@ -137,6 +143,23 @@ export function VisitorManager({
     }));
   }
 
+  function goToPage(nextPage: number) {
+    const params = new URLSearchParams(searchParams.toString());
+    if (query.trim()) {
+      params.set("q", query.trim());
+    } else {
+      params.delete("q");
+    }
+
+    if (nextPage <= 1) {
+      params.delete("page");
+    } else {
+      params.set("page", String(nextPage));
+    }
+
+    router.replace(params.size ? `${pathname}?${params.toString()}` : pathname, { scroll: false });
+  }
+
   return (
     <section className="module-grid module-grid-single">
       <FullscreenLoading active={screenLoading || createPending || reassignPending} />
@@ -147,13 +170,13 @@ export function VisitorManager({
 
         <div className="field" style={{ marginBottom: "0.8rem" }}>
           <input
-            value={query}
-            onChange={(event) => setQuery(event.target.value)}
+            value={queryInput}
+            onChange={(event) => setQueryInput(event.target.value)}
             onKeyDown={(event) => {
               if (event.key === "Escape") {
                 event.preventDefault();
-                setQuery("");
-                setPage(1);
+                setQueryInput("");
+                goToPage(1);
               }
             }}
             placeholder="Buscar visita o interno"
@@ -172,12 +195,12 @@ export function VisitorManager({
               </tr>
             </thead>
             <tbody>
-              {paginated.length === 0 ? (
+              {visitors.length === 0 ? (
                 <tr>
                   <td colSpan={4}>Sin visitas.</td>
                 </tr>
               ) : (
-                paginated.map((visitor) => (
+                visitors.map((visitor) => (
                   <tr key={visitor.id} onClick={() => setSelectedVisitorId(visitor.id)} style={{ cursor: "pointer" }}>
                     <td>
                       <div className="record-title inline">
@@ -202,10 +225,10 @@ export function VisitorManager({
         <div className="actions-row" style={{ marginTop: "0.8rem", justifyContent: "space-between" }}>
           <span className="muted">Pagina {page} de {totalPages}</span>
           <div className="actions-row">
-            <button type="button" className="button-soft" onClick={() => setPage((current) => Math.max(1, current - 1))} disabled={page === 1}>
+            <button type="button" className="button-soft" onClick={() => goToPage(Math.max(1, page - 1))} disabled={page === 1}>
               Anterior
             </button>
-            <button type="button" className="button-soft" onClick={() => setPage((current) => Math.min(totalPages, current + 1))} disabled={page === totalPages}>
+            <button type="button" className="button-soft" onClick={() => goToPage(Math.min(totalPages, page + 1))} disabled={page === totalPages}>
               Siguiente
             </button>
           </div>

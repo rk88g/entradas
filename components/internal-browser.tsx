@@ -1,7 +1,7 @@
 "use client";
 
-import { useActionState, useEffect, useMemo, useRef, useState } from "react";
-import { useRouter } from "next/navigation";
+import { useActionState, useDeferredValue, useEffect, useMemo, useRef, useState } from "react";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import {
   createInternalAction,
   createPassAction,
@@ -12,7 +12,7 @@ import { FullscreenLoading } from "@/components/fullscreen-loading";
 import { LoadingButton } from "@/components/loading-button";
 import { MutationBanner } from "@/components/mutation-banner";
 import { StatusBadge } from "@/components/status-badge";
-import { DateRecord, InternalProfile, ModuleDeviceType, MutationState, RoleKey } from "@/lib/types";
+import { DateRecord, InternalHistoryPayload, InternalProfile, ModuleDeviceType, MutationState, RoleKey } from "@/lib/types";
 import {
   canManageMentions,
   formatLongDate,
@@ -70,26 +70,34 @@ function getPassBadge(passExists: boolean) {
 
 export function InternalBrowser({
   profiles,
+  query,
+  page,
+  totalPages,
   nextDate,
   openDate,
   passArticles,
   roleKey
 }: {
   profiles: InternalProfile[];
+  query: string;
+  page: number;
+  totalPages: number;
   nextDate?: DateRecord | null;
   openDate?: DateRecord | null;
   passArticles: ModuleDeviceType[];
   roleKey: RoleKey;
 }) {
-  const pageSize = 20;
   const router = useRouter();
-  const [query, setQuery] = useState("");
-  const [page, setPage] = useState(1);
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const [queryInput, setQueryInput] = useState(query);
   const [modalInternalId, setModalInternalId] = useState<string | null>(null);
   const [selectedVisitorIds, setSelectedVisitorIds] = useState<string[]>([]);
   const [selectedDateValue, setSelectedDateValue] = useState("");
   const [historyOpen, setHistoryOpen] = useState(false);
   const [historySections, setHistorySections] = useState<Record<string, boolean>>({});
+  const [historyCache, setHistoryCache] = useState<Record<string, InternalHistoryPayload | undefined>>({});
+  const [historyLoading, setHistoryLoading] = useState(false);
   const [formSeed, setFormSeed] = useState(0);
   const [modalBannerResetKey, setModalBannerResetKey] = useState(0);
   const [screenLoading, setScreenLoading] = useState(false);
@@ -99,31 +107,17 @@ export function InternalBrowser({
   const [statusState, statusAction, statusPending] = useActionState(updateInternalStatusAction, mutationInitialState);
   const visitorFormRef = useRef<HTMLFormElement>(null);
   const internalFormRef = useRef<HTMLFormElement>(null);
+  const deferredQuery = useDeferredValue(queryInput);
   const canViewSensitiveData = roleKey === "super-admin";
   const canManageVisitorAvailability = roleKey === "super-admin" || roleKey === "control";
 
   const availableDates = useMemo(() => getDateOptions(openDate, nextDate), [openDate, nextDate]);
-  const filtered = useMemo(() => {
-    const normalized = query.trim().toLowerCase();
-    if (!normalized) {
-      return profiles;
-    }
-
-    return profiles.filter((profile) => {
-      return (
-        profile.fullName.toLowerCase().includes(normalized) ||
-        profile.ubicacion.toLowerCase().includes(normalized)
-      );
-    });
-  }, [profiles, query]);
-
-  const totalPages = Math.max(1, Math.ceil(filtered.length / pageSize));
-  const paginated = filtered.slice((page - 1) * pageSize, page * pageSize);
   const selected = profiles.find((item) => item.id === modalInternalId) ?? null;
   const selectedPass =
     selected && selectedDateValue
       ? getPassForDate(selected, selectedDateValue, openDate, nextDate)
       : null;
+  const selectedHistory = selected ? historyCache[selected.id] ?? null : null;
   const selectedVisitors =
     selected?.visitors.filter((item) => selectedVisitorIds.includes(item.visitaId)) ?? [];
   const availableVisitors =
@@ -184,8 +178,23 @@ export function InternalBrowser({
   }, [modalInternalId]);
 
   useEffect(() => {
-    setPage(1);
+    setQueryInput(query);
   }, [query]);
+
+  useEffect(() => {
+    if (deferredQuery === query) {
+      return;
+    }
+
+    const params = new URLSearchParams(searchParams.toString());
+    if (deferredQuery.trim()) {
+      params.set("q", deferredQuery.trim());
+    } else {
+      params.delete("q");
+    }
+    params.delete("page");
+    router.replace(params.size ? `${pathname}?${params.toString()}` : pathname, { scroll: false });
+  }, [deferredQuery, pathname, query, router, searchParams]);
 
   function openInternalModal(profile: InternalProfile) {
     setModalInternalId(profile.id);
@@ -212,6 +221,54 @@ export function InternalBrowser({
     }));
   }
 
+  async function toggleHistoryPanel() {
+    if (!selected) {
+      return;
+    }
+
+    const nextState = !historyOpen;
+    setHistoryOpen(nextState);
+
+    if (!nextState || historyCache[selected.id] || roleKey !== "super-admin") {
+      return;
+    }
+
+    try {
+      setHistoryLoading(true);
+      const response = await fetch(`/api/internals/${selected.id}/history`, {
+        cache: "no-store"
+      });
+      if (!response.ok) {
+        return;
+      }
+
+      const payload = (await response.json()) as InternalHistoryPayload;
+      setHistoryCache((current) => ({
+        ...current,
+        [selected.id]: payload
+      }));
+    } finally {
+      setHistoryLoading(false);
+    }
+  }
+
+  function goToPage(nextPage: number) {
+    const params = new URLSearchParams(searchParams.toString());
+    if (query.trim()) {
+      params.set("q", query.trim());
+    } else {
+      params.delete("q");
+    }
+
+    if (nextPage <= 1) {
+      params.delete("page");
+    } else {
+      params.set("page", String(nextPage));
+    }
+
+    router.replace(params.size ? `${pathname}?${params.toString()}` : pathname, { scroll: false });
+  }
+
   return (
     <>
       <FullscreenLoading active={screenLoading || createPending || passPending || visitorPending || statusPending} />
@@ -224,13 +281,13 @@ export function InternalBrowser({
           <div className="field" style={{ marginBottom: "0.8rem" }}>
             <input
               id="internal-search"
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
+              value={queryInput}
+              onChange={(event) => setQueryInput(event.target.value)}
               onKeyDown={(event) => {
                 if (event.key === "Escape") {
                   event.preventDefault();
-                  setQuery("");
-                  setPage(1);
+                  setQueryInput("");
+                  goToPage(1);
                 }
               }}
               placeholder="Buscar por nombre o ubicacion"
@@ -248,12 +305,12 @@ export function InternalBrowser({
                 </tr>
               </thead>
               <tbody>
-                {paginated.length === 0 ? (
+                {profiles.length === 0 ? (
                   <tr>
                     <td colSpan={3}>Sin resultados.</td>
                   </tr>
                 ) : (
-                  paginated.map((profile) => (
+                  profiles.map((profile) => (
                     <tr key={profile.id} onClick={() => openInternalModal(profile)} style={{ cursor: "pointer" }}>
                       <td>
                         <div className="record-title inline">
@@ -277,10 +334,10 @@ export function InternalBrowser({
           <div className="actions-row" style={{ marginTop: "0.8rem", justifyContent: "space-between" }}>
             <span className="muted">Pagina {page} de {totalPages}</span>
             <div className="actions-row">
-              <button type="button" className="button-soft" onClick={() => setPage((current) => Math.max(1, current - 1))} disabled={page === 1}>
+              <button type="button" className="button-soft" onClick={() => goToPage(Math.max(1, page - 1))} disabled={page === 1}>
                 Anterior
               </button>
-              <button type="button" className="button-soft" onClick={() => setPage((current) => Math.min(totalPages, current + 1))} disabled={page === totalPages}>
+              <button type="button" className="button-soft" onClick={() => goToPage(Math.min(totalPages, page + 1))} disabled={page === totalPages}>
                 Siguiente
               </button>
             </div>
@@ -335,7 +392,7 @@ export function InternalBrowser({
               </div>
               <div className="actions-row">
                 {roleKey === "super-admin" ? (
-                  <button type="button" className="button-soft" onClick={() => setHistoryOpen((current) => !current)}>
+                  <button type="button" className="button-soft" onClick={toggleHistoryPanel}>
                     Historial
                   </button>
                 ) : null}
@@ -499,12 +556,18 @@ export function InternalBrowser({
 
               {roleKey === "super-admin" && historyOpen ? (
                 <section className="profile-history-stack">
+                  {historyLoading && !selectedHistory ? (
+                    <div className="record-pill">
+                      <strong>Loading...</strong>
+                      <span>Estamos cargando el historial del interno.</span>
+                    </div>
+                  ) : null}
                   {[
                     {
                       key: "visitas",
                       title: "Visitas",
-                      count: selected.visitors.length,
-                      content: selected.visitors.length === 0 ? <span className="muted">Sin visitas.</span> : selected.visitors.map((item) => (
+                      count: selectedHistory?.visitors.length ?? 0,
+                      content: !selectedHistory || selectedHistory.visitors.length === 0 ? <span className="muted">Sin visitas.</span> : selectedHistory.visitors.map((item) => (
                         <div key={item.id} className="record-pill">
                           <strong>{item.visitor.fullName}</strong>
                           <span>{item.parentesco}</span>
@@ -514,8 +577,8 @@ export function InternalBrowser({
                     {
                       key: "aparatos",
                       title: "Aparatos registrados",
-                      count: selected.devices.length,
-                      content: selected.devices.length === 0 ? <span className="muted">Sin aparatos.</span> : selected.devices.map((item) => (
+                      count: selectedHistory?.devices.length ?? 0,
+                      content: !selectedHistory || selectedHistory.devices.length === 0 ? <span className="muted">Sin aparatos.</span> : selectedHistory.devices.map((item) => (
                         <div key={item.id} className="record-pill">
                           <strong>{item.deviceTypeName}</strong>
                           <span>{item.moduleKey} · {item.quantity}</span>
@@ -526,8 +589,8 @@ export function InternalBrowser({
                     {
                       key: "trabajo",
                       title: "Negocios y oficinas",
-                      count: selected.workplaceAssignments.length,
-                      content: selected.workplaceAssignments.length === 0 ? <span className="muted">Sin asignaciones.</span> : selected.workplaceAssignments.map((item) => (
+                      count: selectedHistory?.workplaceAssignments.length ?? 0,
+                      content: !selectedHistory || selectedHistory.workplaceAssignments.length === 0 ? <span className="muted">Sin asignaciones.</span> : selectedHistory.workplaceAssignments.map((item) => (
                         <div key={item.id} className="record-pill">
                           <strong>{item.workplaceName}</strong>
                           <span>{item.title}</span>
@@ -538,8 +601,8 @@ export function InternalBrowser({
                     {
                       key: "pases",
                       title: "Historico de visitas y pases",
-                      count: selected.recentPasses.length,
-                      content: selected.recentPasses.length === 0 ? <span className="muted">Sin historial.</span> : selected.recentPasses.map((item) => (
+                      count: selectedHistory?.recentPasses.length ?? 0,
+                      content: !selectedHistory || selectedHistory.recentPasses.length === 0 ? <span className="muted">Sin historial.</span> : selectedHistory.recentPasses.map((item) => (
                         <div key={item.id} className="record-pill">
                           <strong>{formatLongDate(item.fechaVisita)}</strong>
                           <span>{item.visitantes.length} visitas</span>
@@ -549,8 +612,8 @@ export function InternalBrowser({
                     {
                       key: "pagos",
                       title: "Pagos semanales",
-                      count: selected.weeklyPayments.length,
-                      content: selected.weeklyPayments.length === 0 ? <span className="muted">Sin pagos.</span> : selected.weeklyPayments.map((item) => (
+                      count: selectedHistory?.weeklyPayments.length ?? 0,
+                      content: !selectedHistory || selectedHistory.weeklyPayments.length === 0 ? <span className="muted">Sin pagos.</span> : selectedHistory.weeklyPayments.map((item) => (
                         <div key={item.id} className="record-pill">
                           <strong>{item.deviceTypeName}</strong>
                           <span>{compactMoney(item.amount)} · {item.status}</span>
@@ -560,8 +623,8 @@ export function InternalBrowser({
                     {
                       key: "escaleras",
                       title: "Escaleras",
-                      count: selected.escalerasHistory.length,
-                      content: selected.escalerasHistory.length === 0 ? <span className="muted">Sin registros.</span> : selected.escalerasHistory.map((item) => (
+                      count: selectedHistory?.escalerasHistory.length ?? 0,
+                      content: !selectedHistory || selectedHistory.escalerasHistory.length === 0 ? <span className="muted">Sin registros.</span> : selectedHistory.escalerasHistory.map((item) => (
                         <div key={item.id} className="record-pill">
                           <strong>{formatLongDate(item.fechaVisita)}</strong>
                           <span>{item.status}</span>
@@ -571,16 +634,16 @@ export function InternalBrowser({
                     {
                       key: "multas",
                       title: "Multas y decomisos",
-                      count: selected.fines.length + selected.seizures.length,
-                      content: selected.fines.length === 0 && selected.seizures.length === 0 ? <span className="muted">Sin registros.</span> : (
+                      count: (selectedHistory?.fines.length ?? 0) + (selectedHistory?.seizures.length ?? 0),
+                      content: !selectedHistory || (selectedHistory.fines.length === 0 && selectedHistory.seizures.length === 0) ? <span className="muted">Sin registros.</span> : (
                         <>
-                          {selected.fines.map((item) => (
+                          {selectedHistory.fines.map((item) => (
                             <div key={item.id} className="record-pill">
                               <strong>{item.concept}</strong>
                               <span>{compactMoney(item.amount)} · {item.status}</span>
                             </div>
                           ))}
-                          {selected.seizures.map((item) => (
+                          {selectedHistory.seizures.map((item) => (
                             <div key={item.id} className="record-pill">
                               <strong>{item.concept}</strong>
                               <span>{item.status}</span>
@@ -592,8 +655,8 @@ export function InternalBrowser({
                     {
                       key: "movimientos",
                       title: "Cambios, venta, renta y compra",
-                      count: selected.equipmentMovements.length,
-                      content: selected.equipmentMovements.length === 0 ? <span className="muted">Sin movimientos.</span> : selected.equipmentMovements.map((item) => (
+                      count: selectedHistory?.equipmentMovements.length ?? 0,
+                      content: !selectedHistory || selectedHistory.equipmentMovements.length === 0 ? <span className="muted">Sin movimientos.</span> : selectedHistory.equipmentMovements.map((item) => (
                         <div key={item.id} className="record-pill">
                           <strong>{item.movementType}</strong>
                           <span>{item.description}</span>
@@ -604,8 +667,8 @@ export function InternalBrowser({
                     {
                       key: "notas",
                       title: "Notas y temporalidad",
-                      count: selected.notes.length,
-                      content: selected.notes.length === 0 ? <span className="muted">Sin notas.</span> : selected.notes.map((item) => (
+                      count: selectedHistory?.notes.length ?? 0,
+                      content: !selectedHistory || selectedHistory.notes.length === 0 ? <span className="muted">Sin notas.</span> : selectedHistory.notes.map((item) => (
                         <div key={item.id} className="record-pill">
                           <strong>{item.title}</strong>
                           <span>{item.sourceModule}</span>

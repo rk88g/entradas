@@ -17,6 +17,7 @@ import {
   InternalProfile,
   InternalRecord,
   InternalDeviceRecord,
+  InternalHistoryPayload,
   InternalVisitorLink,
   ListingBuilderData,
   ListingRecord,
@@ -35,6 +36,7 @@ import {
   InternalSeizureRecord,
   InternalWeeklyPaymentRecord,
   PassVisitor,
+  PaginatedResult,
   RoleKey,
   UserProfile,
   VisitorHistoryEntry,
@@ -132,6 +134,22 @@ function splitIntoChunks<T>(items: T[], chunkSize = 500) {
   }
 
   return chunks;
+}
+
+function buildSearchPattern(query?: string | null) {
+  const normalized = query?.trim();
+  return normalized ? `%${normalized}%` : null;
+}
+
+function applyInternalSearch<T extends { or: (filters: string) => T }>(query: T, search?: string | null) {
+  const pattern = buildSearchPattern(search);
+  if (!pattern) {
+    return query;
+  }
+
+  return query.or(
+    `nombres.ilike.${pattern},apellido_pat.ilike.${pattern},apellido_mat.ilike.${pattern},ubicacion.ilike.${pattern}`
+  );
 }
 
 function mapInternalRecord(item: {
@@ -719,6 +737,39 @@ export async function getVisitas(): Promise<VisitorRecord[]> {
   );
 }
 
+export async function getVisitasPage(options?: {
+  query?: string;
+  page?: number;
+  pageSize?: number;
+}): Promise<PaginatedResult<VisitorRecord>> {
+  const supabase = await createServerSupabaseClient();
+  const query = options?.query?.trim() ?? "";
+  const pageSize = Math.max(1, options?.pageSize ?? 20);
+  const page = Math.max(1, options?.page ?? 1);
+  const allVisitors = await getVisitas();
+
+  const filtered = !query
+    ? allVisitors
+    : allVisitors.filter((visitor) => {
+        const normalized = query.toLowerCase();
+        return (
+          visitor.fullName.toLowerCase().includes(normalized) ||
+          (visitor.currentInternalName ?? "").toLowerCase().includes(normalized)
+        );
+      });
+
+  const from = (page - 1) * pageSize;
+  const items = filtered.slice(from, from + pageSize);
+
+  return {
+    items,
+    total: filtered.length,
+    page,
+    pageSize,
+    query
+  };
+}
+
 export async function getBetadas(): Promise<BetadaRecord[]> {
   const supabase = await createServerSupabaseClient();
   const { data, error } = await supabase
@@ -842,10 +893,15 @@ export async function getInternalProfiles(options?: {
   nextDateValue?: string | null;
   openDateValue?: string | null;
   includeInactive?: boolean;
+  presetInternos?: InternalRecord[];
+  includeHistory?: boolean;
 }): Promise<InternalProfile[]> {
   const supabase = await createServerSupabaseClient();
+  const includeHistory = options?.includeHistory ?? true;
   const [internos, nextDate, openDate] = await Promise.all([
-    getInternos(options?.includeInactive ?? false),
+    options?.presetInternos
+      ? Promise.resolve(options.presetInternos)
+      : getInternos(options?.includeInactive ?? false),
     options?.nextDateValue ? getDateByValue(options.nextDateValue) : getNextDate(),
     options?.openDateValue ? getDateByValue(options.openDateValue) : getOpenDate()
   ]);
@@ -905,9 +961,8 @@ export async function getInternalProfiles(options?: {
               return { data: rows, error: null };
             })()
           : Promise.resolve({ data: [], error: null }),
-        getListado()
-        ,
-        internalIds.length
+        includeHistory ? getListado() : Promise.resolve([]),
+        includeHistory && internalIds.length
           ? supabase
               .from("internal_devices")
       .select(
@@ -916,7 +971,7 @@ export async function getInternalProfiles(options?: {
               .in("internal_id", internalIds)
               .neq("status", "baja")
           : Promise.resolve({ data: [] }),
-        internalIds.length
+        includeHistory && internalIds.length
           ? supabase
               .from("device_payments")
               .select(
@@ -924,47 +979,49 @@ export async function getInternalProfiles(options?: {
               )
               .in("internal_devices.internal_id", internalIds)
           : Promise.resolve({ data: [] }),
-        internalIds.length
+        includeHistory && internalIds.length
           ? supabase
               .from("module_internal_staff")
               .select("id, module_key, internal_id, user_profile_id, position_key, user_profiles!inner(full_name)")
               .in("internal_id", internalIds)
           : Promise.resolve({ data: [] }),
-        internalIds.length
+        includeHistory && internalIds.length
           ? supabase
               .from("workplace_positions")
               .select("id, title, salary, assigned_internal_id, active, workplaces!inner(id, name, type)")
               .in("assigned_internal_id", internalIds)
           : Promise.resolve({ data: [] }),
-        internalIds.length
+        includeHistory && internalIds.length
           ? supabase
               .from("internal_log_notes")
               .select("id, internal_id, source_module, title, notes, created_at")
               .in("internal_id", internalIds)
               .order("created_at", { ascending: false })
           : Promise.resolve({ data: [] }),
-        internalIds.length
+        includeHistory && internalIds.length
           ? supabase
               .from("internal_fines")
               .select("id, internal_id, concept, amount, status, created_at")
               .in("internal_id", internalIds)
               .order("created_at", { ascending: false })
           : Promise.resolve({ data: [] }),
-        internalIds.length
+        includeHistory && internalIds.length
           ? supabase
               .from("internal_seizures")
               .select("id, internal_id, concept, status, notes, created_at")
               .in("internal_id", internalIds)
               .order("created_at", { ascending: false })
           : Promise.resolve({ data: [] }),
-        internalIds.length
+        includeHistory && internalIds.length
           ? supabase
               .from("internal_equipment_movements")
               .select("id, internal_id, movement_type, description, amount, created_at")
               .in("internal_id", internalIds)
               .order("created_at", { ascending: false })
           : Promise.resolve({ data: [] }),
-        getEscalerasPanelData(options?.includeInactive ?? false)
+        includeHistory
+          ? getEscalerasPanelData(options?.includeInactive ?? false)
+          : Promise.resolve([])
       ]);
 
   if (relationError) {
@@ -1185,6 +1242,110 @@ export async function getInternalProfiles(options?: {
       fines: fineMap.get(interno.id) ?? [],
       seizures: seizureMap.get(interno.id) ?? []
     }));
+}
+
+export async function getInternalProfilesPage(options?: {
+  query?: string;
+  page?: number;
+  pageSize?: number;
+  includeInactive?: boolean;
+  nextDateValue?: string | null;
+  openDateValue?: string | null;
+}): Promise<PaginatedResult<InternalProfile>> {
+  const supabase = await createServerSupabaseClient();
+  const query = options?.query?.trim() ?? "";
+  const pageSize = Math.max(1, options?.pageSize ?? 20);
+  const page = Math.max(1, options?.page ?? 1);
+  const from = (page - 1) * pageSize;
+  const to = from + pageSize - 1;
+
+  let countQuery = supabase
+    .from("internos")
+    .select("id", { count: "exact", head: true });
+  let dataQuery = supabase
+    .from("internos")
+    .select(
+      "id, expediente, nombres, apellido_pat, apellido_mat, nacimiento, llego, libre, ubicacion, telefono, ubi_filiacion, laborando, estatus, observaciones, created_at, updated_at"
+    )
+    .order("ubicacion", { ascending: true })
+    .range(from, to);
+
+  if (!options?.includeInactive) {
+    countQuery = countQuery.eq("estatus", "activo");
+    dataQuery = dataQuery.eq("estatus", "activo");
+  }
+
+  countQuery = applyInternalSearch(countQuery, query);
+  dataQuery = applyInternalSearch(dataQuery, query);
+
+  const [{ count }, { data, error }] = await Promise.all([countQuery, dataQuery]);
+
+  if (error || !data) {
+    return {
+      items: [],
+      total: 0,
+      page,
+      pageSize,
+      query
+    };
+  }
+
+  const internals = data
+    .map(mapInternalRecord)
+    .sort((a, b) => compareInternalLocations(a.ubicacion, b.ubicacion));
+  const items = await getInternalProfiles({
+    presetInternos: internals,
+    includeInactive: options?.includeInactive,
+    nextDateValue: options?.nextDateValue,
+    openDateValue: options?.openDateValue,
+    includeHistory: false
+  });
+
+  return {
+    items,
+    total: count ?? items.length,
+    page,
+    pageSize,
+    query
+  };
+}
+
+export async function getInternalHistoryById(internalId: string): Promise<InternalHistoryPayload | null> {
+  const supabase = await createServerSupabaseClient();
+  const { data, error } = await supabase
+    .from("internos")
+    .select(
+      "id, expediente, nombres, apellido_pat, apellido_mat, nacimiento, llego, libre, ubicacion, telefono, ubi_filiacion, laborando, estatus, observaciones, created_at, updated_at"
+    )
+    .eq("id", internalId)
+    .maybeSingle();
+
+  if (error || !data) {
+    return null;
+  }
+
+  const [profile] = await getInternalProfiles({
+    presetInternos: [mapInternalRecord(data)],
+    includeHistory: true
+  });
+
+  if (!profile) {
+    return null;
+  }
+
+  return {
+    visitors: profile.visitors,
+    recentPasses: profile.recentPasses,
+    devices: profile.devices,
+    weeklyPayments: profile.weeklyPayments,
+    escalerasHistory: profile.escalerasHistory,
+    notes: profile.notes,
+    staffAssignments: profile.staffAssignments,
+    workplaceAssignments: profile.workplaceAssignments,
+    equipmentMovements: profile.equipmentMovements,
+    fines: profile.fines,
+    seizures: profile.seizures
+  };
 }
 
 export async function getListingBuilderData(includeInactive = false): Promise<ListingBuilderData> {

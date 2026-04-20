@@ -233,7 +233,6 @@ export async function createDateAction(
       afterData: { fechaCompleta: dateValue, estado: status }
     });
 
-    revalidatePath("/sistema");
     revalidatePath("/sistema/fechas");
     revalidatePath("/sistema/listado");
     return success("Fecha registrada.");
@@ -344,7 +343,6 @@ export async function closeDateAction(
       afterData: { fechaCompleta: selectedDate.fechaCompleta, cierre: true, pasesNumerados: orderedPendingPasses.length }
     });
 
-    revalidatePath("/sistema");
     revalidatePath("/sistema/fechas");
     revalidatePath("/sistema/listado");
     revalidatePath("/sistema/internos");
@@ -414,9 +412,7 @@ export async function createInternalAction(
       afterData: payload
     });
 
-    revalidatePath("/sistema");
     revalidatePath("/sistema/internos");
-    revalidatePath("/sistema/listado");
     return success("Interno guardado.");
   } catch (error) {
     return failure(error instanceof Error ? error.message : "No se pudo guardar el interno.");
@@ -464,7 +460,6 @@ export async function updateInternalStatusAction(
     });
 
     revalidatePath("/sistema/internos");
-    revalidatePath("/sistema/listado");
     return success("Estatus actualizado.");
   } catch (error) {
     return failure(error instanceof Error ? error.message : "No se pudo actualizar el estatus.");
@@ -569,10 +564,8 @@ export async function createVisitorAction(
       }
     });
 
-    revalidatePath("/sistema");
     revalidatePath("/sistema/internos");
     revalidatePath("/sistema/visitas");
-    revalidatePath("/sistema/listado");
     return success("Visita guardada.");
   } catch (error) {
     return failure(error instanceof Error ? error.message : "No se pudo guardar la visita.");
@@ -660,7 +653,6 @@ export async function reassignVisitorAction(
 
     revalidatePath("/sistema/internos");
     revalidatePath("/sistema/visitas");
-    revalidatePath("/sistema/listado");
     return success("Visita reasignada.");
   } catch (error) {
     return failure(error instanceof Error ? error.message : "No se pudo reasignar la visita.");
@@ -968,25 +960,23 @@ export async function createPassAction(
       nextNumber = nextPassNumber(maxNumber);
     }
 
-    const { data: insertedPass, error: insertError } = await supabase
-      .from("listado")
-      .insert({
-        interno_id: internoId,
-        fecha_id: targetDate.id,
-        fecha_visita: targetDate.fechaCompleta,
-        apartado: "618",
-        status: "capturado",
-        numero_pase: nextNumber,
-        cierre_aplicado: false,
-        menciones: canManageMentions(profile.roleKey) && mentions ? mentions : null,
-        especiales:
-          canManageMentions(profile.roleKey)
-            ? appendDeviceSummaryToSpecials(specials, articleSummary)
-            : null,
-        created_by: profile.id
-      })
-      .select("id")
-      .single();
+    const orderedVisitors = [...selectedVisitors].sort((a, b) => (b.edad ?? 0) - (a.edad ?? 0));
+    const specialText =
+      canManageMentions(profile.roleKey)
+        ? appendDeviceSummaryToSpecials(specials, articleSummary)
+        : null;
+
+    const { data: insertedPass, error: insertError } = await supabase.rpc("create_support_pass", {
+      p_interno_id: internoId,
+      p_fecha_id: targetDate.id,
+      p_fecha_visita: targetDate.fechaCompleta,
+      p_created_by: profile.id,
+      p_numero_pase: nextNumber,
+      p_menciones: canManageMentions(profile.roleKey) && mentions ? mentions : null,
+      p_especiales: specialText,
+      p_visitor_ids: orderedVisitors.map((visitor) => visitor.id),
+      p_device_items: articlePayload
+    });
 
     if (insertError?.code === "23505") {
       return failure("Ese interno ya tiene pase para la fecha seleccionada.");
@@ -995,97 +985,13 @@ export async function createPassAction(
     if (insertError || !insertedPass) {
       return failure(insertError?.message || "No se pudo crear el pase.");
     }
-
-    const passId = insertedPass.id;
-
-    const orderedVisitors = [...selectedVisitors].sort((a, b) => (b.edad ?? 0) - (a.edad ?? 0));
-    const payload = orderedVisitors.map((visitor, index) => ({
-      listado_id: passId,
-      visita_id: visitor.id,
-      orden: index + 1,
-      validada: false
-    }));
-
-    const { error: relationInsertError } = await supabase.from("listado_visitas").insert(payload);
-    if (relationInsertError) {
-      return failure(
-        relationInsertError.message || "El pase se creo, pero no se pudieron guardar sus visitas."
-      );
-    }
-
-    if (articlePayload.length > 0) {
-      const { data: articleTypes, error: articleTypeError } = await supabase
-        .from("module_device_types")
-        .select("id, module_key")
-        .eq("active", true)
-        .in(
-          "id",
-          articlePayload.map((item) => item.deviceTypeId)
-        );
-
-      if (articleTypeError || !articleTypes) {
-        return failure(articleTypeError?.message || "No se pudieron validar los articulos del pase.");
-      }
-
-      const articleTypeMap = new Map(articleTypes.map((item) => [item.id, item]));
-      const listingItemsPayload = articlePayload
-        .map((item) => ({
-          listado_id: passId,
-          device_type_id: item.deviceTypeId,
-          quantity: item.quantity
-        }))
-        .filter((item) => articleTypeMap.has(item.device_type_id));
-
-      if (listingItemsPayload.length > 0) {
-        const { error: listingItemsError } = await supabase
-          .from("listing_device_items")
-          .insert(listingItemsPayload);
-
-        if (listingItemsError) {
-          return failure(
-            listingItemsError.message || "El pase se creo, pero no se pudieron guardar los articulos."
-          );
-        }
-
-        const internalDevicePayload = articlePayload
-          .map((item) => {
-            const articleType = articleTypeMap.get(item.deviceTypeId);
-            if (!articleType) {
-              return null;
-            }
-
-            return {
-              internal_id: internoId,
-              module_key: articleType.module_key,
-              device_type_id: item.deviceTypeId,
-              source_listing_id: passId,
-              quantity: item.quantity,
-              assigned_manually: false,
-              status: "pendiente",
-              created_by: profile.id
-            };
-          })
-          .filter(Boolean);
-
-        if (internalDevicePayload.length > 0) {
-          const { error: devicesError } = await supabase
-            .from("internal_devices")
-            .insert(internalDevicePayload);
-
-          if (devicesError) {
-            return failure(
-              devicesError.message || "El pase se creo, pero no se pudieron registrar los articulos del interno."
-            );
-          }
-        }
-      }
-    }
-
-    revalidatePath("/sistema");
+    const passId = String(insertedPass);
     revalidatePath("/sistema/internos");
     revalidatePath("/sistema/listado");
-    revalidatePath("/sistema/visual");
-    revalidatePath("/sistema/comunicacion");
+    if (articlePayload.length > 0) {
+      revalidatePath("/sistema/visual");
+      revalidatePath("/sistema/comunicacion");
+    }
     await auditAction({
       userId: profile.id,
       moduleKey: "listado",
