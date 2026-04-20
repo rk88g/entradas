@@ -3,6 +3,7 @@
 import { useActionState, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { createVisitorAction, reassignVisitorAction } from "@/app/sistema/actions";
+import { FullscreenLoading } from "@/components/fullscreen-loading";
 import { LoadingButton } from "@/components/loading-button";
 import { MutationBanner } from "@/components/mutation-banner";
 import { StatusBadge } from "@/components/status-badge";
@@ -42,8 +43,9 @@ export function VisitorManager({
   const [internalSearch, setInternalSearch] = useState("");
   const [createInternalSearch, setCreateInternalSearch] = useState("");
   const [selectedInternalId, setSelectedInternalId] = useState("");
+  const [screenLoading, setScreenLoading] = useState(false);
   const [createState, createAction, createPending] = useActionState(createVisitorAction, mutationInitialState);
-  const [reassignState, reassignAction] = useActionState(reassignVisitorAction, mutationInitialState);
+  const [reassignState, reassignAction, reassignPending] = useActionState(reassignVisitorAction, mutationInitialState);
   const createFormRef = useRef<HTMLFormElement>(null);
 
   const filteredVisitors = useMemo(() => {
@@ -122,6 +124,12 @@ export function VisitorManager({
     setPage(1);
   }, [query]);
 
+  useEffect(() => {
+    if (!createPending && !reassignPending) {
+      setScreenLoading(false);
+    }
+  }, [createPending, reassignPending]);
+
   function toggleSection(sectionKey: string) {
     setSectionsOpen((current) => ({
       ...current,
@@ -131,6 +139,7 @@ export function VisitorManager({
 
   return (
     <section className="module-grid module-grid-single">
+      <FullscreenLoading active={screenLoading || createPending || reassignPending} />
       <article className="data-card">
         <div className="actions-row" style={{ justifyContent: "space-between", alignItems: "center", marginBottom: "0.8rem" }}>
           <strong className="section-title">Visitas</strong>
@@ -267,7 +276,7 @@ export function VisitorManager({
                 {sectionsOpen.reasignacion ? (
                   <div className="section-collapse-body">
                     <MutationBanner state={reassignState} />
-                    <form action={reassignAction} className="field-grid" autoComplete="off">
+                    <form action={reassignAction} className="field-grid" autoComplete="off" onSubmitCapture={() => setScreenLoading(true)}>
                       <input type="hidden" name="visita_id" value={selectedVisitor.id} />
                       <div className="field">
                         <input
@@ -313,7 +322,7 @@ export function VisitorManager({
           {sectionsOpen.nueva ? (
             <div className="section-collapse-body">
               <MutationBanner state={createState} />
-              <form ref={createFormRef} action={createAction} className="field-grid" autoComplete="off">
+              <form ref={createFormRef} action={createAction} className="field-grid" autoComplete="off" onSubmitCapture={() => setScreenLoading(true)}>
                 <div className="field">
                   <input
                     value={createInternalSearch}

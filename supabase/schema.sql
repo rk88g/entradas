@@ -719,9 +719,14 @@ create table if not exists public.internal_seizures (
 drop index if exists public.idx_internos_apartado;
 create index if not exists idx_internos_laborando on public.internos (laborando);
 create index if not exists idx_visitas_betada on public.visitas (betada);
+create unique index if not exists idx_visitas_nombre_completo_unique
+on public.visitas ((lower(regexp_replace(btrim("nombreCompleto"), '\s+', ' ', 'g'))));
 create index if not exists idx_fechas_fecha_completa on public.fechas (fecha_completa);
 create index if not exists idx_listado_fecha_visita on public.listado (fecha_visita, apartado);
 create index if not exists idx_listado_numero_pase on public.listado (fecha_visita, numero_pase);
+create unique index if not exists idx_listado_unique_interno_fecha_activo
+on public.listado (interno_id, fecha_id)
+where status <> 'cancelado';
 create index if not exists idx_interno_visitas_interno on public.interno_visitas (interno_id);
 create index if not exists idx_visita_interno_historial_visita on public.visita_interno_historial (visita_id);
 create index if not exists idx_internal_devices_module on public.internal_devices (module_key, internal_id);

@@ -8,6 +8,7 @@ import {
   createVisitorAction,
   updateInternalStatusAction
 } from "@/app/sistema/actions";
+import { FullscreenLoading } from "@/components/fullscreen-loading";
 import { LoadingButton } from "@/components/loading-button";
 import { MutationBanner } from "@/components/mutation-banner";
 import { StatusBadge } from "@/components/status-badge";
@@ -90,6 +91,8 @@ export function InternalBrowser({
   const [historyOpen, setHistoryOpen] = useState(false);
   const [historySections, setHistorySections] = useState<Record<string, boolean>>({});
   const [formSeed, setFormSeed] = useState(0);
+  const [modalBannerResetKey, setModalBannerResetKey] = useState(0);
+  const [screenLoading, setScreenLoading] = useState(false);
   const [createState, createAction, createPending] = useActionState(createInternalAction, mutationInitialState);
   const [passState, passAction, passPending] = useActionState(createPassAction, mutationInitialState);
   const [visitorState, visitorAction, visitorPending] = useActionState(createVisitorAction, mutationInitialState);
@@ -160,6 +163,12 @@ export function InternalBrowser({
   }, [router, statusState.success]);
 
   useEffect(() => {
+    if (!createPending && !passPending && !visitorPending && !statusPending) {
+      setScreenLoading(false);
+    }
+  }, [createPending, passPending, visitorPending, statusPending]);
+
+  useEffect(() => {
     if (!modalInternalId) {
       return;
     }
@@ -185,6 +194,7 @@ export function InternalBrowser({
     setHistoryOpen(false);
     setHistorySections({});
     setFormSeed((current) => current + 1);
+    setModalBannerResetKey((current) => current + 1);
   }
 
   function toggleVisitor(visitaId: string) {
@@ -204,6 +214,7 @@ export function InternalBrowser({
 
   return (
     <>
+      <FullscreenLoading active={screenLoading || createPending || passPending || visitorPending || statusPending} />
       <section className="module-grid module-grid-single">
         <article className="data-card">
           <div className="actions-row" style={{ justifyContent: "space-between", alignItems: "center", marginBottom: "0.8rem" }}>
@@ -279,7 +290,7 @@ export function InternalBrowser({
         <article className="form-card">
           <strong className="section-title">Nuevo interno</strong>
           <MutationBanner state={createState} />
-          <form ref={internalFormRef} action={createAction} className="field-grid" style={{ marginTop: "0.8rem" }} autoComplete="off">
+          <form ref={internalFormRef} action={createAction} className="field-grid" style={{ marginTop: "0.8rem" }} autoComplete="off" onSubmitCapture={() => setScreenLoading(true)}>
             <div className="field">
               <input name="nombres" placeholder="Nombres" autoComplete="off" />
             </div>
@@ -363,7 +374,8 @@ export function InternalBrowser({
                 <MutationBanner state={{ success: null, error: "Debes incluir al menos un adulto en el pase." }} />
               ) : null}
 
-              <article className="data-card two-column-card">
+              <section className="two-column-section visitor-columns-section">
+              <article className="data-card">
                 <strong style={{ display: "block", marginBottom: "0.7rem" }}>No vendran</strong>
                 <div className="visitor-choice-grid">
                   {availableVisitors.length === 0 ? <span className="muted">Sin registros.</span> : availableVisitors.map((item) => (
@@ -375,7 +387,7 @@ export function InternalBrowser({
                 </div>
               </article>
 
-              <article className="data-card two-column-card">
+              <article className="data-card">
                 <strong style={{ display: "block", marginBottom: "0.7rem" }}>Vendran</strong>
                 <div className="visitor-choice-grid">
                   {selectedVisitors.length === 0 ? <span className="muted">Sin registros.</span> : selectedVisitors.map((item) => (
@@ -386,17 +398,19 @@ export function InternalBrowser({
                   ))}
                 </div>
               </article>
+              </section>
 
 
               <article className="data-card">
                 <strong style={{ display: "block", marginBottom: "0.7rem" }}>Nueva visita</strong>
-                <MutationBanner state={visitorState} />
+                <MutationBanner state={visitorState} resetKey={modalBannerResetKey} />
                 <form
                   key={`visitor-form-${selected.id}-${formSeed}`}
                   ref={visitorFormRef}
                   action={visitorAction}
                   className="field-grid"
                   autoComplete="off"
+                  onSubmitCapture={() => setScreenLoading(true)}
                 >
                   <input type="hidden" name="interno_id" value={selected.id} />
                   <div className="field" style={{ gridColumn: "1 / -1" }}><input name="nombreCompleto" placeholder="Nombre completo" autoComplete="off" required /></div>
@@ -428,12 +442,13 @@ export function InternalBrowser({
 
               <article className="data-card">
                 <strong style={{ display: "block", marginBottom: "0.7rem" }}>Crear pase</strong>
-                <MutationBanner state={passState} />
+                <MutationBanner state={passState} resetKey={modalBannerResetKey} />
                 <form
                   key={`pass-form-${selected.id}-${formSeed}`}
                   action={passAction}
                   className="field-grid"
                   autoComplete="off"
+                  onSubmitCapture={() => setScreenLoading(true)}
                 >
                     <input type="hidden" name="interno_id" value={selected.id} />
                     <input type="hidden" name="fecha_visita" value={selectedDateValue} />
@@ -628,8 +643,8 @@ export function InternalBrowser({
                     <span>{getInternalStatusMeta(selected.estatus).label}</span>
                   </summary>
                   <div className="section-collapse-body">
-                    <MutationBanner state={statusState} />
-                    <form action={statusAction} className="actions-row" autoComplete="off">
+                    <MutationBanner state={statusState} resetKey={modalBannerResetKey} />
+                    <form action={statusAction} className="actions-row" autoComplete="off" onSubmitCapture={() => setScreenLoading(true)}>
                       <input type="hidden" name="interno_id" value={selected.id} />
                       <div className="field" style={{ flex: 1 }}>
                         <select name="estatus" defaultValue={selected.estatus}>

@@ -265,7 +265,12 @@ export function PassListing({
     const normalized = query.trim().toLowerCase();
     const byDate = listings
       .filter((item) => item.fechaVisita === printDate)
-      .filter((item) => !normalized || item.internoNombre.toLowerCase().includes(normalized));
+      .filter(
+        (item) =>
+          !normalized ||
+          item.internoNombre.toLowerCase().includes(normalized) ||
+          item.internoUbicacion.toLowerCase().includes(normalized)
+      );
     const sorted = sortListingsForPrint(byDate);
     if (printMode === "menciones") {
       return sorted.filter(

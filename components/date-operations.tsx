@@ -1,7 +1,8 @@
 "use client";
 
-import { useActionState, useMemo } from "react";
+import { useActionState, useEffect, useMemo, useState } from "react";
 import { closeDateAction, createDateAction, updateClosePasswordAction } from "@/app/sistema/actions";
+import { FullscreenLoading } from "@/components/fullscreen-loading";
 import { LoadingButton } from "@/components/loading-button";
 import { MutationBanner } from "@/components/mutation-banner";
 import { DateRecord, MutationState, RoleKey } from "@/lib/types";
@@ -28,6 +29,7 @@ export function DateOperations({
   const [createState, createAction, createPending] = useActionState(createDateAction, mutationInitialState);
   const [closeState, closeAction, closePending] = useActionState(closeDateAction, mutationInitialState);
   const [passwordState, passwordAction, passwordPending] = useActionState(updateClosePasswordAction, mutationInitialState);
+  const [screenLoading, setScreenLoading] = useState(false);
   const tomorrowValue = getDateOffset(1);
   const waitingValue = getDateOffset(2);
   const canCloseNow = canCloseMexicoCityDate();
@@ -35,8 +37,15 @@ export function DateOperations({
   const tomorrowDate = registeredDates.find((item) => item.fechaCompleta === tomorrowValue) ?? null;
   const waitingDate = registeredDates.find((item) => item.fechaCompleta === waitingValue) ?? null;
 
+  useEffect(() => {
+    if (!createPending && !closePending && !passwordPending) {
+      setScreenLoading(false);
+    }
+  }, [createPending, closePending, passwordPending]);
+
   return (
     <section className="module-grid module-grid-single">
+      <FullscreenLoading active={screenLoading || createPending || closePending || passwordPending} />
       <article className="data-card">
         <strong className="section-title">Fechas</strong>
 
@@ -112,7 +121,7 @@ export function DateOperations({
             </summary>
             <div className="section-collapse-body">
               <MutationBanner state={createState} />
-              <form action={createAction} className="field-grid" autoComplete="off">
+              <form action={createAction} className="field-grid" autoComplete="off" onSubmitCapture={() => setScreenLoading(true)}>
                 <div className="field">
                   <label htmlFor="fecha_completa">Fecha de visita</label>
                   <input id="fecha_completa" name="fecha_completa" type="date" min={tomorrowValue} max={waitingValue} autoComplete="off" />
@@ -139,7 +148,7 @@ export function DateOperations({
                 </p>
               ) : null}
               <MutationBanner state={closeState} />
-              <form action={closeAction} className="field-grid" style={{ marginTop: "0.8rem" }} autoComplete="off">
+              <form action={closeAction} className="field-grid" style={{ marginTop: "0.8rem" }} autoComplete="off" onSubmitCapture={() => setScreenLoading(true)}>
                 <input type="hidden" name="fecha_completa" value={openDate?.fechaCompleta ?? ""} />
                 <div className="field">
                   <label htmlFor="close_password">Contraseña de cierre</label>
@@ -159,7 +168,7 @@ export function DateOperations({
             </summary>
             <div className="section-collapse-body">
               <MutationBanner state={passwordState} />
-              <form action={passwordAction} className="field-grid" autoComplete="off">
+              <form action={passwordAction} className="field-grid" autoComplete="off" onSubmitCapture={() => setScreenLoading(true)}>
                 <div className="field">
                   <label htmlFor="new_close_password">
                     {closePasswordConfigured ? "Nueva contraseña de cierre" : "Crear contraseña de cierre"}

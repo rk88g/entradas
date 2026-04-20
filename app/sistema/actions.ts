@@ -58,6 +58,50 @@ function buildInternalExpediente() {
   return `INT-${Date.now()}-${Math.floor(Math.random() * 10000)}`;
 }
 
+function normalizeFullName(value: string) {
+  return value.replace(/\s+/g, " ").trim();
+}
+
+async function buildExistingVisitorAssignmentMessage(
+  supabase: Awaited<ReturnType<typeof createServerSupabaseClient>>,
+  nombreCompleto: string
+) {
+  const { data: duplicateVisitors } = await supabase
+    .from("visitas")
+    .select("id, \"nombreCompleto\"")
+    .ilike("nombreCompleto", nombreCompleto)
+    .order("created_at", { ascending: false });
+
+  const existingVisitor = duplicateVisitors?.[0] ?? null;
+  if (!existingVisitor) {
+    return "La visita ya existe y ya fue registrada previamente.";
+  }
+
+  const { data: existingRelation } = await supabase
+    .from("interno_visitas")
+    .select("interno_id")
+    .eq("visita_id", existingVisitor.id)
+    .maybeSingle();
+
+  if (!existingRelation?.interno_id) {
+    return "La visita ya existe y ya fue registrada previamente.";
+  }
+
+  const { data: internal } = await supabase
+    .from("internos")
+    .select("nombres, apellido_pat, apellido_mat, ubicacion")
+    .eq("id", existingRelation.interno_id)
+    .maybeSingle();
+
+  if (!internal) {
+    return "La visita ya existe y ya fue registrada previamente.";
+  }
+
+  return `La visita ya esta asignada a ${internal.nombres} ${internal.apellido_pat} ${internal.apellido_mat ?? ""} - ubicacion ${internal.ubicacion}.`
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 async function getPassArticlePayload(formData: FormData) {
   const articlePairs = [...formData.entries()]
     .filter(([key]) => key.startsWith("article_qty_"))
@@ -436,7 +480,7 @@ export async function createVisitorAction(
     const supabase = await createServerSupabaseClient();
 
     const visitorPayload = {
-      nombreCompleto: String(formData.get("nombreCompleto") ?? "").trim(),
+      nombreCompleto: normalizeFullName(String(formData.get("nombreCompleto") ?? "")),
       fecha_nacimiento: String(formData.get("fecha_nacimiento") ?? "").trim(),
       sexo: String(formData.get("sexo") ?? "sin-definir").trim(),
       parentesco: String(formData.get("parentesco") ?? "").trim(),
@@ -475,29 +519,9 @@ export async function createVisitorAction(
     const existingVisitor = duplicateVisitors?.[0] ?? null;
 
     if (existingVisitor) {
-      const { data: existingRelation } = await supabase
-        .from("interno_visitas")
-        .select("interno_id")
-        .eq("visita_id", existingVisitor.id)
-        .maybeSingle();
-
-      if (existingRelation?.interno_id) {
-        const { data: internal } = await supabase
-          .from("internos")
-          .select("nombres, apellido_pat, apellido_mat, ubicacion")
-          .eq("id", existingRelation.interno_id)
-          .maybeSingle();
-
-        if (internal) {
-          return failure(
-            `La visita ya esta asignada a ${internal.nombres} ${internal.apellido_pat} ${internal.apellido_mat ?? ""} - ubicacion ${internal.ubicacion}.`
-              .replace(/\s+/g, " ")
-              .trim()
-          );
-        }
-      }
-
-      return failure("La visita ya existe y ya fue registrada previamente.");
+      return failure(
+        await buildExistingVisitorAssignmentMessage(supabase, visitorPayload.nombreCompleto)
+      );
     }
 
     const { data: insertedVisitor, error: visitorError } = await supabase
@@ -505,6 +529,12 @@ export async function createVisitorAction(
       .insert(visitorPayload)
       .select("id")
       .single();
+
+    if (visitorError?.code === "23505") {
+      return failure(
+        await buildExistingVisitorAssignmentMessage(supabase, visitorPayload.nombreCompleto)
+      );
+    }
 
     if (visitorError || !insertedVisitor) {
       return failure(visitorError?.message || "No se pudo guardar la visita.");
@@ -804,7 +834,7 @@ export async function createPassAction(
     const profile = await requireProfile();
     const supabase = await createServerSupabaseClient();
     const internoId = String(formData.get("interno_id") ?? "").trim();
-    const visitorIds = formData.getAll("visitor_ids").map((item) => String(item));
+    const visitorIds = [...new Set(formData.getAll("visitor_ids").map((item) => String(item).trim()).filter(Boolean))];
     const targetDateValue = String(formData.get("fecha_visita") ?? "").trim();
     const mentions = String(formData.get("menciones") ?? "").trim();
     const specials = String(formData.get("especiales") ?? "").trim();
@@ -957,6 +987,10 @@ export async function createPassAction(
       })
       .select("id")
       .single();
+
+    if (insertError?.code === "23505") {
+      return failure("Ese interno ya tiene pase para la fecha seleccionada.");
+    }
 
     if (insertError || !insertedPass) {
       return failure(insertError?.message || "No se pudo crear el pase.");

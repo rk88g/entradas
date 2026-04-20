@@ -4,10 +4,19 @@ import { useEffect, useState } from "react";
 import { createPortal } from "react-dom";
 import { MutationState } from "@/lib/types";
 
-export function MutationBanner({ state }: { state: MutationState }) {
+export function MutationBanner({
+  state,
+  resetKey
+}: {
+  state: MutationState;
+  resetKey?: string | number;
+}) {
   const [visibleMessage, setVisibleMessage] = useState<string | null>(null);
   const [variant, setVariant] = useState<"error" | "success">("success");
   const [mounted, setMounted] = useState(false);
+  const [suppressedSignature, setSuppressedSignature] = useState<string | null>(null);
+
+  const signature = `${state.error ?? ""}::${state.success ?? ""}`;
 
   useEffect(() => {
     setMounted(true);
@@ -15,6 +24,15 @@ export function MutationBanner({ state }: { state: MutationState }) {
   }, []);
 
   useEffect(() => {
+    setVisibleMessage(null);
+    setSuppressedSignature(signature);
+  }, [resetKey, signature]);
+
+  useEffect(() => {
+    if (signature === suppressedSignature) {
+      return;
+    }
+
     if (state.error) {
       setVisibleMessage(state.error);
       setVariant("error");
@@ -28,7 +46,7 @@ export function MutationBanner({ state }: { state: MutationState }) {
     }
 
     setVisibleMessage(null);
-  }, [state.error, state.success]);
+  }, [state.error, state.success, signature, suppressedSignature]);
 
   useEffect(() => {
     if (!visibleMessage) {
@@ -37,7 +55,7 @@ export function MutationBanner({ state }: { state: MutationState }) {
 
     const timeout = window.setTimeout(() => {
       setVisibleMessage(null);
-    }, 4200);
+    }, 2600);
 
     return () => window.clearTimeout(timeout);
   }, [visibleMessage]);
