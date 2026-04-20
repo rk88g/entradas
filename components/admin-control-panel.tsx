@@ -89,6 +89,7 @@ export function AdminControlPanel({
   const [selectedWorkplaceInternal, setSelectedWorkplaceInternal] = useState<InternalSearchOption | null>(null);
   const [selectedCorrectionInternal, setSelectedCorrectionInternal] = useState<InternalSearchOption | null>(null);
   const [selectedCorrectionVisitor, setSelectedCorrectionVisitor] = useState<VisitorSearchOption | null>(null);
+  const [showPassword, setShowPassword] = useState(false);
   const [internalNamesForm, setInternalNamesForm] = useState({
     nombres: "",
     apellidoPat: "",
@@ -165,25 +166,26 @@ export function AdminControlPanel({
 
   return (
     <section className="module-panel danger-zone-panel">
-      <div className="toolbar">
-        <button type="button" className={`button-secondary listing-toggle ${tab === "configuracion" ? "active" : ""}`} onClick={() => setTab("configuracion")}>
-          Configuracion
-        </button>
-        <button type="button" className={`button-secondary listing-toggle ${tab === "usuarios" ? "active" : ""}`} onClick={() => setTab("usuarios")}>
-          Usuarios
-        </button>
-        <button type="button" className={`button-secondary listing-toggle ${tab === "correcciones" ? "active" : ""}`} onClick={() => setTab("correcciones")}>
-          Correcciones
-        </button>
-        <button type="button" className={`button-secondary listing-toggle ${tab === "permisos" ? "active" : ""}`} onClick={() => setTab("permisos")}>
-          Permisos
-        </button>
-        <button type="button" className={`button-secondary listing-toggle ${tab === "sesiones" ? "active" : ""}`} onClick={() => setTab("sesiones")}>
-          Sesiones
-        </button>
-        <button type="button" className={`button-secondary listing-toggle ${tab === "acciones" ? "active" : ""}`} onClick={() => setTab("acciones")}>
-          Acciones
-        </button>
+      <div className="admin-tabstrip" role="tablist" aria-label="Secciones de Danger Zone">
+        {[
+          { key: "configuracion", label: "Configuracion" },
+          { key: "usuarios", label: "Usuarios" },
+          { key: "correcciones", label: "Correcciones" },
+          { key: "permisos", label: "Permisos" },
+          { key: "sesiones", label: "Sesiones" },
+          { key: "acciones", label: "Acciones" }
+        ].map((item) => (
+          <button
+            key={item.key}
+            type="button"
+            role="tab"
+            aria-selected={tab === item.key}
+            className={`admin-tab ${tab === item.key ? "active" : ""}`}
+            onClick={() => setTab(item.key as typeof tab)}
+          >
+            <span className="admin-tab-label">{item.label}</span>
+          </button>
+        ))}
       </div>
 
       {tab === "configuracion" ? (
@@ -511,7 +513,21 @@ export function AdminControlPanel({
                 </select>
               </div>
               <div className="field">
-                <input name="password" type="password" placeholder="Nueva contrasena" autoComplete="off" />
+                <div className="password-field-row">
+                  <input
+                    name="password"
+                    type={showPassword ? "text" : "password"}
+                    placeholder="Nueva contrasena"
+                    autoComplete="off"
+                  />
+                  <button
+                    type="button"
+                    className="button-soft password-toggle"
+                    onClick={() => setShowPassword((current) => !current)}
+                  >
+                    {showPassword ? "Ocultar" : "Mostrar"}
+                  </button>
+                </div>
               </div>
               <div className="actions-row">
                 <LoadingButton pending={passwordPending} label="Actualizar contrasena" loadingLabel="Loading..." className="button" disabled={!adminConfigured} />
