@@ -99,9 +99,7 @@ alter table public.internos
 
 create table if not exists public.visitas (
   id uuid primary key default gen_random_uuid(),
-  nombres text not null,
-  apellido_pat text not null,
-  apellido_mat text,
+  "nombreCompleto" text not null,
   fecha_nacimiento date not null,
   edad integer not null default 0,
   menor boolean not null default false,
@@ -114,6 +112,47 @@ create table if not exists public.visitas (
   created_at timestamptz not null default timezone('utc', now()),
   updated_at timestamptz not null default timezone('utc', now())
 );
+
+alter table public.visitas
+  add column if not exists "nombreCompleto" text;
+
+do $$
+begin
+  if exists (
+    select 1
+    from information_schema.columns
+    where table_schema = 'public'
+      and table_name = 'visitas'
+      and column_name = 'nombres'
+  ) then
+    execute $sql$
+      update public.visitas
+      set "nombreCompleto" = trim(
+        concat_ws(
+          ' ',
+          nullif(trim(nombres), ''),
+          nullif(trim(apellido_pat), ''),
+          nullif(trim(apellido_mat), '')
+        )
+      )
+      where coalesce(trim("nombreCompleto"), '') = ''
+    $sql$;
+  end if;
+end $$;
+
+drop view if exists public.historial_ingresos;
+
+alter table public.visitas
+  alter column "nombreCompleto" set not null;
+
+alter table public.visitas
+  drop column if exists nombres;
+
+alter table public.visitas
+  drop column if exists apellido_pat;
+
+alter table public.visitas
+  drop column if exists apellido_mat;
 
 alter table public.visitas
   add column if not exists sexo text not null default 'sin-definir';
@@ -706,7 +745,7 @@ select
   i.id as interno_id,
   concat_ws(' ', i.nombres, i.apellido_pat, i.apellido_mat) as interno_nombre,
   v.id as visita_id,
-  concat_ws(' ', v.nombres, v.apellido_pat, v.apellido_mat) as visita_nombre,
+  v."nombreCompleto" as visita_nombre,
   v.parentesco,
   v.edad,
   v.menor,

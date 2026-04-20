@@ -88,9 +88,7 @@ export interface InternalProfile extends InternalRecord {
 export interface VisitorRecord {
   id: string;
   fullName: string;
-  nombres: string;
-  apellidoPat: string;
-  apellidoMat: string;
+  nombreCompleto: string;
   fechaNacimiento: string;
   edad: number;
   menor: boolean;

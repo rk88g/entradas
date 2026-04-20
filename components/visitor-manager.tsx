@@ -332,9 +332,7 @@ export function VisitorManager({
                   </div>
                 ) : null}
 
-                <div className="field"><input name="nombres" placeholder="Nombres" autoComplete="off" required /></div>
-                <div className="field"><input name="apellido_pat" placeholder="Apellido paterno" autoComplete="off" required /></div>
-                <div className="field"><input name="apellido_mat" placeholder="Apellido materno" autoComplete="off" required /></div>
+                <div className="field" style={{ gridColumn: "1 / -1" }}><input name="nombreCompleto" placeholder="Nombre completo" autoComplete="off" required /></div>
                 <div className="field"><input name="fecha_nacimiento" type="date" autoComplete="off" required /></div>
                 <div className="field">
                   <select name="sexo" defaultValue="" required>
@@ -344,7 +342,6 @@ export function VisitorManager({
                   </select>
                 </div>
                 <div className="field"><input name="parentesco" placeholder="Parentesco" autoComplete="off" required /></div>
-                <div className="field"><input name="telefono" placeholder="Telefono" autoComplete="off" /></div>
                 {canManageAvailability ? (
                   <div className="field">
                     <select name="betada" defaultValue="false">

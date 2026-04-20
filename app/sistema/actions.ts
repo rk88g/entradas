@@ -436,9 +436,7 @@ export async function createVisitorAction(
     const supabase = await createServerSupabaseClient();
 
     const visitorPayload = {
-      nombres: String(formData.get("nombres") ?? "").trim(),
-      apellido_pat: String(formData.get("apellido_pat") ?? "").trim(),
-      apellido_mat: String(formData.get("apellido_mat") ?? "").trim() || null,
+      nombreCompleto: String(formData.get("nombreCompleto") ?? "").trim(),
       fecha_nacimiento: String(formData.get("fecha_nacimiento") ?? "").trim(),
       sexo: String(formData.get("sexo") ?? "sin-definir").trim(),
       parentesco: String(formData.get("parentesco") ?? "").trim(),
@@ -453,9 +451,7 @@ export async function createVisitorAction(
     const internalId = String(formData.get("interno_id") ?? "").trim();
 
     if (
-      !visitorPayload.nombres ||
-      !visitorPayload.apellido_pat ||
-      !visitorPayload.apellido_mat ||
+      !visitorPayload.nombreCompleto ||
       !visitorPayload.fecha_nacimiento ||
       !visitorPayload.parentesco
     ) {
@@ -466,23 +462,17 @@ export async function createVisitorAction(
       return failure("Debes asignar la visita a un interno.");
     }
 
-    const normalizedApellidoMat = (visitorPayload.apellido_mat ?? "").trim().toLowerCase();
     const { data: duplicateVisitors, error: existingVisitorError } = await supabase
       .from("visitas")
-      .select("id, apellido_mat")
-      .ilike("nombres", visitorPayload.nombres)
-      .ilike("apellido_pat", visitorPayload.apellido_pat)
+      .select("id, \"nombreCompleto\"")
+      .ilike("nombreCompleto", visitorPayload.nombreCompleto)
       .order("created_at", { ascending: false });
 
     if (existingVisitorError) {
       return failure(existingVisitorError.message || "No se pudo validar la visita.");
     }
 
-    const existingVisitor =
-      duplicateVisitors?.find(
-        (item) => (item.apellido_mat ?? "").trim().toLowerCase() === normalizedApellidoMat
-      ) ??
-      null;
+    const existingVisitor = duplicateVisitors?.[0] ?? null;
 
     if (existingVisitor) {
       const { data: existingRelation } = await supabase
@@ -878,11 +868,11 @@ export async function createPassAction(
     if (missingVisitorIds.length > 0) {
       const { data: missingVisitors } = await supabase
         .from("visitas")
-        .select("nombres, apellido_pat, apellido_mat")
+        .select("\"nombreCompleto\"")
         .in("id", missingVisitorIds);
 
       const missingNames = (missingVisitors ?? [])
-        .map((item) => [item.nombres, item.apellido_pat, item.apellido_mat].filter(Boolean).join(" "))
+        .map((item) => item.nombreCompleto)
         .filter(Boolean);
 
       if (missingNames.length > 0) {

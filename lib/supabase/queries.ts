@@ -139,9 +139,7 @@ function mapInternalRecord(item: {
 function mapVisitorRecord(
   item: {
     id: string;
-    nombres: string;
-    apellido_pat: string;
-    apellido_mat: string | null;
+    nombreCompleto: string;
     fecha_nacimiento: string;
     edad: number | null;
     menor: boolean | null;
@@ -157,10 +155,8 @@ function mapVisitorRecord(
 ): VisitorRecord {
   return {
     id: item.id,
-    fullName: fullNameFromParts(item.nombres, item.apellido_pat, item.apellido_mat),
-    nombres: item.nombres,
-    apellidoPat: item.apellido_pat,
-    apellidoMat: item.apellido_mat ?? "",
+    fullName: item.nombreCompleto,
+    nombreCompleto: item.nombreCompleto,
     fechaNacimiento: item.fecha_nacimiento,
     edad: item.edad ?? 0,
     menor: Boolean(item.menor),
@@ -278,7 +274,7 @@ async function getVisitorsMap(
     supabase
       .from("visitas")
       .select(
-        "id, nombres, apellido_pat, apellido_mat, fecha_nacimiento, edad, menor, sexo, parentesco, betada, telefono, created_at, updated_at"
+        "id, \"nombreCompleto\", fecha_nacimiento, edad, menor, sexo, parentesco, betada, telefono, created_at, updated_at"
       )
       .in("id", visitorIds)
   ]);
@@ -532,7 +528,7 @@ export async function getVisitas(): Promise<VisitorRecord[]> {
     supabase
       .from("visitas")
       .select(
-        "id, nombres, apellido_pat, apellido_mat, fecha_nacimiento, edad, menor, sexo, parentesco, betada, telefono, created_at, updated_at"
+        "id, \"nombreCompleto\", fecha_nacimiento, edad, menor, sexo, parentesco, betada, telefono, created_at, updated_at"
       )
       .order("updated_at", { ascending: false }),
     supabase

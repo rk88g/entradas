@@ -391,9 +391,7 @@ export function InternalBrowser({
                   autoComplete="off"
                 >
                   <input type="hidden" name="interno_id" value={selected.id} />
-                  <div className="field"><input name="nombres" placeholder="Nombres" autoComplete="off" required /></div>
-                  <div className="field"><input name="apellido_pat" placeholder="Apellido paterno" autoComplete="off" required /></div>
-                  <div className="field"><input name="apellido_mat" placeholder="Apellido materno" autoComplete="off" required /></div>
+                  <div className="field" style={{ gridColumn: "1 / -1" }}><input name="nombreCompleto" placeholder="Nombre completo" autoComplete="off" required /></div>
                   <div className="field"><input name="fecha_nacimiento" type="date" autoComplete="off" required /></div>
                   <div className="field">
                     <select name="sexo" defaultValue="" required>
