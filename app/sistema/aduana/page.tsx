@@ -6,7 +6,11 @@ import { canAccessModule } from "@/lib/utils";
 export default async function AduanaPage() {
   const profile = await getCurrentUserProfile();
 
-  if (!profile?.active || !canAccessModule(profile.roleKey, profile.accessibleModules, "escaleras")) {
+  if (
+    !profile?.active ||
+    profile.roleKey === "control" ||
+    !canAccessModule(profile.roleKey, profile.accessibleModules, "escaleras")
+  ) {
     redirect("/sistema");
   }
 

@@ -44,7 +44,13 @@ export function AppShell({
     ...(user.roleKey === "super-admin"
       ? [{ href: "/sistema/admin", icon: "DZ", label: "Danger Zone", danger: true }]
       : []),
-    ...moduleNavItems.filter((item) => canAccessModule(user.roleKey, user.accessibleModules, item.moduleKey))
+    ...moduleNavItems.filter((item) => {
+      if (user.roleKey === "control" && item.href === "/sistema/aduana") {
+        return false;
+      }
+
+      return canAccessModule(user.roleKey, user.accessibleModules, item.moduleKey);
+    })
   ];
 
   useEffect(() => {

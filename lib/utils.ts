@@ -298,8 +298,12 @@ export function canAccessModule(
   accesses: ModuleAccess[],
   moduleKey: ModuleKey
 ) {
-  if (role === "super-admin" || role === "control") {
+  if (role === "super-admin") {
     return true;
+  }
+
+  if (role === "control") {
+    return moduleKey === "escaleras";
   }
 
   if (role === "escaleras" && moduleKey === "escaleras") {
@@ -315,8 +319,12 @@ export function canManageModuleFunction(
   moduleKey: ModuleKey,
   fn: ModuleWorkerFunctionKey
 ) {
-  if (role === "super-admin" || role === "control") {
+  if (role === "super-admin") {
     return true;
+  }
+
+  if (role === "control") {
+    return moduleKey === "escaleras";
   }
 
   return accesses.some(
