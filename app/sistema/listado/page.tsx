@@ -1,13 +1,18 @@
 import { redirect } from "next/navigation";
 import { PassListing } from "@/components/pass-listing";
-import { getCurrentUserProfile, getListingBuilderData, getListado } from "@/lib/supabase/queries";
+import {
+  getCurrentUserProfile,
+  getListado,
+  getNextDate,
+  getOpenDate
+} from "@/lib/supabase/queries";
 import { canAccessCoreSystem, formatLongDate } from "@/lib/utils";
 
 export default async function ListadoPage() {
-  const [profile, builderData, listado] = await Promise.all([
+  const [profile, openDate, nextDate] = await Promise.all([
     getCurrentUserProfile(),
-    getListingBuilderData(),
-    getListado()
+    getOpenDate(),
+    getNextDate()
   ]);
 
   if (profile?.moduleOnly && profile.accessibleModules.length > 0) {
@@ -18,10 +23,10 @@ export default async function ListadoPage() {
     redirect("/sistema/escaleras");
   }
 
-  const printDate = builderData.printDate?.fechaCompleta ?? "";
-  const waitingDate = builderData.nextDate?.fechaCompleta ?? "";
-  const currentPrintListings = listado.filter((item) => item.fechaVisita === printDate);
-  const waitingListings = listado.filter((item) => item.fechaVisita === waitingDate);
+  const [currentPrintListings, waitingListings] = await Promise.all([
+    openDate ? getListado({ fechaVisita: openDate.fechaCompleta }) : Promise.resolve([]),
+    nextDate ? getListado({ fechaVisita: nextDate.fechaCompleta }) : Promise.resolve([])
+  ]);
 
   return (
     <>
@@ -30,7 +35,7 @@ export default async function ListadoPage() {
           <h3>En espera</h3>
           <div className="mini-list">
             <div className="mini-row">
-              <strong>{builderData.nextDate ? formatLongDate(builderData.nextDate.fechaCompleta) : "Sin fecha"}</strong>
+              <strong>{nextDate ? formatLongDate(nextDate.fechaCompleta) : "Sin fecha"}</strong>
             </div>
             <div className="mini-row">
               <span>Pases</span>
@@ -39,10 +44,10 @@ export default async function ListadoPage() {
           </div>
         </article>
         <article className="quick-card">
-          <h3>Mañana</h3>
+          <h3>Manana</h3>
           <div className="mini-list">
             <div className="mini-row">
-              <strong>{builderData.openDate ? formatLongDate(builderData.openDate.fechaCompleta) : "Sin fecha"}</strong>
+              <strong>{openDate ? formatLongDate(openDate.fechaCompleta) : "Sin fecha"}</strong>
             </div>
             <div className="mini-row">
               <span>Pases</span>
@@ -52,7 +57,10 @@ export default async function ListadoPage() {
         </article>
       </section>
 
-      <PassListing listings={listado} printDate={printDate} />
+      <PassListing
+        listings={currentPrintListings}
+        printDate={openDate?.fechaCompleta ?? ""}
+      />
     </>
   );
 }
