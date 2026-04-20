@@ -1,7 +1,7 @@
 import { redirect } from "next/navigation";
 import { VisitorManager } from "@/components/visitor-manager";
 import { getCurrentUserProfile, getVisitasPage } from "@/lib/supabase/queries";
-import { canAccessCoreSystem, canAccessScope } from "@/lib/utils";
+import { canAccessCoreSystem, canAccessScope, canViewSensitiveSystemData } from "@/lib/utils";
 
 export default async function VisitasPage({
   searchParams
@@ -43,6 +43,7 @@ export default async function VisitasPage({
       page={visitorsPage.page}
       totalPages={Math.max(1, Math.ceil(visitorsPage.total / visitorsPage.pageSize))}
       roleKey={profile?.roleKey ?? "capturador"}
+      canViewSensitiveData={canViewSensitiveSystemData(profile?.roleKey ?? "capturador", profile?.id)}
     />
   );
 }

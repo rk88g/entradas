@@ -76,7 +76,8 @@ export function InternalBrowser({
   nextDate,
   openDate,
   passArticles,
-  roleKey
+  roleKey,
+  canViewSensitiveData
 }: {
   profiles: InternalProfile[];
   query: string;
@@ -86,6 +87,7 @@ export function InternalBrowser({
   openDate?: DateRecord | null;
   passArticles: ModuleDeviceType[];
   roleKey: RoleKey;
+  canViewSensitiveData: boolean;
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -114,7 +116,6 @@ export function InternalBrowser({
   const internalFormRef = useRef<HTMLFormElement>(null);
   const handledPassSuccessKeyRef = useRef<number | null>(null);
   const pendingPassContextRef = useRef<{ internoId: string; fechaVisita: string } | null>(null);
-  const canViewSensitiveData = roleKey === "super-admin";
   const canManageVisitorAvailability = roleKey === "super-admin" || roleKey === "control";
 
   const availableDates = useMemo(() => getDateOptions(openDate, nextDate), [openDate, nextDate]);

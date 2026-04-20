@@ -26,13 +26,15 @@ export function VisitorManager({
   query,
   page,
   totalPages,
-  roleKey
+  roleKey,
+  canViewSensitiveData
 }: {
   visitors: VisitorRecord[];
   query: string;
   page: number;
   totalPages: number;
   roleKey: RoleKey;
+  canViewSensitiveData: boolean;
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -56,7 +58,6 @@ export function VisitorManager({
   const selectedVisitor = visitors.find((visitor) => visitor.id === selectedVisitorId) ?? null;
   const canReassign = roleKey === "super-admin";
   const canManageAvailability = roleKey === "super-admin" || roleKey === "control";
-  const canViewSensitiveData = roleKey === "super-admin";
   const reassignedInternalCount = selectedVisitor
     ? new Set(
         [...selectedVisitor.historialInterno, selectedVisitor.currentInternalName ?? ""].filter(Boolean)

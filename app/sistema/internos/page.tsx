@@ -7,7 +7,7 @@ import {
   getOpenDate,
   getPassDeviceTypes
 } from "@/lib/supabase/queries";
-import { canAccessCoreSystem, canAccessScope } from "@/lib/utils";
+import { canAccessCoreSystem, canAccessScope, canViewSensitiveSystemData } from "@/lib/utils";
 
 export default async function InternosPage({
   searchParams
@@ -59,6 +59,7 @@ export default async function InternosPage({
       openDate={openDate}
       passArticles={passArticles}
       roleKey={profile?.roleKey ?? "capturador"}
+      canViewSensitiveData={canViewSensitiveSystemData(profile?.roleKey ?? "capturador", profile?.id)}
     />
   );
 }
