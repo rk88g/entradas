@@ -47,6 +47,7 @@ export function VisitorManager({
   });
   const [selectedReassignInternal, setSelectedReassignInternal] = useState<InternalSearchOption | null>(null);
   const [selectedCreateInternal, setSelectedCreateInternal] = useState<InternalSearchOption | null>(null);
+  const [searchLoading, setSearchLoading] = useState(false);
   const [screenLoading, setScreenLoading] = useState(false);
   const [createState, createAction, createPending] = useActionState(createVisitorAction, mutationInitialState);
   const [reassignState, reassignAction, reassignPending] = useActionState(reassignVisitorAction, mutationInitialState);
@@ -79,6 +80,7 @@ export function VisitorManager({
 
   useEffect(() => {
     setQueryInput(query);
+    setSearchLoading(false);
   }, [query]);
 
   useEffect(() => {
@@ -95,6 +97,7 @@ export function VisitorManager({
   }
 
   function goToPage(nextPage: number) {
+    setSearchLoading(true);
     const params = new URLSearchParams(searchParams.toString());
     if (query.trim()) {
       params.set("q", query.trim());
@@ -112,6 +115,7 @@ export function VisitorManager({
   }
 
   function applySearch(rawValue: string) {
+    setSearchLoading(true);
     const params = new URLSearchParams(searchParams.toString());
     const normalized = rawValue.trim();
     if (normalized) {
@@ -125,7 +129,7 @@ export function VisitorManager({
 
   return (
     <section className="module-grid module-grid-single">
-      <FullscreenLoading active={screenLoading || createPending || reassignPending} />
+      <FullscreenLoading active={searchLoading || screenLoading || createPending || reassignPending} />
       <article className="data-card">
         <div className="actions-row" style={{ justifyContent: "space-between", alignItems: "center", marginBottom: "0.8rem" }}>
           <strong className="section-title">Visitas</strong>

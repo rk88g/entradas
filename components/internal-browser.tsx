@@ -100,6 +100,10 @@ export function InternalBrowser({
   const [historyLoading, setHistoryLoading] = useState(false);
   const [formSeed, setFormSeed] = useState(0);
   const [modalBannerResetKey, setModalBannerResetKey] = useState(0);
+  const [visitorBannerStateKey, setVisitorBannerStateKey] = useState(0);
+  const [passBannerStateKey, setPassBannerStateKey] = useState(0);
+  const [statusBannerStateKey, setStatusBannerStateKey] = useState(0);
+  const [searchLoading, setSearchLoading] = useState(false);
   const [screenLoading, setScreenLoading] = useState(false);
   const [createState, createAction, createPending] = useActionState(createInternalAction, mutationInitialState);
   const [passState, passAction, passPending] = useActionState(createPassAction, mutationInitialState);
@@ -131,9 +135,10 @@ export function InternalBrowser({
 
   useEffect(() => {
     if (passState.success) {
-      setModalInternalId(null);
+      setSelectedVisitorIds([]);
+      router.refresh();
     }
-  }, [passState.success]);
+  }, [passState.success, router]);
 
   useEffect(() => {
     if (visitorState.success) {
@@ -178,6 +183,7 @@ export function InternalBrowser({
 
   useEffect(() => {
     setQueryInput(query);
+    setSearchLoading(false);
   }, [query]);
 
   function openInternalModal(profile: InternalProfile) {
@@ -237,6 +243,7 @@ export function InternalBrowser({
   }
 
   function goToPage(nextPage: number) {
+    setSearchLoading(true);
     const params = new URLSearchParams(searchParams.toString());
     if (query.trim()) {
       params.set("q", query.trim());
@@ -254,6 +261,7 @@ export function InternalBrowser({
   }
 
   function applySearch(rawValue: string) {
+    setSearchLoading(true);
     const params = new URLSearchParams(searchParams.toString());
     const normalized = rawValue.trim();
     if (normalized) {
@@ -267,7 +275,7 @@ export function InternalBrowser({
 
   return (
     <>
-      <FullscreenLoading active={screenLoading || createPending || passPending || visitorPending || statusPending} />
+      <FullscreenLoading active={searchLoading || screenLoading || createPending || passPending || visitorPending || statusPending} />
       <section className="module-grid module-grid-single">
         <article className="data-card">
           <div className="actions-row" style={{ justifyContent: "space-between", alignItems: "center", marginBottom: "0.8rem" }}>
@@ -440,10 +448,10 @@ export function InternalBrowser({
               ) : null}
 
               <section className="two-column-section visitor-columns-section">
-              <article className="data-card">
+              <article className="data-card visitor-column-card">
                 <strong style={{ display: "block", marginBottom: "0.7rem" }}>No vendran</strong>
-                <div className="visitor-choice-grid">
-                  {availableVisitors.length === 0 ? <span className="muted">Sin registros.</span> : availableVisitors.map((item) => (
+                <div className="visitor-choice-grid visitor-column-list">
+                  {availableVisitors.length === 0 ? <span className="muted visitor-column-empty">Sin registros.</span> : availableVisitors.map((item) => (
                     <button key={item.id} type="button" className="visitor-choice-item available" onClick={() => toggleVisitor(item.visitaId)}>
                       <strong>{item.visitor.fullName}</strong>
                       <span className="muted">{maskValue(item.visitor.edad, canViewSensitiveData)} años</span>
@@ -452,10 +460,10 @@ export function InternalBrowser({
                 </div>
               </article>
 
-              <article className="data-card">
+              <article className="data-card visitor-column-card">
                 <strong style={{ display: "block", marginBottom: "0.7rem" }}>Vendran</strong>
-                <div className="visitor-choice-grid">
-                  {selectedVisitors.length === 0 ? <span className="muted">Sin registros.</span> : selectedVisitors.map((item) => (
+                <div className="visitor-choice-grid visitor-column-list">
+                  {selectedVisitors.length === 0 ? <span className="muted visitor-column-empty">Sin registros.</span> : selectedVisitors.map((item) => (
                     <button key={item.id} type="button" className="visitor-choice-item selected" onClick={() => toggleVisitor(item.visitaId)}>
                       <strong>{item.visitor.fullName}</strong>
                       <span className="muted">{maskValue(item.visitor.edad, canViewSensitiveData)} años</span>
@@ -468,14 +476,21 @@ export function InternalBrowser({
 
               <article className="data-card">
                 <strong style={{ display: "block", marginBottom: "0.7rem" }}>Nueva visita</strong>
-                <MutationBanner state={visitorState} resetKey={modalBannerResetKey} />
+                <MutationBanner
+                  state={visitorState}
+                  resetKey={modalBannerResetKey}
+                  stateKey={visitorBannerStateKey}
+                />
                 <form
                   key={`visitor-form-${selected.id}-${formSeed}`}
                   ref={visitorFormRef}
                   action={visitorAction}
                   className="field-grid"
                   autoComplete="off"
-                  onSubmitCapture={() => setScreenLoading(true)}
+                  onSubmitCapture={() => {
+                    setVisitorBannerStateKey((current) => current + 1);
+                    setScreenLoading(true);
+                  }}
                 >
                   <input type="hidden" name="interno_id" value={selected.id} />
                   <div className="field" style={{ gridColumn: "1 / -1" }}><input name="nombreCompleto" placeholder="Nombre completo" autoComplete="off" required /></div>
@@ -507,13 +522,20 @@ export function InternalBrowser({
 
               <article className="data-card">
                 <strong style={{ display: "block", marginBottom: "0.7rem" }}>Crear pase</strong>
-                <MutationBanner state={passState} resetKey={modalBannerResetKey} />
+                <MutationBanner
+                  state={passState}
+                  resetKey={modalBannerResetKey}
+                  stateKey={passBannerStateKey}
+                />
                 <form
                   key={`pass-form-${selected.id}-${formSeed}`}
                   action={passAction}
                   className="field-grid"
                   autoComplete="off"
-                  onSubmitCapture={() => setScreenLoading(true)}
+                  onSubmitCapture={() => {
+                    setPassBannerStateKey((current) => current + 1);
+                    setScreenLoading(true);
+                  }}
                 >
                     <input type="hidden" name="interno_id" value={selected.id} />
                     <input type="hidden" name="fecha_visita" value={selectedDateValue} />
@@ -714,8 +736,20 @@ export function InternalBrowser({
                     <span>{getInternalStatusMeta(selected.estatus).label}</span>
                   </summary>
                   <div className="section-collapse-body">
-                    <MutationBanner state={statusState} resetKey={modalBannerResetKey} />
-                    <form action={statusAction} className="actions-row" autoComplete="off" onSubmitCapture={() => setScreenLoading(true)}>
+                    <MutationBanner
+                      state={statusState}
+                      resetKey={modalBannerResetKey}
+                      stateKey={statusBannerStateKey}
+                    />
+                    <form
+                      action={statusAction}
+                      className="actions-row"
+                      autoComplete="off"
+                      onSubmitCapture={() => {
+                        setStatusBannerStateKey((current) => current + 1);
+                        setScreenLoading(true);
+                      }}
+                    >
                       <input type="hidden" name="interno_id" value={selected.id} />
                       <div className="field" style={{ flex: 1 }}>
                         <select name="estatus" defaultValue={selected.estatus}>

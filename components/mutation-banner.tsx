@@ -6,17 +6,19 @@ import { MutationState } from "@/lib/types";
 
 export function MutationBanner({
   state,
-  resetKey
+  resetKey,
+  stateKey
 }: {
   state: MutationState;
   resetKey?: string | number;
+  stateKey?: string | number;
 }) {
   const [visibleMessage, setVisibleMessage] = useState<string | null>(null);
   const [variant, setVariant] = useState<"error" | "success">("success");
   const [mounted, setMounted] = useState(false);
   const [suppressedSignature, setSuppressedSignature] = useState<string | null>(null);
 
-  const signature = `${state.error ?? ""}::${state.success ?? ""}`;
+  const signature = `${stateKey ?? "default"}::${state.error ?? ""}::${state.success ?? ""}`;
 
   useEffect(() => {
     setMounted(true);
@@ -55,7 +57,7 @@ export function MutationBanner({
 
     const timeout = window.setTimeout(() => {
       setVisibleMessage(null);
-    }, 2600);
+    }, 1800);
 
     return () => window.clearTimeout(timeout);
   }, [visibleMessage]);

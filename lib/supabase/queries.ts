@@ -142,15 +142,45 @@ function buildSearchPattern(query?: string | null) {
   return normalized ? `%${normalized}%` : null;
 }
 
+function escapePostgrestLikeToken(value: string) {
+  return value.replaceAll("\\", "\\\\").replaceAll(",", "\\,").replaceAll("(", "\\(").replaceAll(")", "\\)");
+}
+
+function buildInternalSearchFilter(search?: string | null) {
+  const normalized = search?.trim();
+  if (!normalized) {
+    return null;
+  }
+
+  const tokens = normalized
+    .split(/\s+/)
+    .map((token) => token.trim())
+    .filter(Boolean)
+    .map((token) => `%${escapePostgrestLikeToken(token)}%`);
+
+  if (tokens.length === 0) {
+    return null;
+  }
+
+  const tokenFilters = tokens.map(
+    (pattern) =>
+      `or(nombres.ilike.${pattern},apellido_pat.ilike.${pattern},apellido_mat.ilike.${pattern},ubicacion.ilike.${pattern})`
+  );
+
+  if (tokenFilters.length === 1) {
+    return tokenFilters[0].slice(3, -1);
+  }
+
+  return `and(${tokenFilters.join(",")})`;
+}
+
 function applyInternalSearch<T extends { or: (filters: string) => T }>(query: T, search?: string | null) {
-  const pattern = buildSearchPattern(search);
-  if (!pattern) {
+  const filters = buildInternalSearchFilter(search);
+  if (!filters) {
     return query;
   }
 
-  return query.or(
-    `nombres.ilike.${pattern},apellido_pat.ilike.${pattern},apellido_mat.ilike.${pattern},ubicacion.ilike.${pattern}`
-  );
+  return query.or(filters);
 }
 
 function mapInternalRecord(item: {

@@ -896,6 +896,27 @@ tr:last-child td {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 1rem;
+  align-items: start;
+  grid-column: 1 / -1;
+}
+
+.visitor-columns-section {
+  width: 100%;
+}
+
+.visitor-column-card {
+  width: 100%;
+  min-width: 0;
+}
+
+.visitor-column-list {
+  grid-template-columns: minmax(0, 1fr) !important;
+  align-content: start;
+}
+
+.visitor-column-empty {
+  display: block;
+  padding: 0.35rem 0;
 }
 
 .visitor-choice-item {
