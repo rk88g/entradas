@@ -218,6 +218,52 @@ export interface PaginatedResult<T> {
   query: string;
 }
 
+export type SupportTicketType = "cambio" | "correccion" | "solicitud" | "comentario";
+
+export type SupportTicketStatus =
+  | "abierto"
+  | "en platicas"
+  | "en autorizacion"
+  | "no autorizado"
+  | "escribiendo codigo"
+  | "pruebas"
+  | "realizado"
+  | "cerrado";
+
+export interface SupportTicketContext {
+  moduleKey?: string | null;
+  entityType?: string | null;
+  entityId?: string | null;
+  label?: string | null;
+  subtitle?: string | null;
+}
+
+export interface SupportTicketRecord {
+  id: string;
+  subject: string;
+  type: SupportTicketType;
+  status: SupportTicketStatus;
+  createdBy: string;
+  createdByName: string;
+  assignedTo?: string | null;
+  assignedToName?: string | null;
+  unreadCount: number;
+  lastMessageAt: string;
+  createdAt: string;
+  updatedAt: string;
+  context?: SupportTicketContext | null;
+}
+
+export interface SupportMessageRecord {
+  id: string;
+  ticketId: string;
+  senderUserId: string;
+  senderName: string;
+  body: string;
+  readByRecipientAt?: string | null;
+  createdAt: string;
+}
+
 export interface InternalHistoryPayload {
   visitors: InternalVisitorLink[];
   recentPasses: ListingRecord[];

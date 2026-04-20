@@ -43,6 +43,8 @@ import {
   PermissionScopeRecord,
   RoleKey,
   StoredPermissionGrantRecord,
+  SupportMessageRecord,
+  SupportTicketRecord,
   UserProfile,
   VisitorSearchOption,
   VisitorHistoryEntry,
@@ -2354,4 +2356,190 @@ export async function getAdminPanelData() {
     users: assignableUsers,
     config
   };
+}
+
+export async function getSupportUnreadCount() {
+  const profile = await getCurrentUserProfile();
+  if (!profile?.active) {
+    return 0;
+  }
+
+  const supabase = await createServerSupabaseClient();
+  let request = supabase
+    .from("support_messages")
+    .select("id, support_tickets!inner(created_by)", { count: "exact", head: true })
+    .is("read_by_recipient_at", null)
+    .neq("sender_user_id", profile.id);
+
+  if (profile.roleKey !== "super-admin") {
+    request = request.eq("support_tickets.created_by", profile.id);
+  }
+
+  const { count, error } = await request;
+  if (error) {
+    return 0;
+  }
+
+  return count ?? 0;
+}
+
+export async function getSupportTicketsPage(options?: {
+  query?: string;
+  page?: number;
+  pageSize?: number;
+}) {
+  const profile = await getCurrentUserProfile();
+  if (!profile?.active) {
+    return {
+      items: [],
+      total: 0,
+      page: 1,
+      pageSize: options?.pageSize ?? 20,
+      query: options?.query?.trim() ?? ""
+    } satisfies PaginatedResult<SupportTicketRecord>;
+  }
+
+  const supabase = await createServerSupabaseClient();
+  const query = options?.query?.trim() ?? "";
+  const pageSize = Math.max(1, options?.pageSize ?? 20);
+  const page = Math.max(1, options?.page ?? 1);
+  const from = (page - 1) * pageSize;
+  const to = from + pageSize - 1;
+
+  let request = supabase
+    .from("support_tickets")
+    .select(
+      "id, subject, type, status, created_by, assigned_to, context_snapshot, last_message_at, created_at, updated_at",
+      { count: "exact" }
+    )
+    .order("last_message_at", { ascending: false })
+    .range(from, to);
+
+  if (profile.roleKey !== "super-admin") {
+    request = request.eq("created_by", profile.id);
+  }
+
+  if (query) {
+    request = request.ilike("subject", `%${query}%`);
+  }
+
+  const { data, error, count } = await request;
+  if (error || !data) {
+    return {
+      items: [],
+      total: 0,
+      page,
+      pageSize,
+      query
+    } satisfies PaginatedResult<SupportTicketRecord>;
+  }
+
+  const userIds = [
+    ...new Set(
+      data
+        .flatMap((item) => [item.created_by, item.assigned_to].filter(Boolean))
+        .filter(Boolean)
+    )
+  ] as string[];
+  const usersMap = new Map<string, string>();
+
+  if (userIds.length > 0) {
+    const { data: users } = await supabase
+      .from("user_profiles")
+      .select("id, full_name")
+      .in("id", userIds);
+
+    (users ?? []).forEach((item) => {
+      usersMap.set(item.id, item.full_name ?? "Usuario");
+    });
+  }
+
+  const ticketIds = data.map((item) => item.id);
+  const { data: unreadMessages } = ticketIds.length
+    ? await supabase
+        .from("support_messages")
+        .select("ticket_id")
+        .in("ticket_id", ticketIds)
+        .is("read_by_recipient_at", null)
+        .neq("sender_user_id", profile.id)
+    : { data: [] as Array<{ ticket_id: string }> };
+
+  const unreadCountMap = new Map<string, number>();
+  (unreadMessages ?? []).forEach((item) => {
+    unreadCountMap.set(item.ticket_id, (unreadCountMap.get(item.ticket_id) ?? 0) + 1);
+  });
+
+  return {
+    items: data.map((item) => ({
+      id: item.id,
+      subject: item.subject,
+      type: item.type,
+      status: item.status,
+      createdBy: item.created_by,
+      createdByName: usersMap.get(item.created_by) ?? "Usuario",
+      assignedTo: item.assigned_to,
+      assignedToName: item.assigned_to ? usersMap.get(item.assigned_to) ?? "Usuario" : null,
+      unreadCount: unreadCountMap.get(item.id) ?? 0,
+      lastMessageAt: item.last_message_at,
+      createdAt: item.created_at,
+      updatedAt: item.updated_at,
+      context: (item.context_snapshot as SupportTicketRecord["context"]) ?? null
+    })),
+    total: count ?? 0,
+    page,
+    pageSize,
+    query
+  } satisfies PaginatedResult<SupportTicketRecord>;
+}
+
+export async function getSupportTicketMessages(ticketId: string) {
+  const profile = await getCurrentUserProfile();
+  if (!profile?.active || !ticketId) {
+    return [] as SupportMessageRecord[];
+  }
+
+  const supabase = await createServerSupabaseClient();
+  const { data: ticket } = await supabase
+    .from("support_tickets")
+    .select("id, created_by")
+    .eq("id", ticketId)
+    .maybeSingle();
+
+  if (!ticket || (profile.roleKey !== "super-admin" && ticket.created_by !== profile.id)) {
+    return [] as SupportMessageRecord[];
+  }
+
+  const { data, error } = await supabase
+    .from("support_messages")
+    .select("id, ticket_id, sender_user_id, body, read_by_recipient_at, created_at")
+    .eq("ticket_id", ticketId)
+    .order("created_at", { ascending: true });
+
+  if (error || !data) {
+    return [] as SupportMessageRecord[];
+  }
+
+  const senderIds = [...new Set(data.map((item) => item.sender_user_id))];
+  const namesMap = new Map<string, string>();
+
+  if (senderIds.length > 0) {
+    const { data: users } = await supabase
+      .from("user_profiles")
+      .select("id, full_name")
+      .in("id", senderIds);
+
+    (users ?? []).forEach((item) => {
+      namesMap.set(item.id, item.full_name ?? "Usuario");
+    });
+  }
+
+  return data.map((item) => ({
+    id: item.id,
+    ticketId: item.ticket_id,
+    senderUserId: item.sender_user_id,
+    senderName: namesMap.get(item.sender_user_id) ?? "Usuario",
+    body: item.body,
+    readByRecipientAt: item.read_by_recipient_at,
+    createdAt: item.created_at
+  }));
 }

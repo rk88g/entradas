@@ -128,6 +128,26 @@ export function VisitorManager({
     router.replace(params.size ? `${pathname}?${params.toString()}` : pathname, { scroll: false });
   }
 
+  function openSupportTicketForVisitor() {
+    if (!selectedVisitor) {
+      return;
+    }
+
+    const params = new URLSearchParams({
+      new: "1",
+      type: "correccion",
+      module: "visitas",
+      entityType: "visita",
+      entityId: selectedVisitor.id,
+      label: selectedVisitor.fullName,
+      subtitle: selectedVisitor.currentInternalName
+        ? `${selectedVisitor.currentInternalName} · ${selectedVisitor.parentesco}`
+        : selectedVisitor.parentesco
+    });
+
+    router.push(`/sistema/tickets?${params.toString()}`);
+  }
+
   return (
     <section className="module-grid module-grid-single">
       <FullscreenLoading active={searchLoading || screenLoading || createPending || reassignPending} />
@@ -222,6 +242,12 @@ export function VisitorManager({
             {reassignedInternalCount > 3 ? (
               <MutationBanner state={{ success: null, error: "Advertencia: esta visita ya fue reasignada varias veces." }} />
             ) : null}
+
+            <div className="actions-row" style={{ justifyContent: "flex-end" }}>
+              <button type="button" className="button-soft" onClick={openSupportTicketForVisitor}>
+                Ticket
+              </button>
+            </div>
 
             <article className="data-card section-collapse">
               <button type="button" className="button-soft collapse-trigger" onClick={() => toggleSection("perfil")}>

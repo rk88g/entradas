@@ -12,11 +12,14 @@ export async function signInAction(
   _prevState: AuthActionState,
   formData: FormData
 ): Promise<AuthActionState> {
-  const email = String(formData.get("email") ?? "").trim();
+  const rawUsername = String(formData.get("username") ?? "").trim();
   const password = String(formData.get("password") ?? "");
+  const email = rawUsername.includes("@")
+    ? rawUsername
+    : `${rawUsername}@intranetprev.com`;
 
-  if (!email || !password) {
-    return { error: "Escribe tu correo y tu contrasena." };
+  if (!rawUsername || !password) {
+    return { error: "Escribe tu usuario y tu contrasena." };
   }
 
   try {
@@ -29,7 +32,7 @@ export async function signInAction(
         success: false,
         failureReason: error.message
       });
-      return { error: "No se pudo iniciar sesion. Revisa correo, contrasena y permisos." };
+      return { error: "No se pudo iniciar sesion. Revisa usuario, contrasena y permisos." };
     }
 
     await logConnectionEvent({

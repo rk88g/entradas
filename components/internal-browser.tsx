@@ -307,6 +307,25 @@ export function InternalBrowser({
     router.replace(params.size ? `${pathname}?${params.toString()}` : pathname, { scroll: false });
   }
 
+  function openSupportTicketForInternal() {
+    if (!selected) {
+      return;
+    }
+
+    const params = new URLSearchParams({
+      new: "1",
+      type: "correccion",
+      module: "internos",
+      entityType: "interno",
+      entityId: selected.id,
+      label: selected.fullName,
+      subtitle: `Ubicacion ${selected.ubicacion}`
+    });
+
+    setModalInternalId(null);
+    router.push(`/sistema/tickets?${params.toString()}`);
+  }
+
   return (
     <>
       <FullscreenLoading active={searchLoading || screenLoading || createPending || passPending || visitorPending || statusPending} />
@@ -441,6 +460,9 @@ export function InternalBrowser({
                 </span>
               </div>
               <div className="actions-row">
+                <button type="button" className="button-soft" onClick={openSupportTicketForInternal}>
+                  Ticket
+                </button>
                 {roleKey === "super-admin" ? (
                   <button type="button" className="button-soft" onClick={toggleHistoryPanel}>
                     Historial

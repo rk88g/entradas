@@ -42,15 +42,16 @@ export function LoginForm({
 
       <div className="field-grid">
         <div className="field">
-          <label htmlFor="email">Correo</label>
+          <label htmlFor="username">Usuario</label>
           <input
-            id="email"
-            name="email"
-            type="email"
+            id="username"
+            name="username"
+            type="text"
             autoComplete="off"
-            placeholder="usuario@institucion.mx"
+            placeholder="cap1"
             disabled={disabled}
           />
+          <small className="muted">@intranetprev.com</small>
         </div>
         <div className="field">
           <label htmlFor="password">Contrasena</label>

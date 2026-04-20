@@ -1,13 +1,16 @@
 import { redirect } from "next/navigation";
 import { AppShell } from "@/components/app-shell";
-import { getCurrentUserProfile } from "@/lib/supabase/queries";
+import { getCurrentUserProfile, getSupportUnreadCount } from "@/lib/supabase/queries";
 
 export default async function SistemaLayout({
   children
 }: Readonly<{
   children: React.ReactNode;
 }>) {
-  const profile = await getCurrentUserProfile();
+  const [profile, supportUnreadCount] = await Promise.all([
+    getCurrentUserProfile(),
+    getSupportUnreadCount()
+  ]);
 
   if (!profile?.active) {
     redirect("/?error=profile");
@@ -17,6 +20,7 @@ export default async function SistemaLayout({
     <AppShell
       title="Sistema"
       user={profile}
+      supportUnreadCount={supportUnreadCount}
     >
       {children}
     </AppShell>
