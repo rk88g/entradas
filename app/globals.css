@@ -708,6 +708,10 @@ html[data-theme="dark"] .role-badge {
   border-radius: 18px;
 }
 
+.responsive-mobile-table table {
+  min-width: 0;
+}
+
 .compact-table th,
 .compact-table td {
   padding: 0.46rem 0.72rem;
@@ -1638,6 +1642,57 @@ html[data-theme="dark"] .danger-zone-panel .section-collapse summary {
 
   .two-column-section {
     grid-template-columns: 1fr;
+  }
+
+  .responsive-mobile-table {
+    overflow: visible;
+    border: none;
+  }
+
+  .responsive-mobile-table table,
+  .responsive-mobile-table thead,
+  .responsive-mobile-table tbody,
+  .responsive-mobile-table tr,
+  .responsive-mobile-table th,
+  .responsive-mobile-table td {
+    display: block;
+    width: 100%;
+  }
+
+  .responsive-mobile-table thead {
+    display: none;
+  }
+
+  .responsive-mobile-table tbody {
+    display: grid;
+    gap: 0.7rem;
+  }
+
+  .responsive-mobile-table tr {
+    border: 1px solid var(--line);
+    border-radius: 16px;
+    background: var(--surface-strong);
+    padding: 0.35rem 0.75rem;
+  }
+
+  .responsive-mobile-table td {
+    border: none;
+    padding: 0.45rem 0;
+    white-space: normal;
+    display: flex;
+    align-items: flex-start;
+    justify-content: space-between;
+    gap: 0.9rem;
+  }
+
+  .responsive-mobile-table td::before {
+    content: attr(data-label);
+    color: var(--muted);
+    font-size: 0.82rem;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    flex: 0 0 auto;
   }
 
   th,

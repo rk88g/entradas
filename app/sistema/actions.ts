@@ -62,6 +62,52 @@ function normalizeFullName(value: string) {
   return value.replace(/\s+/g, " ").trim();
 }
 
+function looksLikeUuid(value: string) {
+  return /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(value);
+}
+
+async function resolveZoneId(
+  supabase: Awaited<ReturnType<typeof createServerSupabaseClient>>,
+  rawZoneValue: FormDataEntryValue | null
+) {
+  const normalized = String(rawZoneValue ?? "").trim();
+  if (!normalized) {
+    return { zoneId: null as string | null, error: null as string | null };
+  }
+
+  if (looksLikeUuid(normalized)) {
+    const { data, error } = await supabase
+      .from("zones")
+      .select("id")
+      .eq("id", normalized)
+      .maybeSingle();
+
+    if (error) {
+      return { zoneId: null, error: error.message || "No se pudo validar la zona." };
+    }
+
+    if (data?.id) {
+      return { zoneId: data.id, error: null };
+    }
+  }
+
+  const { data, error } = await supabase
+    .from("zones")
+    .select("id")
+    .eq("name", normalized.toUpperCase())
+    .maybeSingle();
+
+  if (error) {
+    return { zoneId: null, error: error.message || "No se pudo validar la zona." };
+  }
+
+  if (!data?.id) {
+    return { zoneId: null, error: "La zona seleccionada ya no existe o no es valida." };
+  }
+
+  return { zoneId: data.id, error: null };
+}
+
 async function buildExistingVisitorAssignmentMessage(
   supabase: Awaited<ReturnType<typeof createServerSupabaseClient>>,
   nombreCompleto: string
@@ -1062,8 +1108,13 @@ export async function createModuleChargeRouteAction(
 
     const supabase = await createServerSupabaseClient();
     const moduleKey = String(formData.get("module_key") ?? "").trim();
-    const zoneId = String(formData.get("zone_id") ?? "").trim();
+    const zoneSelection = formData.get("zone_id");
     const chargeWeekday = Number(formData.get("charge_weekday") ?? 0);
+    const { zoneId, error: zoneError } = await resolveZoneId(supabase, zoneSelection);
+
+    if (zoneError) {
+      return failure(zoneError);
+    }
 
     if (!moduleKey || !zoneId || !Number.isFinite(chargeWeekday)) {
       return failure("Debes elegir bloque, zona y dia de cobro.");
@@ -1291,7 +1342,7 @@ export async function assignModuleDeviceAction(
     const moduleKey = String(formData.get("module_key") ?? "").trim();
     const internalId = String(formData.get("internal_id") ?? "").trim();
     const deviceTypeId = String(formData.get("device_type_id") ?? "").trim();
-    const zoneId = String(formData.get("zone_id") ?? "").trim() || null;
+    const zoneSelection = formData.get("zone_id");
     const brand = String(formData.get("brand") ?? "").trim() || null;
     const model = String(formData.get("model") ?? "").trim() || null;
     const characteristics = String(formData.get("characteristics") ?? "").trim() || null;
@@ -1303,6 +1354,11 @@ export async function assignModuleDeviceAction(
 
     if (!internalId || !deviceTypeId) {
       return failure("Debes elegir el interno y el tipo de aparato.");
+    }
+
+    const { zoneId, error: zoneError } = await resolveZoneId(supabase, zoneSelection);
+    if (zoneError) {
+      return failure(zoneError);
     }
 
     const allowedDeviceNames = getAllowedModuleDeviceNames(moduleKey as "visual" | "comunicacion" | "escaleras" | "rentas");
@@ -1380,12 +1436,17 @@ export async function registerModulePaymentAction(
     const moduleKey = String(formData.get("module_key") ?? "").trim();
     const internalDeviceId = String(formData.get("internal_device_id") ?? "").trim();
     const internalId = String(formData.get("internal_id") ?? "").trim();
-    const zoneId = String(formData.get("zone_id") ?? "").trim() || null;
+    const zoneSelection = formData.get("zone_id");
     const amount = Number(formData.get("amount") ?? 0);
     const notes = String(formData.get("notes") ?? "").trim() || null;
 
     if (!internalDeviceId && !internalId) {
       return failure("Debes elegir un interno.");
+    }
+
+    const { zoneId, error: zoneError } = await resolveZoneId(supabase, zoneSelection);
+    if (zoneError) {
+      return failure(zoneError);
     }
 
     const { data: settings } = await supabase

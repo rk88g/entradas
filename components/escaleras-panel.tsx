@@ -145,7 +145,7 @@ function EscaleraEditor({
                 </div>
               </form>
 
-              <div className="table-wrap compact-table" style={{ marginTop: "1rem" }}>
+              <div className="table-wrap compact-table responsive-mobile-table" style={{ marginTop: "1rem" }}>
                 <table>
                   <thead>
                     <tr>
@@ -163,12 +163,12 @@ function EscaleraEditor({
                       </tr>
                     ) : (
                       record.manualItems.map((item) => (
-                        <tr key={item.id}>
-                          <td>{item.description}</td>
-                          <td>{item.quantity}{item.unitLabel ? ` ${item.unitLabel}` : ""}</td>
-                          <td>{item.weightKg ?? "-"}</td>
-                          <td>{item.liters ?? "-"}</td>
-                          <td>{item.notes ?? "-"}</td>
+                      <tr key={item.id}>
+                          <td data-label="Articulo">{item.description}</td>
+                          <td data-label="Cantidad">{item.quantity}{item.unitLabel ? ` ${item.unitLabel}` : ""}</td>
+                          <td data-label="Peso">{item.weightKg ?? "-"}</td>
+                          <td data-label="Litros">{item.liters ?? "-"}</td>
+                          <td data-label="Notas">{item.notes ?? "-"}</td>
                         </tr>
                       ))
                     )}
@@ -332,7 +332,7 @@ export function EscalerasPanel({
             <span>{records.length} registros</span>
           </summary>
           <div className="section-collapse-body">
-            <div className="table-wrap compact-table">
+            <div className="table-wrap compact-table responsive-mobile-table">
               <table>
                 <thead>
                   <tr>
@@ -349,11 +349,11 @@ export function EscalerasPanel({
                   ) : (
                     records.map((record) => (
                       <tr key={record.listadoId} onClick={() => setSelectedId(record.listadoId)} style={{ cursor: "pointer" }}>
-                        <td>{record.internalLocation}</td>
-                        <td>{record.internalName}</td>
-                        <td>{record.laborando ? "Si" : "No"}</td>
-                        <td>{record.off8Aplica ? "Aplica" : "No"}</td>
-                        <td>
+                        <td data-label="Ubicacion">{record.internalLocation}</td>
+                        <td data-label="Interno">{record.internalName}</td>
+                        <td data-label="Labora">{record.laborando ? "Si" : "No"}</td>
+                        <td data-label="Off8">{record.off8Aplica ? "Aplica" : "No"}</td>
+                        <td data-label="Estatus">
                           <StatusBadge variant={getEscaleraStatusMeta(record.status).variant}>
                             {getEscaleraStatusMeta(record.status).label}
                           </StatusBadge>
@@ -397,7 +397,7 @@ export function AduanaPanel({
             <span>{records.length} registros</span>
           </summary>
           <div className="section-collapse-body">
-            <div className="table-wrap compact-table">
+            <div className="table-wrap compact-table responsive-mobile-table">
               <table>
                 <thead>
                   <tr>
@@ -413,10 +413,10 @@ export function AduanaPanel({
                   ) : (
                     records.map((record) => (
                       <tr key={record.id} onClick={() => setSelectedId(record.id)} style={{ cursor: "pointer" }}>
-                        <td>{record.internalLocation}</td>
-                        <td>{record.internalName}</td>
-                        <td>${Number(record.off8Value ?? record.ticketAmount ?? 0).toFixed(2)}</td>
-                        <td>
+                        <td data-label="Ubicacion">{record.internalLocation}</td>
+                        <td data-label="Interno">{record.internalName}</td>
+                        <td data-label="Off8">${Number(record.off8Value ?? record.ticketAmount ?? 0).toFixed(2)}</td>
+                        <td data-label="Estatus">
                           <StatusBadge variant={getEscaleraStatusMeta(record.status).variant}>
                             {getEscaleraStatusMeta(record.status).label}
                           </StatusBadge>
