@@ -742,7 +742,7 @@ export async function getVisitas(): Promise<VisitorRecord[]> {
         .select(
           "id, \"nombreCompleto\", fecha_nacimiento, edad, menor, sexo, parentesco, betada, telefono, created_at, updated_at"
         )
-        .order("updated_at", { ascending: false })
+        .order("created_at", { ascending: false })
         .range(from, to)
     ),
     fetchAllRows<{ visita_id: string; interno_id: string }>((from, to) =>
@@ -774,8 +774,8 @@ export async function getVisitas(): Promise<VisitorRecord[]> {
     });
   }
 
-  return sortVisitorsByAge(
-    data.map((item) => {
+  return data
+    .map((item) => {
       const currentRelation = currentRelationMap.get(item.id);
       return {
         ...mapVisitorRecord(
@@ -788,7 +788,7 @@ export async function getVisitas(): Promise<VisitorRecord[]> {
       };
     })
     .filter((item) => Boolean(item.currentInternalId && item.currentInternalName))
-  );
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
 }
 
 export async function getVisitasPage(options?: {
@@ -1321,7 +1321,7 @@ export async function getInternalProfilesPage(options?: {
     .select(
       "id, expediente, nombres, apellido_pat, apellido_mat, nacimiento, llego, libre, ubicacion, telefono, ubi_filiacion, laborando, estatus, observaciones, created_at, updated_at"
     )
-    .order("ubicacion", { ascending: true })
+    .order("created_at", { ascending: false })
     .range(from, to);
 
   if (!options?.includeInactive) {
@@ -1346,7 +1346,7 @@ export async function getInternalProfilesPage(options?: {
 
   const internals = data
     .map(mapInternalRecord)
-    .sort((a, b) => compareInternalLocations(a.ubicacion, b.ubicacion));
+    .sort((a, b) => b.createdAt.localeCompare(a.createdAt));
   const items = await getInternalProfiles({
     presetInternos: internals,
     includeInactive: options?.includeInactive,
