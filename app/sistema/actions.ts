@@ -16,7 +16,6 @@ import {
 } from "@/lib/supabase/queries";
 import { MutationState } from "@/lib/types";
 import {
-  canCloseMexicoCityDate,
   getAllowedModuleDeviceNames,
   canManageMentions,
   compareInternalLocations,
@@ -306,10 +305,6 @@ export async function closeDateAction(
     const dateValue = String(formData.get("fecha_completa") ?? "").trim() || openDate?.fechaCompleta || "";
     if (!dateValue) {
       return failure("No se encontro la fecha activa de MAÑANA.");
-    }
-
-    if (!canCloseMexicoCityDate()) {
-      return failure("Solo puedes cerrar la fecha despues de las 18:00 horas de Mexico.");
     }
 
     const supabase = await createServerSupabaseClient();

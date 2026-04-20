@@ -57,7 +57,7 @@ export function MutationBanner({
 
     const timeout = window.setTimeout(() => {
       setVisibleMessage(null);
-    }, 1800);
+    }, 3200);
 
     return () => window.clearTimeout(timeout);
   }, [visibleMessage]);

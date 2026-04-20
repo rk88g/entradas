@@ -6,7 +6,7 @@ import { FullscreenLoading } from "@/components/fullscreen-loading";
 import { LoadingButton } from "@/components/loading-button";
 import { MutationBanner } from "@/components/mutation-banner";
 import { DateRecord, MutationState, RoleKey } from "@/lib/types";
-import { canCloseMexicoCityDate, formatLongDate, getDateOffset } from "@/lib/utils";
+import { formatLongDate, getDateOffset } from "@/lib/utils";
 
 const mutationInitialState: MutationState = {
   success: null,
@@ -32,7 +32,6 @@ export function DateOperations({
   const [screenLoading, setScreenLoading] = useState(false);
   const tomorrowValue = getDateOffset(1);
   const waitingValue = getDateOffset(2);
-  const canCloseNow = canCloseMexicoCityDate();
   const registeredDates = useMemo(() => [...dates].sort((a, b) => b.fechaCompleta.localeCompare(a.fechaCompleta)), [dates]);
   const tomorrowDate = registeredDates.find((item) => item.fechaCompleta === tomorrowValue) ?? null;
   const waitingDate = registeredDates.find((item) => item.fechaCompleta === waitingValue) ?? null;
@@ -142,11 +141,6 @@ export function DateOperations({
               <p className="muted">
                 {openDate ? `Vas a cerrar la fecha ${formatLongDate(openDate.fechaCompleta)}.` : "No hay fecha registrada para MAÑANA."}
               </p>
-              {!canCloseNow ? (
-                <p className="muted" style={{ marginTop: "0.4rem" }}>
-                  Solo puedes cerrar la fecha despues de las 18:00 horas de Mexico.
-                </p>
-              ) : null}
               <MutationBanner state={closeState} />
               <form action={closeAction} className="field-grid" style={{ marginTop: "0.8rem" }} autoComplete="off" onSubmitCapture={() => setScreenLoading(true)}>
                 <input type="hidden" name="fecha_completa" value={openDate?.fechaCompleta ?? ""} />
@@ -155,7 +149,7 @@ export function DateOperations({
                   <input id="close_password" name="close_password" type="password" placeholder="Contraseña" autoComplete="off" />
                 </div>
                 <div className="actions-row">
-                  <LoadingButton pending={closePending} label="Cerrar fecha" loadingLabel="Loading..." className="button-secondary" disabled={!openDate || !canCloseNow} />
+                  <LoadingButton pending={closePending} label="Cerrar fecha" loadingLabel="Loading..." className="button-secondary" disabled={!openDate} />
                 </div>
               </form>
             </div>

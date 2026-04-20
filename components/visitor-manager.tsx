@@ -173,6 +173,12 @@ export function VisitorManager({
                   event.preventDefault();
                   setQueryInput("");
                   applySearch("");
+                  return;
+                }
+
+                if (event.key === "Enter") {
+                  event.preventDefault();
+                  applySearch(queryInput);
                 }
               }}
               placeholder="Buscar visita o interno"

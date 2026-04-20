@@ -348,13 +348,19 @@ export function InternalBrowser({
                 id="internal-search"
                 value={queryInput}
                 onChange={(event) => setQueryInput(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === "Escape") {
-                    event.preventDefault();
-                    setQueryInput("");
-                    applySearch("");
-                  }
-                }}
+              onKeyDown={(event) => {
+                if (event.key === "Escape") {
+                  event.preventDefault();
+                  setQueryInput("");
+                  applySearch("");
+                  return;
+                }
+
+                if (event.key === "Enter") {
+                  event.preventDefault();
+                  applySearch(queryInput);
+                }
+              }}
                 placeholder="Buscar por nombre o ubicacion"
                 autoComplete="off"
               />
