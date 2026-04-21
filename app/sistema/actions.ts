@@ -65,6 +65,18 @@ function normalizeFullName(value: string) {
   return value.replace(/\s+/g, " ").trim();
 }
 
+function capitalizeWords(value: string) {
+  const normalized = normalizeFullName(value).toLocaleLowerCase("es-MX");
+  return normalized.replace(/(^|[\s-])([\p{L}])/gu, (_match, prefix: string, letter: string) => {
+    return `${prefix}${letter.toLocaleUpperCase("es-MX")}`;
+  });
+}
+
+function normalizeParentesco(value: string) {
+  const normalized = capitalizeWords(value);
+  return normalized.toUpperCase() === "SN" ? "SN" : normalized;
+}
+
 function splitVisitorLegacyName(nombreCompleto: string) {
   const tokens = normalizeFullName(nombreCompleto).split(" ").filter(Boolean);
   if (tokens.length === 0) {
@@ -587,23 +599,23 @@ export async function createInternalAction(
 ): Promise<MutationState> {
   try {
     const profile = await requireProfile();
-    if (profile.roleKey !== "super-admin") {
-      return failure("Solo super-admin puede guardar precios.");
+    if (!["super-admin", "control", "supervisor", "capturador"].includes(profile.roleKey)) {
+      return failure("Tu rol no puede guardar internos.");
     }
     const supabase = await createServerSupabaseClient();
 
     const age = Number(formData.get("edad") ?? 0);
     const payload = {
       expediente: String(formData.get("expediente") ?? "").trim() || buildInternalExpediente(),
-      nombres: String(formData.get("nombres") ?? "").trim(),
-      apellido_pat: String(formData.get("apellido_pat") ?? "").trim(),
-      apellido_mat: String(formData.get("apellido_mat") ?? "").trim() || null,
+      nombres: capitalizeWords(String(formData.get("nombres") ?? "")),
+      apellido_pat: capitalizeWords(String(formData.get("apellido_pat") ?? "")),
+      apellido_mat: capitalizeWords(String(formData.get("apellido_mat") ?? "")) || null,
       nacimiento: String(formData.get("nacimiento") ?? "").trim() || buildBirthDateFromAge(age),
       llego: String(formData.get("llego") ?? "").trim() || new Date().toISOString().slice(0, 10),
       libre: String(formData.get("libre") ?? "").trim() || null,
       ubicacion: String(formData.get("ubicacion") ?? "").trim(),
       telefono: null,
-      ubi_filiacion: String(formData.get("ubi_filiacion") ?? "").trim() || "Sin dato",
+      ubi_filiacion: capitalizeWords(String(formData.get("ubi_filiacion") ?? "")) || "Sin Dato",
       laborando: false,
       observaciones: String(formData.get("observaciones") ?? "").trim() || null,
       created_by: profile.id
@@ -707,9 +719,9 @@ export async function updateInternalIdentityAction(
 
     const supabase = await createServerSupabaseClient();
     const internalId = String(formData.get("interno_id") ?? "").trim();
-    const nombres = String(formData.get("nombres") ?? "").trim();
-    const apellidoPat = String(formData.get("apellido_pat") ?? "").trim();
-    const apellidoMat = String(formData.get("apellido_mat") ?? "").trim();
+    const nombres = capitalizeWords(String(formData.get("nombres") ?? ""));
+    const apellidoPat = capitalizeWords(String(formData.get("apellido_pat") ?? ""));
+    const apellidoMat = capitalizeWords(String(formData.get("apellido_mat") ?? ""));
     const ubicacion = String(formData.get("ubicacion") ?? "").trim();
 
     if (!internalId || !nombres || !apellidoPat || !ubicacion) {
@@ -782,7 +794,7 @@ export async function updateVisitorIdentityAction(
 
     const supabase = await createServerSupabaseClient();
     const visitorId = String(formData.get("visita_id") ?? "").trim();
-    const nombreCompleto = normalizeFullName(String(formData.get("nombreCompleto") ?? ""));
+    const nombreCompleto = capitalizeWords(String(formData.get("nombreCompleto") ?? ""));
 
     if (!visitorId || !nombreCompleto) {
       return failure("Debes elegir la visita y capturar el nombre completo.");
@@ -935,13 +947,13 @@ export async function createVisitorAction(
     const parentescoInput = String(formData.get("parentesco") ?? "").trim();
 
     const visitorPayload = {
-      nombreCompleto: normalizeFullName(String(formData.get("nombreCompleto") ?? "")),
+      nombreCompleto: capitalizeWords(String(formData.get("nombreCompleto") ?? "")),
       fecha_nacimiento: resolvedBirthDate.birthDate,
       fecha_betada: canUseFallbackParentesco && String(formData.get("betada") ?? "false") === "true"
         ? new Date().toISOString().slice(0, 10)
         : null,
       sexo: String(formData.get("sexo") ?? "sin-definir").trim(),
-      parentesco: parentescoInput || (canUseFallbackParentesco ? "SN" : ""),
+      parentesco: normalizeParentesco(parentescoInput) || (canUseFallbackParentesco ? "SN" : ""),
       telefono: String(formData.get("telefono") ?? "").trim() || "No aplica",
       betada: canUseFallbackParentesco && String(formData.get("betada") ?? "false") === "true",
       notas: String(formData.get("notas") ?? "").trim() || null,
