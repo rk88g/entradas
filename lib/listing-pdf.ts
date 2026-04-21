@@ -71,15 +71,6 @@ function getVisibleVisitors(pass: ListingRecord) {
   return { visibleVisitors, underTwelveCount };
 }
 
-function getCompactVisibleVisitors(pass: ListingRecord) {
-  const { visibleVisitors, underTwelveCount } = getVisibleVisitors(pass);
-  return {
-    listedVisitors: visibleVisitors.slice(0, 8),
-    hiddenVisitorsCount: Math.max(0, visibleVisitors.length - 8),
-    underTwelveCount
-  };
-}
-
 function getListingVisitors(pass: ListingRecord) {
   const { visibleVisitors, underTwelveCount } = getVisibleVisitors(pass);
   return { visibleVisitors, underTwelveCount };
