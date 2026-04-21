@@ -1273,6 +1273,16 @@ html[data-theme="dark"] .note-box {
   gap: 1rem;
 }
 
+.listing-card-stack {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.listing-card-actions {
+  display: flex;
+  justify-content: flex-end;
+}
+
 .delivery-print-list {
   display: none;
 }
@@ -1720,6 +1730,11 @@ html[data-theme="dark"] .admin-tab.active {
   border-top: 1px dashed #d7bf98;
 }
 
+.mention-title {
+  color: #c23030;
+  font-weight: 800;
+}
+
 .support-note-block {
   display: grid;
   gap: 0.12rem;
@@ -1951,6 +1966,7 @@ html[data-theme="dark"] .admin-tab.active {
 @media print {
   body {
     background: white;
+    margin: 0 !important;
   }
 
   .print-zone,
@@ -1976,6 +1992,8 @@ html[data-theme="dark"] .admin-tab.active {
 
   .print-zone {
     gap: 0.25cm;
+    margin: 0 !important;
+    padding: 0 !important;
   }
 
   .pass-card {
@@ -2078,6 +2096,8 @@ html[data-theme="dark"] .admin-tab.active {
   .apoyo-print-grid {
     grid-template-columns: 1fr;
     gap: 0.12cm;
+    margin: 0 !important;
+    padding: 0 !important;
   }
 
   .apoyo-print-grid .apoyo-pass-card {
@@ -2110,6 +2130,8 @@ html[data-theme="dark"] .admin-tab.active {
   .apoyo-secondary-grid {
     grid-template-columns: 1fr;
     gap: 0.14cm;
+    margin: 0 !important;
+    padding: 0 !important;
   }
 
   .apoyo-secondary-grid .apoyo-pass-list {
@@ -2191,16 +2213,21 @@ html[data-theme="dark"] .admin-tab.active {
     border: none;
     border-radius: 0;
     box-shadow: none;
+    margin: 0 !important;
+    break-before: auto;
+    page-break-before: auto;
   }
 
   .apoyo-numbers-grid .numbers-print-list {
     display: grid;
-    gap: 0.18cm;
+    gap: 0.14cm;
+    margin: 0 !important;
+    padding: 0 !important;
   }
 
   .apoyo-numbers-grid .numbers-print-row {
     grid-template-columns: 2cm minmax(0, 1fr) 2.2cm;
-    min-height: 1.98cm;
+    min-height: 1.92cm;
     align-items: center;
     border: 2px solid #0f172a;
     padding: 0.05cm 0.1cm;
@@ -2209,6 +2236,8 @@ html[data-theme="dark"] .admin-tab.active {
     line-height: 1.1;
     break-inside: avoid;
     page-break-inside: avoid;
+    break-before: auto;
+    page-break-before: auto;
   }
 
   .apoyo-numbers-grid .numbers-print-row span {
@@ -2235,6 +2264,19 @@ html[data-theme="dark"] .admin-tab.active {
 
   .module-panel {
     padding-bottom: 0.9cm !important;
+    margin: 0 !important;
+  }
+
+  .print-mode-numeros.module-panel,
+  .print-mode-sexos.module-panel,
+  .print-mode-menciones.module-panel {
+    padding-bottom: 0 !important;
+  }
+
+  .print-mode-numeros .print-sheet-footer,
+  .print-mode-sexos .print-sheet-footer,
+  .print-mode-menciones .print-sheet-footer {
+    display: none !important;
   }
 
   .hide-print {
@@ -2243,7 +2285,7 @@ html[data-theme="dark"] .admin-tab.active {
 
   @page {
     size: legal portrait;
-    margin: 0.55cm;
+    margin: 0.45cm 0.55cm 0.45cm 0.55cm;
   }
 }
 

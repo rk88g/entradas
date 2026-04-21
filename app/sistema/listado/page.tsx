@@ -84,6 +84,7 @@ export default async function ListadoPage({
         printDate={openDate?.fechaCompleta ?? ""}
         initialMode={initialMode}
         autoPrint={autoPrint}
+        roleKey={profile?.roleKey ?? "capturador"}
       />
     </>
   );

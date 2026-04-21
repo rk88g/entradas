@@ -41,6 +41,7 @@ import {
   PassVisitor,
   PaginatedResult,
   PermissionGrantRecord,
+  PassEditData,
   PermissionScopeRecord,
   RoleKey,
   StoredPermissionGrantRecord,
@@ -629,13 +630,13 @@ async function buildListingsForRows(
       status: item.status,
       numeroPase: item.numero_pase,
       cierreAplicado: Boolean(item.cierre_aplicado),
-      menciones: item.menciones ?? undefined,
-      especiales: item.especiales ?? undefined,
-      createdAt: item.created_at,
-      visitantes,
-      deviceItems: (deviceMap.get(item.id) ?? [])
-        .map((device) => {
-          const deviceType = device.module_device_types?.[0];
+        menciones: item.menciones ?? undefined,
+        especiales: item.especiales ?? undefined,
+        createdAt: item.created_at,
+        visitantes,
+        deviceItems: (deviceMap.get(item.id) ?? [])
+          .map((device) => {
+            const deviceType = device.module_device_types?.[0];
           if (!deviceType) {
             return null;
           }
@@ -649,8 +650,68 @@ async function buildListingsForRows(
           };
         })
         .filter((item): item is ListingRecord["deviceItems"][number] => item !== null)
-    };
-  });
+      };
+    });
+}
+
+export async function getPassEditData(passId: string): Promise<PassEditData | null> {
+  const supabase = await createServerSupabaseClient();
+  const { data: passRow, error: passError } = await supabase
+    .from("listado")
+    .select("id, interno_id, fecha_id, fecha_visita, apartado, status, numero_pase, cierre_aplicado, menciones, especiales, created_at")
+    .eq("id", passId)
+    .maybeSingle();
+
+  if (passError || !passRow) {
+    return null;
+  }
+
+  const [builtPasses, { data: relationRows, error: relationError }, passArticles] = await Promise.all([
+    buildListingsForRows(supabase, [passRow]),
+    supabase
+      .from("interno_visitas")
+      .select("visita_id")
+      .eq("interno_id", passRow.interno_id),
+    getPassDeviceTypes()
+  ]);
+
+  if (relationError) {
+    return null;
+  }
+
+  const pass = builtPasses[0];
+  if (!pass) {
+    return null;
+  }
+
+  const linkedVisitorIds = [...new Set((relationRows ?? []).map((item) => item.visita_id))];
+  const visitorsMap = await getVisitorsMap(supabase, linkedVisitorIds);
+  const linkedVisitors = sortVisitorsByAge(
+    linkedVisitorIds
+      .map((visitorId) => {
+        const visitor = visitorsMap.get(visitorId);
+        if (!visitor) {
+          return null;
+        }
+
+        return {
+          visitorId: visitor.id,
+          nombre: visitor.fullName,
+          parentesco: visitor.parentesco,
+          edad: visitor.edad,
+          menor: visitor.menor,
+          sexo: visitor.sexo,
+          betada: visitor.betada
+        };
+      })
+      .filter((visitor): visitor is PassVisitor => visitor !== null)
+  );
+
+  return {
+    pass,
+    linkedVisitors,
+    passArticles
+  };
 }
 
 export async function getCurrentUserProfile(): Promise<UserProfile | null> {

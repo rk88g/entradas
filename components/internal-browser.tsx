@@ -482,7 +482,7 @@ export function InternalBrowser({
               <input name="apellido_mat" placeholder="Apellido materno" autoComplete="off" />
             </div>
             <div className="field">
-              <input name="ubicacion" placeholder="Ubicacion 1-101" autoComplete="off" />
+                <input name="ubicacion" placeholder="Ubicacion 1-101 o I-00" autoComplete="off" />
             </div>
             <div className="field">
               <input name="edad" type="number" placeholder="Edad" autoComplete="off" />

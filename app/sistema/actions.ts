@@ -426,11 +426,11 @@ export async function createInternalAction(
       created_by: profile.id
     };
 
-    if (
-      !payload.nombres ||
-      !payload.apellido_pat ||
-      !payload.nacimiento ||
-      !payload.ubicacion
+      if (
+        !payload.nombres ||
+        !payload.apellido_pat ||
+        !payload.nacimiento ||
+        !payload.ubicacion
     ) {
       return failure("Completa los datos obligatorios.");
     }
@@ -439,9 +439,9 @@ export async function createInternalAction(
       return failure("La edad del interno debe ser mayor a cero.");
     }
 
-    if (!isValidInternalLocation(payload.ubicacion)) {
-      return failure("La ubicacion debe tener formato numero-numero, por ejemplo 1-101 o 15-8.");
-    }
+      if (!isValidInternalLocation(payload.ubicacion)) {
+        return failure("La ubicacion debe tener formato numero-numero o letra-numero, por ejemplo 1-101, 15-8 o I-00.");
+      }
 
     const { error } = await supabase.from("internos").insert(payload);
     if (error) {
@@ -534,7 +534,7 @@ export async function updateInternalIdentityAction(
     }
 
     if (!isValidInternalLocation(ubicacion)) {
-      return failure("La ubicacion debe tener formato numero-numero.");
+      return failure("La ubicacion debe tener formato numero-numero o letra-numero.");
     }
 
     const { data: previousInternal, error: previousError } = await supabase
@@ -1434,6 +1434,300 @@ export async function createPassAction(
   }
 }
 
+export async function updatePassAction(
+  _prevState: MutationState,
+  formData: FormData
+): Promise<MutationState> {
+  try {
+    const profile = await requireProfile();
+    if (profile.roleKey !== "super-admin") {
+      return failure("Solo super-admin puede editar pases.");
+    }
+
+    const supabase = await createServerSupabaseClient();
+    const passId = String(formData.get("listado_id") ?? "").trim();
+    const internoId = String(formData.get("interno_id") ?? "").trim();
+    const visitorIds = [...new Set(formData.getAll("visitor_ids").map((item) => String(item).trim()).filter(Boolean))];
+    const mentions = String(formData.get("menciones") ?? "").trim();
+    const specials = String(formData.get("especiales") ?? "").trim();
+    const articlePayload = await getPassArticlePayload(formData);
+
+    if (!passId || !internoId) {
+      return failure("No se encontro el pase a editar.");
+    }
+
+    if (visitorIds.length === 0) {
+      return failure("Debes elegir al menos una visita.");
+    }
+
+    const { data: passRow, error: passError } = await supabase
+      .from("listado")
+      .select("id, interno_id, fecha_id, fecha_visita, menciones, especiales")
+      .eq("id", passId)
+      .maybeSingle();
+
+    if (passError || !passRow || passRow.interno_id !== internoId) {
+      return failure("No se encontro el pase seleccionado.");
+    }
+
+    const { data: relationRows, error: relationError } = await supabase
+      .from("interno_visitas")
+      .select("visita_id")
+      .eq("interno_id", internoId)
+      .in("visita_id", visitorIds);
+
+    if (relationError) {
+      return failure(relationError.message || "No se pudieron validar las visitas.");
+    }
+
+    const allowedIds = new Set((relationRows ?? []).map((item) => item.visita_id));
+    if (visitorIds.some((id) => !allowedIds.has(id))) {
+      return failure("Una o mas visitas ya no pertenecen al interno.");
+    }
+
+    const { data: selectedVisitors, error: visitorError } = await supabase
+      .from("visitas")
+      .select("id, edad, betada")
+      .in("id", visitorIds);
+
+    if (visitorError || !selectedVisitors) {
+      return failure(visitorError?.message || "No se pudieron validar las visitas.");
+    }
+
+    if (selectedVisitors.some((item) => item.betada)) {
+      return failure("No puedes guardar un pase con visitas betadas.");
+    }
+
+    if (selectedVisitors.every((item) => (item.edad ?? 0) < 18)) {
+      return failure("Debes incluir al menos un adulto en el pase.");
+    }
+
+    let articleSummary: string | null = null;
+    if (articlePayload.length > 0) {
+      const { data: articleTypes, error: articleTypeError } = await supabase
+        .from("module_device_types")
+        .select("id, name")
+        .eq("active", true)
+        .in(
+          "id",
+          articlePayload.map((item) => item.deviceTypeId)
+        );
+
+      if (articleTypeError) {
+        return failure(articleTypeError.message || "No se pudieron validar los articulos del pase.");
+      }
+
+      const articleNameMap = new Map((articleTypes ?? []).map((item) => [item.id, item.name]));
+      articleSummary = articlePayload
+        .map((item) => {
+          const name = articleNameMap.get(item.deviceTypeId);
+          if (!name || item.quantity < 1) {
+            return null;
+          }
+
+          return `${name} [${item.quantity}]`;
+        })
+        .filter((item): item is string => Boolean(item))
+        .join(", ");
+    }
+
+    const specialText = appendDeviceSummaryToSpecials(specials, articleSummary);
+
+    const { data: currentDeviceItemRows, error: currentDeviceItemsError } = await supabase
+      .from("listing_device_items")
+      .select("device_type_id, quantity")
+      .eq("listado_id", passId);
+
+    if (currentDeviceItemsError) {
+      return failure(currentDeviceItemsError.message || "No se pudieron validar los articulos actuales.");
+    }
+
+    const { data: linkedDevices, error: linkedDevicesError } = await supabase
+      .from("internal_devices")
+      .select("id, device_type_id, quantity, status")
+      .eq("source_listing_id", passId);
+
+    if (linkedDevicesError) {
+      return failure(linkedDevicesError.message || "No se pudieron validar los aparatos pendientes.");
+    }
+
+    const normalizeItems = (items: Array<{ device_type_id?: string; deviceTypeId?: string; quantity: number }>) =>
+      [...items]
+        .map((item) => ({
+          deviceTypeId: String(item.deviceTypeId ?? item.device_type_id ?? ""),
+          quantity: Math.max(1, Number(item.quantity ?? 1))
+        }))
+        .sort((a, b) => a.deviceTypeId.localeCompare(b.deviceTypeId) || a.quantity - b.quantity);
+
+    const currentNormalizedItems = JSON.stringify(normalizeItems(currentDeviceItemRows ?? []));
+    const nextNormalizedItems = JSON.stringify(normalizeItems(articlePayload));
+    const hasProcessedLinkedDevices = (linkedDevices ?? []).some((item) => item.status !== "pendiente");
+
+    if (hasProcessedLinkedDevices && currentNormalizedItems !== nextNormalizedItems) {
+      return failure("No puedes modificar los articulos de este pase porque ya generaron movimiento en otros bloques.");
+    }
+
+    const orderedVisitors = [...selectedVisitors].sort((a, b) => (b.edad ?? 0) - (a.edad ?? 0));
+
+    const { error: updatePassError } = await supabase
+      .from("listado")
+      .update({
+        menciones: mentions || null,
+        especiales: specialText
+      })
+      .eq("id", passId);
+
+    if (updatePassError) {
+      return failure(updatePassError.message || "No se pudo actualizar el encabezado del pase.");
+    }
+
+    const { error: deleteVisitorsError } = await supabase
+      .from("listado_visitas")
+      .delete()
+      .eq("listado_id", passId);
+
+    if (deleteVisitorsError) {
+      return failure(deleteVisitorsError.message || "No se pudieron actualizar las visitas del pase.");
+    }
+
+    const { error: insertVisitorsError } = await supabase.from("listado_visitas").insert(
+      orderedVisitors.map((visitor, index) => ({
+        listado_id: passId,
+        visita_id: visitor.id,
+        orden: index + 1,
+        validada: false
+      }))
+    );
+
+    if (insertVisitorsError) {
+      return failure(insertVisitorsError.message || "No se pudieron guardar las visitas del pase.");
+    }
+
+    if (!hasProcessedLinkedDevices) {
+      const { error: deleteItemsError } = await supabase
+        .from("listing_device_items")
+        .delete()
+        .eq("listado_id", passId);
+
+      if (deleteItemsError) {
+        return failure(deleteItemsError.message || "No se pudieron actualizar los articulos del pase.");
+      }
+
+      if (articlePayload.length > 0) {
+        const { error: insertItemsError } = await supabase.from("listing_device_items").insert(
+          articlePayload.map((item) => ({
+            listado_id: passId,
+            device_type_id: item.deviceTypeId,
+            quantity: item.quantity
+          }))
+        );
+
+        if (insertItemsError) {
+          return failure(insertItemsError.message || "No se pudieron guardar los articulos del pase.");
+        }
+      }
+
+      const { error: deletePendingDevicesError } = await supabase
+        .from("internal_devices")
+        .delete()
+        .eq("source_listing_id", passId)
+        .eq("status", "pendiente");
+
+      if (deletePendingDevicesError) {
+        return failure(deletePendingDevicesError.message || "No se pudieron limpiar los aparatos pendientes del pase.");
+      }
+
+      if (articlePayload.length > 0) {
+        const { data: typeRows, error: typeRowsError } = await supabase
+          .from("module_device_types")
+          .select("id, module_key")
+          .eq("active", true)
+          .in(
+            "id",
+            articlePayload.map((item) => item.deviceTypeId)
+          );
+
+        if (typeRowsError) {
+          return failure(typeRowsError.message || "No se pudieron preparar los aparatos pendientes.");
+        }
+
+        const typeModuleMap = new Map((typeRows ?? []).map((item) => [item.id, item.module_key]));
+        const pendingDevicesPayload = articlePayload
+          .map((item) => {
+            const moduleKey = typeModuleMap.get(item.deviceTypeId);
+            if (!moduleKey) {
+              return null;
+            }
+
+            return {
+              internal_id: internoId,
+              module_key: moduleKey,
+              device_type_id: item.deviceTypeId,
+              source_listing_id: passId,
+              quantity: item.quantity,
+              cameras_allowed: false,
+              status: "pendiente",
+              created_by: profile.id
+            };
+          })
+          .filter(
+            (
+              item
+            ): item is {
+              internal_id: string;
+              module_key: string;
+              device_type_id: string;
+              source_listing_id: string;
+              quantity: number;
+              cameras_allowed: boolean;
+              status: string;
+              created_by: string;
+            } => item !== null
+          );
+
+        if (pendingDevicesPayload.length > 0) {
+          const { error: recreatePendingError } = await supabase
+            .from("internal_devices")
+            .insert(pendingDevicesPayload);
+
+          if (recreatePendingError) {
+            return failure(recreatePendingError.message || "No se pudieron recrear los aparatos pendientes del pase.");
+          }
+        }
+      }
+    }
+
+    revalidatePath("/sistema/listado");
+    revalidatePath("/sistema/internos");
+    revalidatePath("/sistema/visual");
+    revalidatePath("/sistema/comunicacion");
+
+    await auditAction({
+      userId: profile.id,
+      moduleKey: "listado",
+      sectionKey: "editar-pase",
+      actionKey: "update",
+      entityType: "pase",
+      entityId: passId,
+      beforeData: {
+        menciones: passRow.menciones,
+        especiales: passRow.especiales,
+        deviceItems: currentDeviceItemRows ?? []
+      },
+      afterData: {
+        menciones: mentions || null,
+        especiales: specialText,
+        visitorIds,
+        articlePayload
+      }
+    });
+
+    return success("Pase actualizado.");
+  } catch (error) {
+    return failure(error instanceof Error ? error.message : "No se pudo actualizar el pase.");
+  }
+}
+
 export async function createModuleZoneAction(
   _prevState: MutationState,
   formData: FormData
@@ -1450,9 +1744,9 @@ export async function createModuleZoneAction(
       return failure("Debes escribir el nombre de la zona.");
     }
 
-    if (!/^M\d+$/i.test(name)) {
-      return failure("La zona debe tener formato M + numero, por ejemplo M8.");
-    }
+      if (!/^M[A-Z0-9]+$/i.test(name)) {
+        return failure("La zona debe tener formato M seguido de numeros o letras, por ejemplo M8 o MI.");
+      }
 
     const { error } = await supabase.from("zones").insert({
       name,

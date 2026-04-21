@@ -488,23 +488,39 @@ export function nextPassNumber(seed: number) {
 }
 
 export function isValidInternalLocation(value: string) {
-  return /^(?:[1-9]|1[0-5])-\d+$/.test(value.trim());
+  const normalized = value.trim().toUpperCase();
+  return /^(?:(?:[1-9]|1[0-5])-\d+|[A-Z]+-\d+)$/.test(normalized);
 }
 
 export function parseInternalLocation(value: string) {
   const normalized = String(value ?? "").trim();
-  const match = /^(\d+)-(\d+)$/.exec(normalized);
-  if (!match) {
+  const numericMatch = /^(\d+)-(\d+)$/.exec(normalized);
+  if (numericMatch) {
     return {
-      primary: Number.MAX_SAFE_INTEGER,
-      secondary: Number.MAX_SAFE_INTEGER,
+      type: "numeric" as const,
+      primaryNumber: Number(numericMatch[1]),
+      primaryText: "",
+      secondary: Number(numericMatch[2]),
       raw: normalized
     };
   }
 
+  const alphaMatch = /^([A-Z]+)-(\d+)$/i.exec(normalized);
+  if (alphaMatch) {
+    return {
+      type: "alpha" as const,
+      primaryNumber: Number.MAX_SAFE_INTEGER,
+      primaryText: alphaMatch[1].toUpperCase(),
+      secondary: Number(alphaMatch[2]),
+      raw: normalized.toUpperCase()
+    };
+  }
+
   return {
-    primary: Number(match[1]),
-    secondary: Number(match[2]),
+    type: "unknown" as const,
+    primaryNumber: Number.MAX_SAFE_INTEGER,
+    primaryText: normalized.toUpperCase(),
+    secondary: Number.MAX_SAFE_INTEGER,
     raw: normalized
   };
 }
@@ -513,8 +529,30 @@ export function compareInternalLocations(a: string, b: string) {
   const locationA = parseInternalLocation(a);
   const locationB = parseInternalLocation(b);
 
-  if (locationA.primary !== locationB.primary) {
-    return locationA.primary - locationB.primary;
+  if (locationA.type !== locationB.type) {
+    if (locationA.type === "numeric") {
+      return -1;
+    }
+
+    if (locationB.type === "numeric") {
+      return 1;
+    }
+  }
+
+  if (locationA.type === "numeric" && locationB.type === "numeric") {
+    if (locationA.primaryNumber !== locationB.primaryNumber) {
+      return locationA.primaryNumber - locationB.primaryNumber;
+    }
+
+    if (locationA.secondary !== locationB.secondary) {
+      return locationA.secondary - locationB.secondary;
+    }
+
+    return locationA.raw.localeCompare(locationB.raw);
+  }
+
+  if (locationA.primaryText !== locationB.primaryText) {
+    return locationA.primaryText.localeCompare(locationB.primaryText);
   }
 
   if (locationA.secondary !== locationB.secondary) {

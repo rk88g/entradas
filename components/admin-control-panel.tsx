@@ -780,7 +780,7 @@ export function AdminControlPanel({
                 <div className="field">
                   <input
                     name="ubicacion"
-                    placeholder="Ubicacion"
+                    placeholder="Ubicacion 1-101 o I-00"
                     autoComplete="off"
                     value={internalNamesForm.ubicacion}
                     onChange={(event) =>

@@ -174,6 +174,12 @@ export interface ListingRecord {
   deviceItems: PassDeviceItem[];
 }
 
+export interface PassEditData {
+  pass: ListingRecord;
+  linkedVisitors: PassVisitor[];
+  passArticles: ModuleDeviceType[];
+}
+
 export interface PassDeviceItem {
   id: string;
   deviceTypeId: string;
