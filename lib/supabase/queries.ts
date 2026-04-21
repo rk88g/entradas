@@ -1399,7 +1399,7 @@ export async function getInternalProfiles(options?: {
           ? supabase
               .from("internal_devices")
       .select(
-        "id, internal_id, module_key, device_type_id, zone_id, brand, model, characteristics, imei, chip_number, cameras_allowed, quantity, status, paid_through, weekly_price_override, discount_override, assigned_manually, notes, module_device_types!inner(name,module_key), zones(name)"
+        "id, internal_id, module_key, device_type_id, zone_id, brand, model, characteristics, imei, chip_number, cameras_allowed, quantity, status, paid_through, weekly_price_override, discount_override, assigned_manually, notes, module_device_types!inner(name,module_key)"
       )
               .in("internal_id", internalIds)
               .neq("status", "baja")
@@ -1530,7 +1530,7 @@ export async function getInternalProfiles(options?: {
       deviceTypeId: item.device_type_id,
       deviceTypeName: getFirstRelation(item.module_device_types)?.name ?? "Aparato",
       zoneId: item.zone_id ?? undefined,
-      zoneName: getFirstRelation(item.zones)?.name ?? undefined,
+      zoneName: undefined,
       brand: item.brand ?? undefined,
       model: item.model ?? undefined,
       characteristics: item.characteristics ?? undefined,
@@ -1888,7 +1888,7 @@ export async function getModulePanelData(moduleKey: ModuleKey, includeInactiveIn
     supabase
       .from("internal_devices")
       .select(
-        "id, internal_id, module_key, device_type_id, zone_id, brand, model, characteristics, imei, chip_number, cameras_allowed, quantity, status, paid_through, weekly_price_override, discount_override, assigned_manually, notes, module_device_types!inner(name,module_key), zones(name)"
+        "id, internal_id, module_key, device_type_id, zone_id, brand, model, characteristics, imei, chip_number, cameras_allowed, quantity, status, paid_through, weekly_price_override, discount_override, assigned_manually, notes, module_device_types!inner(name,module_key)"
       )
       .neq("status", "baja")
       .order("created_at", { ascending: false }),
@@ -1999,7 +1999,7 @@ export async function getModulePanelData(moduleKey: ModuleKey, includeInactiveIn
           deviceTypeId: item.device_type_id,
           deviceTypeName: typeRelation?.name ?? "Aparato",
         zoneId: item.zone_id ?? undefined,
-        zoneName: zone?.name ?? getFirstRelation(item.zones)?.name ?? undefined,
+        zoneName: zone?.name ?? undefined,
         brand: item.brand ?? undefined,
         model: item.model ?? undefined,
         characteristics: item.characteristics ?? undefined,

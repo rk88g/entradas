@@ -515,31 +515,34 @@ export function PassListing({
             <h3>Sin pases</h3>
           </div>
         ) : printMode === "listado" ? (
-          listingPages.map((page, pageIndex) => (
-            <section
-              key={`listing-page-${pageIndex}`}
-              className={`listing-print-page ${pageIndex < listingPages.length - 1 ? "listing-print-page-break" : ""}`}
-            >
-              <div className="listing-print-page-body">
-                {page.map((pass) => (
-                  <div key={pass.id} className="listing-card-stack">
-                    {roleKey === "super-admin" ? (
-                      <div className="listing-card-actions hide-print">
-                        <button type="button" className="button-soft" onClick={() => void openEditModal(pass.id)}>
-                          Editar pase
-                        </button>
-                      </div>
-                    ) : null}
-                    {renderMainPass(pass)}
-                  </div>
-                ))}
-              </div>
-              <div className="print-sheet-footer listing-page-footer">
-                <div>#70-TODO LO NO AGREGADO EN LA PETICION DE SU PASE NO TENDRA AUTORIZACION PARA ENTRAR.</div>
-                <div>#70-TODO LO QUE VENGA EN PETICION ESPECIAL / ENTREGAR A ADUANA PARA SU REVISION.</div>
-              </div>
-            </section>
-          ))
+          <>
+            <section className="listing-print-page listing-print-page--blank listing-print-page-break" aria-hidden="true" />
+            {listingPages.map((page, pageIndex) => (
+              <section
+                key={`listing-page-${pageIndex}`}
+                className={`listing-print-page ${pageIndex < listingPages.length - 1 ? "listing-print-page-break" : ""}`}
+              >
+                <div className="listing-print-page-body">
+                  {page.map((pass) => (
+                    <div key={pass.id} className="listing-card-stack">
+                      {roleKey === "super-admin" ? (
+                        <div className="listing-card-actions hide-print">
+                          <button type="button" className="button-soft" onClick={() => void openEditModal(pass.id)}>
+                            Editar pase
+                          </button>
+                        </div>
+                      ) : null}
+                      {renderMainPass(pass)}
+                    </div>
+                  ))}
+                </div>
+                <div className="print-sheet-footer listing-page-footer">
+                  <div>#70-TODO LO NO AGREGADO EN LA PETICION DE SU PASE NO TENDRA AUTORIZACION PARA ENTRAR.</div>
+                  <div>#70-TODO LO QUE VENGA EN PETICION ESPECIAL / ENTREGAR A ADUANA PARA SU REVISION.</div>
+                </div>
+              </section>
+            ))}
+          </>
         ) : printMode === "sexos" ? (
           filtered.flatMap((pass) => renderSeparatedPasses(pass))
         ) : printMode === "menciones" ? (
