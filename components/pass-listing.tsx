@@ -467,7 +467,22 @@ export function PassListing({
       params.set("q", query.trim());
     }
 
-    window.open(`/api/listado/pdf?${params.toString()}`, "_blank", "noopener,noreferrer");
+    const fileName =
+      printMode === "sexos"
+        ? "HOMBRES - MUJERES - COMANDAS.pdf"
+        : printMode === "numeros"
+          ? "NUMERO DE PASE.pdf"
+          : printMode === "menciones"
+            ? "MENCIONES.pdf"
+            : "LISTADO - AG.pdf";
+
+    const link = document.createElement("a");
+    link.href = `/api/listado/pdf?${params.toString()}`;
+    link.download = fileName;
+    link.rel = "noopener noreferrer";
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
   }
 
   return (

@@ -1987,7 +1987,8 @@ export async function getModulePanelData(moduleKey: ModuleKey, includeInactiveIn
 
   const internalMap = new Map(internals.map((item) => [item.id, item]));
   const zoneMap = new Map(zones.map((item) => [item.id, item]));
-  const visibleZones = zones.filter((item) => item.active);
+  const activeZones = zones.filter((item) => item.active);
+  const visibleZones = activeZones.length > 0 ? activeZones : zones;
   const cycleId = cyclesResponse.data?.id ?? null;
   const paymentMap = new Map(
     (paymentsResponse.data ?? [])

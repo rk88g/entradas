@@ -20,6 +20,10 @@ const COLORS = {
   warning: rgb(0.79, 0.34, 0.1),
   danger: rgb(0.76, 0.19, 0.19)
 };
+const LISTADO_TEXT_SIZE = 10.125; // 13.5px
+const SECONDARY_LISTING_TEXT_SIZE = 9; // 12px
+const PASS_NUMBER_TEXT_SIZE = 10.125; // 13.5px
+const PASS_NUMBER_SIZE = 28;
 
 function normalizeSearchText(value?: string | null) {
   return String(value ?? "")
@@ -286,8 +290,8 @@ function drawMainListingCard(options: {
     ...(!pass.especiales?.trim() && formatDeviceSummary(pass) ? [formatDeviceSummary(pass) as string] : [])
   ];
 
-  const listingTextSize = 10.125;
-  const detailTextSize = 9.2;
+  const listingTextSize = LISTADO_TEXT_SIZE;
+  const detailTextSize = LISTADO_TEXT_SIZE;
   const compactGap = 0.7;
   let cursorTop = top + 6;
   drawTextLine(page, "REGISTRO PASE PARA TERRAZA", innerX, cursorTop, listingTextSize, boldFont);
@@ -316,7 +320,7 @@ function drawMainListingCard(options: {
       : [])
   ];
   const useTwoColumns = visitorLines.length > 6;
-  const visitorFontSize = visitorLines.length > 12 ? 8.55 : visitorLines.length > 8 ? 8.9 : 9.2;
+  const visitorFontSize = visitorLines.length > 12 ? 8.55 : visitorLines.length > 8 ? 8.9 : LISTADO_TEXT_SIZE;
   const visitorLineHeight = visitorFontSize + 0.45;
   const columns = useTwoColumns ? 2 : 1;
   const columnGap = 10;
@@ -425,7 +429,7 @@ function drawSecondaryCard(options: {
     color: COLORS.danger
   });
 
-  const textSize = 9;
+  const textSize = SECONDARY_LISTING_TEXT_SIZE;
   let cursorTop = top + 6;
   drawTextLine(page, title, innerX, cursorTop, textSize, boldFont);
   drawTextLine(page, date, innerX + 98, cursorTop, textSize, regularFont, COLORS.muted);
@@ -486,7 +490,7 @@ function drawNumbersRow(options: {
     x: x + 10,
     top: textTop,
     width: leftWidth - 12,
-    size: 10.125,
+    size: PASS_NUMBER_TEXT_SIZE,
     maxLines: 1
   });
   drawWrappedBlock({
@@ -496,10 +500,17 @@ function drawNumbersRow(options: {
     x: x + leftWidth + 4,
     top: textTop,
     width: middleWidth,
-    size: 10.125,
+    size: PASS_NUMBER_TEXT_SIZE,
     maxLines: 2
   });
-  drawTextLine(page, String(pass.numeroPase ?? "-"), x + width - rightWidth + 18, top + rowHeight / 2 - 18, 28, boldFont);
+  drawTextLine(
+    page,
+    String(pass.numeroPase ?? "-"),
+    x + width - rightWidth + 18,
+    top + rowHeight / 2 - 18,
+    PASS_NUMBER_SIZE,
+    boldFont
+  );
 }
 
 function drawListadoMode(pdf: PDFDocument, listings: ListingRecord[], regularFont: PDFFont, boldFont: PDFFont) {

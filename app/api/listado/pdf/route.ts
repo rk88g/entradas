@@ -64,11 +64,12 @@ export async function GET(request: NextRequest) {
   });
 
   const fileName = getPdfFileName(mode);
+  const encodedFileName = encodeURIComponent(fileName);
   return new NextResponse(Buffer.from(pdfBytes), {
     status: 200,
     headers: {
       "Content-Type": "application/pdf",
-      "Content-Disposition": `inline; filename="${fileName}"`,
+      "Content-Disposition": `attachment; filename="${fileName}"; filename*=UTF-8''${encodedFileName}`,
       "Cache-Control": "no-store"
     }
   });
