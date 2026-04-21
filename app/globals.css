@@ -460,7 +460,7 @@ html[data-theme="dark"] .segmented-button {
 .app-shell {
   display: grid;
   gap: 1rem;
-  align-items: start;
+  align-items: flex-start;
 }
 
 .app-sidebar {
@@ -900,7 +900,7 @@ tr:last-child td {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
   gap: 1rem;
-  align-items: start;
+  align-items: flex-start;
   grid-column: 1 / -1;
 }
 
@@ -915,7 +915,7 @@ tr:last-child td {
 
 .visitor-column-list {
   grid-template-columns: minmax(0, 1fr) !important;
-  align-content: start;
+  align-content: flex-start;
   max-height: 22rem;
   overflow: auto;
   padding-right: 0.2rem;
@@ -1395,7 +1395,7 @@ html[data-theme="dark"] .note-box {
 .compact-pass-column {
   display: grid;
   gap: 0.45rem;
-  align-content: start;
+  align-content: flex-start;
 }
 
 .apoyo-pass-card {
@@ -1408,7 +1408,7 @@ html[data-theme="dark"] .note-box {
 .apoyo-pass-header {
   display: grid;
   grid-template-columns: 1fr auto;
-  align-items: start;
+  align-items: flex-start;
   gap: 1rem;
 }
 
@@ -1418,7 +1418,7 @@ html[data-theme="dark"] .note-box {
   justify-content: flex-start;
   flex-wrap: wrap;
   gap: 0.55rem;
-  align-content: start;
+  align-content: flex-start;
 }
 
 .apoyo-pass-kicker {
@@ -1790,7 +1790,7 @@ html[data-theme="dark"] .admin-tab.active {
   display: grid;
   grid-template-columns: 2.2cm minmax(0, 1fr) 1.6cm;
   gap: 0.25cm;
-  align-items: start;
+  align-items: flex-start;
   border-bottom: 1px dotted #dbe4ef;
   padding: 0.12cm 0;
   font-size: 0.84rem;
@@ -2156,7 +2156,7 @@ html[data-theme="dark"] .admin-tab.active {
     display: grid;
     grid-template-columns: 1.1cm 1.8cm minmax(0, 1fr);
     gap: 0.2cm;
-    align-items: start;
+    align-items: flex-start;
   }
 
   .delivery-print-head {
@@ -2219,7 +2219,7 @@ html[data-theme="dark"] .admin-tab.active {
   .listing-print-page-body {
     flex: 1 1 auto;
     display: grid !important;
-    align-content: start;
+    align-content: flex-start;
     gap: 0.12cm;
     margin: 0;
     padding: 0;

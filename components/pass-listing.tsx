@@ -442,6 +442,19 @@ export function PassListing({
     );
   }
 
+  function openPdf() {
+    const params = new URLSearchParams({
+      mode: printMode,
+      date: printDate
+    });
+
+    if (query.trim()) {
+      params.set("q", query.trim());
+    }
+
+    window.open(`/api/listado/pdf?${params.toString()}`, "_blank", "noopener,noreferrer");
+  }
+
   return (
     <section className={`module-panel print-module-panel print-mode-${printMode}`}>
       <FullscreenLoading active={editScreenLoading || editLoading} label="Loading..." />
@@ -474,6 +487,13 @@ export function PassListing({
             onClick={() => setPrintMode("menciones")}
           >
             Menciones
+          </button>
+          <button
+            type="button"
+            className="button-secondary listing-toggle"
+            onClick={openPdf}
+          >
+            PDF
           </button>
           <button
             type="button"
