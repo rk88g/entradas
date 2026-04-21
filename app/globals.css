@@ -2094,20 +2094,20 @@ html[data-theme="dark"] .admin-tab.active {
   }
 
   .apoyo-print-grid {
-    display: block !important;
-    grid-template-columns: 1fr;
-    gap: 0.12cm;
-    margin: 0 !important;
-    padding: 0 !important;
-  }
+      display: block !important;
+      grid-template-columns: 1fr;
+      gap: 0.08cm;
+      margin: 0 !important;
+      padding: 0 !important;
+    }
 
   .apoyo-print-grid .listing-card-stack {
-    display: block !important;
-    margin: 0 0 0.12cm 0 !important;
-    padding: 0 !important;
-    break-inside: avoid;
-    page-break-inside: avoid;
-  }
+      display: block !important;
+      margin: 0 0 0.08cm 0 !important;
+      padding: 0 !important;
+      break-inside: avoid;
+      page-break-inside: avoid;
+    }
 
   .apoyo-print-grid .listing-card-stack:last-child {
     margin-bottom: 0 !important;
@@ -2120,14 +2120,14 @@ html[data-theme="dark"] .admin-tab.active {
   }
 
   .apoyo-print-grid .apoyo-pass-card {
-    display: flex;
-    flex-direction: column;
-    min-height: 6.25cm;
-    height: 6.25cm;
-    padding: 0.22cm 0.28cm;
-    overflow: hidden;
-    break-inside: avoid;
-    page-break-inside: avoid;
+      display: flex;
+      flex-direction: column;
+      min-height: 6.7cm;
+      height: 6.7cm;
+      padding: 0.22cm 0.28cm;
+      overflow: hidden;
+      break-inside: avoid;
+      page-break-inside: avoid;
     box-shadow: none;
     border: 2px solid #0f172a;
     width: 100%;
@@ -2274,7 +2274,7 @@ html[data-theme="dark"] .admin-tab.active {
       position: fixed;
       left: 0.55cm;
       right: 0.55cm;
-      bottom: 0.08cm;
+      bottom: 0.02cm;
       color: #c23030;
       font-size: 0.48rem;
       line-height: 1.05;
