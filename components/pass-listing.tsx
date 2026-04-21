@@ -151,9 +151,19 @@ function renderSeparatedPasses(pass: ListingRecord) {
   const { visibleVisitors, underTwelveCount } = getVisibleVisitors(pass);
   const men = visibleVisitors.filter((visitor) => visitor.sexo === "hombre");
   const womenAndTeens = visibleVisitors.filter((visitor) => visitor.sexo !== "hombre");
+  const menChildrenCount =
+    underTwelveCount > 0 && men.length > 0 && womenAndTeens.length === 0
+      ? underTwelveCount
+      : 0;
+  const womenChildrenCount =
+    underTwelveCount > 0
+      ? menChildrenCount > 0
+        ? 0
+        : underTwelveCount
+      : 0;
   const sections = [
-    { key: "men", label: "Hombres", visitors: men, childrenCount: 0 },
-    { key: "women", label: "Mujeres y menores", visitors: womenAndTeens, childrenCount: underTwelveCount }
+    { key: "men", label: "Hombres", visitors: men, childrenCount: menChildrenCount },
+    { key: "women", label: "Mujeres y menores", visitors: womenAndTeens, childrenCount: womenChildrenCount }
   ].filter((section) => section.visitors.length > 0 || section.childrenCount > 0);
 
   return sections.map((section) => (
