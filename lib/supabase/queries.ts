@@ -282,12 +282,14 @@ function mapVisitorRecord(
     id: string;
     nombreCompleto: string;
     fecha_nacimiento: string;
+    fecha_betada?: string | null;
     edad: number | null;
     menor: boolean | null;
     sexo: string | null;
     parentesco: string;
     betada: boolean | null;
     telefono: string | null;
+    notas?: string | null;
     created_at: string;
     updated_at: string;
   },
@@ -296,20 +298,22 @@ function mapVisitorRecord(
 ): VisitorRecord {
   return {
     id: item.id,
-    fullName: item.nombreCompleto,
-    nombreCompleto: item.nombreCompleto,
-    fechaNacimiento: item.fecha_nacimiento,
-    edad: item.edad ?? 0,
-    menor: Boolean(item.menor),
-    sexo: ensureSex(item.sexo),
-    parentesco: item.parentesco,
-    betada: Boolean(item.betada),
-    historialInterno,
-    historial,
-    telefono: item.telefono ?? "No aplica",
-    createdAt: item.created_at,
-    updatedAt: item.updated_at
-  };
+      fullName: item.nombreCompleto,
+      nombreCompleto: item.nombreCompleto,
+      fechaNacimiento: item.fecha_nacimiento,
+      fechaBetada: item.fecha_betada ?? null,
+      edad: item.edad ?? 0,
+      menor: Boolean(item.menor),
+      sexo: ensureSex(item.sexo),
+      parentesco: item.parentesco,
+      betada: Boolean(item.betada),
+      historialInterno,
+      historial,
+      telefono: item.telefono ?? "No aplica",
+      notas: item.notas ?? null,
+      createdAt: item.created_at,
+      updatedAt: item.updated_at
+    };
 }
 
 async function getVisitorHistoryData(supabase: SupabaseClient, visitorIds?: string[]) {
@@ -945,7 +949,7 @@ export async function searchVisitors(
 
   const { data, error } = await supabase
     .from("visitas")
-    .select("id, nombreCompleto, parentesco, betada")
+      .select("id, nombreCompleto, parentesco, betada, fecha_betada, notas")
     .ilike("nombreCompleto", searchPattern)
     .order("created_at", { ascending: false })
     .limit(limit);
@@ -975,14 +979,16 @@ export async function searchVisitors(
       ? internalsMap.get(currentRelations.get(item.id)!)
       : null;
 
-    return {
-      id: item.id,
-      fullName: item.nombreCompleto,
-      parentesco: item.parentesco,
-      currentInternalName: currentInternal?.fullName,
-      currentInternalLocation: currentInternal?.ubicacion,
-      betada: Boolean(item.betada)
-    };
+      return {
+        id: item.id,
+        fullName: item.nombreCompleto,
+        parentesco: item.parentesco,
+        currentInternalName: currentInternal?.fullName,
+        currentInternalLocation: currentInternal?.ubicacion,
+        betada: Boolean(item.betada),
+        fechaBetada: item.fecha_betada ?? null,
+        notas: item.notas ?? null
+      };
   });
 }
 
@@ -1006,7 +1012,7 @@ export async function getVisitas(): Promise<VisitorRecord[]> {
       supabase
         .from("visitas")
         .select(
-          "id, \"nombreCompleto\", fecha_nacimiento, edad, menor, sexo, parentesco, betada, telefono, created_at, updated_at"
+          "id, \"nombreCompleto\", fecha_nacimiento, fecha_betada, edad, menor, sexo, parentesco, betada, telefono, notas, created_at, updated_at"
         )
         .order("created_at", { ascending: false })
         .range(from, to)
@@ -1117,7 +1123,7 @@ export async function getVisitasPage(options?: {
     .select("id", { count: "exact", head: true });
   let dataQuery = supabase
     .from("visitas")
-    .select("id, nombreCompleto, fecha_nacimiento, edad, menor, sexo, parentesco, betada, telefono, created_at, updated_at")
+      .select("id, nombreCompleto, fecha_nacimiento, fecha_betada, edad, menor, sexo, parentesco, betada, telefono, notas, created_at, updated_at")
     .order("created_at", { ascending: false })
     .range(from, to);
 

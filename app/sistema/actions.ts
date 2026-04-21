@@ -65,6 +65,122 @@ function normalizeFullName(value: string) {
   return value.replace(/\s+/g, " ").trim();
 }
 
+function splitVisitorLegacyName(nombreCompleto: string) {
+  const tokens = normalizeFullName(nombreCompleto).split(" ").filter(Boolean);
+  if (tokens.length === 0) {
+    return {
+      nombres: "Sin nombre",
+      apellidoPat: "SN",
+      apellidoMat: ""
+    };
+  }
+
+  if (tokens.length === 1) {
+    return {
+      nombres: tokens[0],
+      apellidoPat: "SN",
+      apellidoMat: ""
+    };
+  }
+
+  return {
+    nombres: tokens.slice(0, -2).join(" ") || tokens[0],
+    apellidoPat: tokens.length >= 2 ? tokens[tokens.length - 2] : "SN",
+    apellidoMat: tokens.length >= 3 ? tokens[tokens.length - 1] : ""
+  };
+}
+
+async function syncVisitorAvailabilityState(
+  supabase: Awaited<ReturnType<typeof createServerSupabaseClient>>,
+  profileId: string,
+  visitor: {
+    id: string;
+    nombreCompleto: string;
+    fechaNacimiento?: string | null;
+    betada: boolean;
+    fechaBetada?: string | null;
+    notas?: string | null;
+  }
+) {
+  const fechaBetada = visitor.betada ? visitor.fechaBetada ?? new Date().toISOString().slice(0, 10) : null;
+
+  const { error: visitorUpdateError } = await supabase
+    .from("visitas")
+    .update({
+      betada: visitor.betada,
+      fecha_betada: fechaBetada,
+      notas: visitor.notas ?? null
+    })
+    .eq("id", visitor.id);
+
+  if (visitorUpdateError) {
+    return visitorUpdateError.message || "No se pudo actualizar la disponibilidad de la visita.";
+  }
+
+  const { data: existingBetada, error: existingBetadaError } = await supabase
+    .from("betadas")
+    .select("id")
+    .eq("visita_id", visitor.id)
+    .maybeSingle();
+
+  if (existingBetadaError) {
+    return existingBetadaError.message || "No se pudo revisar el historico de la visita.";
+  }
+
+  if (!visitor.betada) {
+    if (existingBetada?.id) {
+      const { error } = await supabase
+        .from("betadas")
+        .update({
+          activo: false,
+          fecha_betada: null,
+          motivo: visitor.notas?.trim() || "Disponible",
+          imposed_by: profileId
+        })
+        .eq("id", existingBetada.id);
+
+      if (error) {
+        return error.message || "No se pudo actualizar el historico de betado.";
+      }
+    }
+
+    return null;
+  }
+
+  const legacyName = splitVisitorLegacyName(visitor.nombreCompleto);
+  const payload = {
+    visita_id: visitor.id,
+    nombres: legacyName.nombres,
+    apellido_pat: legacyName.apellidoPat,
+    apellido_mat: legacyName.apellidoMat || null,
+    fecha_nacimiento: visitor.fechaNacimiento ?? null,
+    motivo: visitor.notas?.trim() || "No disponible",
+    activo: true,
+    imposed_by: profileId,
+    fecha_betada: fechaBetada
+  };
+
+  if (existingBetada?.id) {
+    const { error } = await supabase
+      .from("betadas")
+      .update(payload)
+      .eq("id", existingBetada.id);
+
+    if (error) {
+      return error.message || "No se pudo actualizar el historico de betado.";
+    }
+
+    return null;
+  }
+
+  const { error } = await supabase.from("betadas").insert(payload);
+  if (error) {
+    return error.message || "No se pudo registrar el historico de betado.";
+  }
+
+  return null;
+}
+
 function resolveVisitorBirthDate(formData: FormData) {
   const inputMode = String(formData.get("birth_input_mode") ?? "fecha").trim().toLowerCase();
   const rawBirthDate = String(formData.get("fecha_nacimiento") ?? "").trim();
@@ -717,6 +833,78 @@ export async function updateVisitorIdentityAction(
   }
 }
 
+export async function updateVisitorAvailabilityAction(
+  _prevState: MutationState,
+  formData: FormData
+): Promise<MutationState> {
+  try {
+    const profile = await requireProfile();
+    if (profile.roleKey !== "super-admin") {
+      return failure("Solo super-admin puede modificar disponibilidad de visitas.");
+    }
+
+    const supabase = await createServerSupabaseClient();
+    const visitorId = String(formData.get("visita_id") ?? "").trim();
+    const betada = String(formData.get("betada") ?? "false") === "true";
+    const fechaBetada = String(formData.get("fecha_betada") ?? "").trim() || null;
+    const notas = String(formData.get("notas") ?? "").trim() || null;
+
+    if (!visitorId) {
+      return failure("Debes elegir la visita.");
+    }
+
+    if (betada && !fechaBetada) {
+      return failure("Debes capturar la fecha en que se beto la visita.");
+    }
+
+    const { data: previousVisitor, error: previousError } = await supabase
+      .from("visitas")
+      .select("nombreCompleto, fecha_nacimiento, betada, fecha_betada, notas")
+      .eq("id", visitorId)
+      .maybeSingle();
+
+    if (previousError || !previousVisitor) {
+      return failure("No se encontro la visita seleccionada.");
+    }
+
+    const syncError = await syncVisitorAvailabilityState(supabase, profile.id, {
+      id: visitorId,
+      nombreCompleto: previousVisitor.nombreCompleto,
+      fechaNacimiento: previousVisitor.fecha_nacimiento,
+      betada,
+      fechaBetada,
+      notas
+    });
+
+    if (syncError) {
+      return failure(syncError);
+    }
+
+    await auditAction({
+      userId: profile.id,
+      moduleKey: "admin",
+      sectionKey: "correcciones-visitas",
+      actionKey: "update",
+      entityType: "visita",
+      entityId: visitorId,
+      beforeData: previousVisitor,
+      afterData: {
+        betada,
+        fecha_betada: betada ? fechaBetada : null,
+        notas
+      }
+    });
+
+    revalidatePath("/sistema/internos");
+    revalidatePath("/sistema/visitas");
+    revalidatePath("/sistema/listado");
+    revalidatePath("/sistema/admin");
+    return success("Disponibilidad de visita actualizada.");
+  } catch (error) {
+    return failure(error instanceof Error ? error.message : "No se pudo actualizar la visita.");
+  }
+}
+
 export async function createVisitorAction(
   _prevState: MutationState,
   formData: FormData
@@ -735,6 +923,9 @@ export async function createVisitorAction(
     const visitorPayload = {
       nombreCompleto: normalizeFullName(String(formData.get("nombreCompleto") ?? "")),
       fecha_nacimiento: resolvedBirthDate.birthDate,
+      fecha_betada: canUseFallbackParentesco && String(formData.get("betada") ?? "false") === "true"
+        ? new Date().toISOString().slice(0, 10)
+        : null,
       sexo: String(formData.get("sexo") ?? "sin-definir").trim(),
       parentesco: parentescoInput || (canUseFallbackParentesco ? "SN" : ""),
       telefono: String(formData.get("telefono") ?? "").trim() || "No aplica",
@@ -785,6 +976,19 @@ export async function createVisitorAction(
 
     if (visitorError || !insertedVisitor) {
       return failure(visitorError?.message || "No se pudo guardar la visita.");
+    }
+
+    const availabilityError = await syncVisitorAvailabilityState(supabase, profile.id, {
+      id: insertedVisitor.id,
+      nombreCompleto: visitorPayload.nombreCompleto,
+      fechaNacimiento: visitorPayload.fecha_nacimiento,
+      betada: visitorPayload.betada,
+      fechaBetada: visitorPayload.fecha_betada,
+      notas: visitorPayload.notas
+    });
+
+    if (availabilityError) {
+      return failure(availabilityError);
     }
 
     if (internalId) {

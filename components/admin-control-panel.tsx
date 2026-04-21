@@ -12,10 +12,11 @@ import {
   saveUserPermissionGrantAction,
   saveWorkplacePositionAction,
   updateModuleZoneSortOrderAction,
-  updateInternalIdentityAction,
-  updateAuthUserPasswordAction,
-  updateVisitorIdentityAction
-} from "@/app/sistema/actions";
+    updateInternalIdentityAction,
+    updateAuthUserPasswordAction,
+    updateVisitorIdentityAction,
+    updateVisitorAvailabilityAction
+  } from "@/app/sistema/actions";
 import { LoadingButton } from "@/components/loading-button";
 import { MutationBanner } from "@/components/mutation-banner";
 import { RemoteInternalSearchField } from "@/components/remote-internal-search-field";
@@ -100,12 +101,18 @@ export function AdminControlPanel({
   const [visitorNameForm, setVisitorNameForm] = useState({
     nombreCompleto: ""
   });
+  const [visitorAvailabilityForm, setVisitorAvailabilityForm] = useState({
+    betada: false,
+    fechaBetada: "",
+    notas: ""
+  });
   const [passwordState, passwordAction, passwordPending] = useActionState(updateAuthUserPasswordAction, mutationInitialState);
   const [forceState, forceAction, forcePending] = useActionState(forceCloseUserSessionsAction, mutationInitialState);
   const [rolePermissionState, rolePermissionAction, rolePermissionPending] = useActionState(saveRolePermissionGrantAction, mutationInitialState);
   const [userPermissionState, userPermissionAction, userPermissionPending] = useActionState(saveUserPermissionGrantAction, mutationInitialState);
   const [internalIdentityState, internalIdentityAction, internalIdentityPending] = useActionState(updateInternalIdentityAction, mutationInitialState);
   const [visitorIdentityState, visitorIdentityAction, visitorIdentityPending] = useActionState(updateVisitorIdentityAction, mutationInitialState);
+  const [visitorAvailabilityState, visitorAvailabilityAction, visitorAvailabilityPending] = useActionState(updateVisitorAvailabilityAction, mutationInitialState);
   const [cutoffState, cutoffAction, cutoffPending] = useActionState(saveModuleSettingsAction, mutationInitialState);
   const [zoneState, zoneAction, zonePending] = useActionState(createModuleZoneAction, mutationInitialState);
   const [zoneSortState, zoneSortAction, zoneSortPending] = useActionState(updateModuleZoneSortOrderAction, mutationInitialState);
@@ -151,6 +158,14 @@ export function AdminControlPanel({
   useEffect(() => {
     setVisitorNameForm({
       nombreCompleto: selectedCorrectionVisitor?.fullName ?? ""
+    });
+  }, [selectedCorrectionVisitor]);
+
+  useEffect(() => {
+    setVisitorAvailabilityForm({
+      betada: Boolean(selectedCorrectionVisitor?.betada),
+      fechaBetada: selectedCorrectionVisitor?.fechaBetada ?? "",
+      notas: selectedCorrectionVisitor?.notas ?? ""
     });
   }, [selectedCorrectionVisitor]);
 
@@ -831,8 +846,8 @@ export function AdminControlPanel({
               <span>Nombre completo</span>
             </summary>
             <div className="section-collapse-body">
-              <MutationBanner state={visitorIdentityState} />
-              <form action={visitorIdentityAction} className="field-grid" autoComplete="off">
+                <MutationBanner state={visitorIdentityState} />
+                <form action={visitorIdentityAction} className="field-grid" autoComplete="off">
                 <RemoteVisitorSearchField
                   name="visita_id"
                   selected={selectedCorrectionVisitor}
@@ -853,9 +868,57 @@ export function AdminControlPanel({
                 <div className="actions-row">
                   <LoadingButton pending={visitorIdentityPending} label="Guardar visita" loadingLabel="Loading..." className="button-secondary" />
                 </div>
-              </form>
-            </div>
-          </details>
+                </form>
+                <MutationBanner state={visitorAvailabilityState} />
+                <form action={visitorAvailabilityAction} className="field-grid" autoComplete="off" style={{ marginTop: "1rem" }}>
+                  <input type="hidden" name="visita_id" value={selectedCorrectionVisitor?.id ?? ""} />
+                  <div className="field">
+                    <select
+                      name="betada"
+                      value={visitorAvailabilityForm.betada ? "true" : "false"}
+                      onChange={(event) =>
+                        setVisitorAvailabilityForm((current) => ({
+                          ...current,
+                          betada: event.target.value === "true",
+                          fechaBetada:
+                            event.target.value === "true"
+                              ? current.fechaBetada || new Date().toISOString().slice(0, 10)
+                              : ""
+                        }))
+                      }
+                    >
+                      <option value="false">Activa</option>
+                      <option value="true">No disponible</option>
+                    </select>
+                  </div>
+                  <div className="field">
+                    <input
+                      name="fecha_betada"
+                      type="date"
+                      value={visitorAvailabilityForm.fechaBetada}
+                      onChange={(event) =>
+                        setVisitorAvailabilityForm((current) => ({ ...current, fechaBetada: event.target.value }))
+                      }
+                      disabled={!visitorAvailabilityForm.betada}
+                    />
+                  </div>
+                  <div className="field" style={{ gridColumn: "1 / -1" }}>
+                    <textarea
+                      name="notas"
+                      placeholder="Observaciones"
+                      autoComplete="off"
+                      value={visitorAvailabilityForm.notas}
+                      onChange={(event) =>
+                        setVisitorAvailabilityForm((current) => ({ ...current, notas: event.target.value }))
+                      }
+                    />
+                  </div>
+                  <div className="actions-row">
+                    <LoadingButton pending={visitorAvailabilityPending} label="Guardar disponibilidad" loadingLabel="Loading..." className="button-secondary" />
+                  </div>
+                </form>
+              </div>
+            </details>
         </section>
       ) : null}
 

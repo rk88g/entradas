@@ -79,6 +79,8 @@ export interface VisitorSearchOption {
   currentInternalName?: string;
   currentInternalLocation?: string;
   betada: boolean;
+  fechaBetada?: string | null;
+  notas?: string | null;
 }
 
 export interface InternalVisitorLink {
@@ -111,6 +113,7 @@ export interface VisitorRecord {
   fullName: string;
   nombreCompleto: string;
   fechaNacimiento: string;
+  fechaBetada?: string | null;
   edad: number;
   menor: boolean;
   sexo: VisitorSex;
@@ -121,6 +124,7 @@ export interface VisitorRecord {
   currentInternalId?: string;
   currentInternalName?: string;
   telefono?: string;
+  notas?: string | null;
   createdAt: string;
   updatedAt: string;
   motivoBetado?: string;
