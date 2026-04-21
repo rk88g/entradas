@@ -2267,6 +2267,11 @@ export async function registerModulePaymentAction(
     const zoneSelection = formData.get("zone_id");
     const amount = Number(formData.get("amount") ?? 0);
     const notes = String(formData.get("notes") ?? "").trim() || null;
+    const brand = String(formData.get("brand") ?? "").trim() || null;
+    const model = String(formData.get("model") ?? "").trim() || null;
+    const imei = String(formData.get("imei") ?? "").trim() || null;
+    const chipNumber = String(formData.get("chip_number") ?? "").trim() || null;
+    const characteristics = String(formData.get("characteristics") ?? "").trim() || null;
 
     if (!internalDeviceId && !internalId) {
       return failure("Debes elegir un interno.");
@@ -2323,6 +2328,42 @@ export async function registerModulePaymentAction(
       return failure(targetDevices.error?.message || "No se encontraron aparatos para cobrar.");
     }
     const filteredTargetDevices = targetDevices.data ?? [];
+
+    if (internalDeviceId) {
+      const updatePayload: Record<string, string | null> = {};
+      if (zoneId) {
+        updatePayload.zone_id = zoneId;
+      }
+      if (brand !== null) {
+        updatePayload.brand = brand;
+      }
+      if (model !== null) {
+        updatePayload.model = model;
+      }
+      if (imei !== null) {
+        updatePayload.imei = imei;
+      }
+      if (chipNumber !== null) {
+        updatePayload.chip_number = chipNumber;
+      }
+      if (characteristics !== null) {
+        updatePayload.characteristics = characteristics;
+      }
+      if (notes !== null) {
+        updatePayload.notes = notes;
+      }
+
+      if (Object.keys(updatePayload).length > 0) {
+        const { error: updateDeviceError } = await supabase
+          .from("internal_devices")
+          .update(updatePayload)
+          .eq("id", internalDeviceId);
+
+        if (updateDeviceError) {
+          return failure(updateDeviceError.message || "No se pudo actualizar el aparato antes del pago.");
+        }
+      }
+    }
 
     const deviceTypeIds = [...new Set(filteredTargetDevices.map((device) => device.device_type_id))];
     const { data: modulePrices } = deviceTypeIds.length

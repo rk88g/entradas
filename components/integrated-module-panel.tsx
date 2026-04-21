@@ -69,8 +69,9 @@ export function IntegratedModulePanel({
 }) {
   const [tab, setTab] = useState<ModuleTab>("resumen");
   const [selectedInternalId, setSelectedInternalId] = useState<string | null>(null);
+  const [selectedPendingDeviceId, setSelectedPendingDeviceId] = useState<string | null>(null);
   const [selectedEntryInternal, setSelectedEntryInternal] = useState<InternalSearchOption | null>(null);
-  const [selectedChargeInternalId, setSelectedChargeInternalId] = useState("");
+  const [selectedChargeDeviceId, setSelectedChargeDeviceId] = useState("");
   const [selectedZoneFilter, setSelectedZoneFilter] = useState("");
   const [selectedDeviceTypeId, setSelectedDeviceTypeId] = useState("");
   const [chargeInternalSearch, setChargeInternalSearch] = useState("");
@@ -172,7 +173,51 @@ export function IntegratedModulePanel({
   });
 
   const selectedInternal = groupedInternals.find((item) => item.internalId === selectedInternalId) ?? null;
-  const selectedChargeInternal = filteredInternalsForZone.find((item) => item.internalId === selectedChargeInternalId) ?? null;
+  const selectedPendingDevice = data.pendingDevices.find((item) => item.id === selectedPendingDeviceId) ?? null;
+
+  const chargeDevices = useMemo(() => {
+    return data.unpaidDevices
+      .filter((device) => {
+        if (!selectedZoneFilter) {
+          return true;
+        }
+
+        const zone = data.zones.find((entry) => entry.id === selectedZoneFilter);
+        if (!zone) {
+          return true;
+        }
+
+        return device.zoneId === zone.id || matchesZoneByLocation(zone.name, device.internalLocation);
+      })
+      .map((device) => ({
+        ...device,
+        totalDue: getDeviceWeeklyCharge(device, priceMap)
+      }))
+      .sort((a, b) => compareInternalLocations(a.internalLocation, b.internalLocation));
+  }, [data.unpaidDevices, data.zones, priceMap, selectedZoneFilter]);
+
+  const filteredChargeDevices = chargeDevices.filter((device) => {
+    const normalized = chargeInternalSearch.trim().toLowerCase();
+    if (!normalized) {
+      return true;
+    }
+
+    return (
+      device.internalName.toLowerCase().includes(normalized) ||
+      device.internalLocation.toLowerCase().includes(normalized) ||
+      device.deviceTypeName.toLowerCase().includes(normalized)
+    );
+  });
+
+  const selectedChargeDevice = filteredChargeDevices.find((item) => item.id === selectedChargeDeviceId) ?? null;
+  const activationPaidDeviceIds = useMemo(
+    () => new Set(data.activationPaidDevices.map((item) => item.id)),
+    [data.activationPaidDevices]
+  );
+  const weeklyPaidDevices = useMemo(
+    () => data.paidDevices.filter((item) => !activationPaidDeviceIds.has(item.id)),
+    [activationPaidDeviceIds, data.paidDevices]
+  );
 
   useEffect(() => {
     if (!selectedInternalId) {
@@ -195,6 +240,13 @@ export function IntegratedModulePanel({
       setSelectedEntryInternal(null);
     }
   }, [deviceState.success]);
+
+  useEffect(() => {
+    if (paymentState.success) {
+      setSelectedPendingDeviceId(null);
+      setSelectedChargeDeviceId("");
+    }
+  }, [paymentState.success]);
 
   return (
     <>
@@ -236,40 +288,77 @@ export function IntegratedModulePanel({
                 ) : null}
 
                 <section className="stats-grid">
-                  <article className="stat-card"><small>Pagados</small><strong>{data.paidDevices.length}</strong></article>
+                  <article className="stat-card"><small>Pagados</small><strong>{weeklyPaidDevices.length}</strong></article>
                   <article className="stat-card"><small>Pendientes</small><strong>{data.unpaidDevices.length}</strong></article>
-                  <article className="stat-card"><small>Altas</small><strong>{data.pendingDevices.length}</strong></article>
+                  <article className="stat-card"><small>Altas</small><strong>{data.activationPaidDevices.length}</strong></article>
                   <article className="stat-card"><small>Mantenimiento</small><strong>{data.devices.filter((item) => item.status === "reparacion").length}</strong></article>
                   <article className="stat-card"><small>Retenidos</small><strong>{data.devices.filter((item) => item.status === "retenido").length}</strong></article>
                   <article className="stat-card"><small>Ingresos</small><strong>${data.totalIncome.toFixed(2)}</strong></article>
                 </section>
 
-                <div className="table-wrap compact-table" style={{ marginTop: "0.8rem" }}>
-                  <table>
-                <thead>
-                  <tr>
-                    <th>Zona</th>
-                    <th>Pagados</th>
-                    <th>Pendientes</th>
-                    <th>Total</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {data.totalsByZone.length === 0 ? (
-                    <tr><td colSpan={4}>Sin zonas registradas.</td></tr>
-                  ) : (
-                    data.totalsByZone.map((zone) => (
-                      <tr key={zone.zoneName}>
-                        <td>{zone.zoneName}</td>
-                        <td>{zone.paidCount}</td>
-                        <td>{zone.pendingCount}</td>
-                        <td>${zone.totalPaid.toFixed(2)}</td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-                  </table>
-                </div>
+                {data.pendingDevices.length > 0 ? (
+                  <div className="table-wrap compact-table" style={{ marginTop: "0.8rem" }}>
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>Ubicacion</th>
+                          <th>Interno</th>
+                          <th>Aparato</th>
+                          <th>Alta</th>
+                          <th />
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {data.pendingDevices.map((device) => (
+                          <tr key={device.id}>
+                            <td>{device.internalLocation}</td>
+                            <td>{device.internalName}</td>
+                            <td>{device.deviceTypeName}</td>
+                            <td>${(priceMap.get(device.deviceTypeId)?.activationPrice ?? 0).toFixed(2)}</td>
+                            <td style={{ textAlign: "right" }}>
+                              {canManageCharges ? (
+                                <button type="button" className="button-soft" onClick={() => setSelectedPendingDeviceId(device.id)}>
+                                  Dar de alta
+                                </button>
+                              ) : null}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                    <div className="actions-row" style={{ justifyContent: "space-between", marginTop: "0.8rem" }}>
+                      <span className="muted">Registros pendientes por alta</span>
+                      <strong>${data.activationPendingTotal.toFixed(2)}</strong>
+                    </div>
+                  </div>
+                ) : (
+                  <div className="table-wrap compact-table" style={{ marginTop: "0.8rem" }}>
+                    <table>
+                      <thead>
+                        <tr>
+                          <th>Zona</th>
+                          <th>Pagados</th>
+                          <th>Pendientes</th>
+                          <th>Total</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {data.totalsByZone.length === 0 ? (
+                          <tr><td colSpan={4}>Sin zonas registradas.</td></tr>
+                        ) : (
+                          data.totalsByZone.map((zone) => (
+                            <tr key={zone.zoneName}>
+                              <td>{zone.zoneName}</td>
+                              <td>{zone.paidCount}</td>
+                              <td>{zone.pendingCount}</td>
+                              <td>${zone.totalPaid.toFixed(2)}</td>
+                            </tr>
+                          ))
+                        )}
+                      </tbody>
+                    </table>
+                  </div>
+                )}
               </div>
             </details>
 
@@ -409,7 +498,7 @@ export function IntegratedModulePanel({
             <details className="data-card section-collapse">
               <summary>
                 <span>Cobranza por zona</span>
-                <span>{filteredInternalsForZone.length} internos</span>
+                <span>{filteredChargeDevices.length} aparatos</span>
               </summary>
               <div className="section-collapse-body">
                 <div className="actions-row" style={{ justifyContent: "space-between", marginBottom: "0.8rem" }}>
@@ -434,20 +523,22 @@ export function IntegratedModulePanel({
                     <tr>
                       <th>Ubicacion</th>
                       <th>Interno</th>
-                      <th>Dispositivos</th>
+                      <th>Dispositivo</th>
+                      <th>Zona</th>
                       <th>Total</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {filteredInternalsForZone.length === 0 ? (
-                      <tr><td colSpan={4}>Sin internos para esta zona.</td></tr>
+                    {filteredChargeDevices.length === 0 ? (
+                      <tr><td colSpan={5}>Sin aparatos para esta zona.</td></tr>
                     ) : (
-                      filteredInternalsForZone.map((item) => (
-                        <tr key={item.internalId}>
-                          <td>{item.internalLocation}</td>
-                          <td>{item.internalName}</td>
-                          <td>{item.devices.map((device) => `${device.quantity} ${device.deviceTypeName}`).join(", ")}</td>
-                          <td>${item.totalDue.toFixed(2)}</td>
+                      filteredChargeDevices.map((device) => (
+                        <tr key={device.id}>
+                          <td>{device.internalLocation}</td>
+                          <td>{device.internalName}</td>
+                          <td>{device.deviceTypeName}</td>
+                          <td>{device.zoneName ?? "Sin zona"}</td>
+                          <td>${device.totalDue.toFixed(2)}</td>
                         </tr>
                       ))
                     )}
@@ -460,33 +551,33 @@ export function IntegratedModulePanel({
             <details className="data-card section-collapse">
               <summary>
                 <span>Registrar pago</span>
-                <span>{selectedChargeInternal ? selectedChargeInternal.internalName : "Sin interno"}</span>
+                <span>{selectedChargeDevice ? `${selectedChargeDevice.internalName} · ${selectedChargeDevice.deviceTypeName}` : "Sin aparato"}</span>
               </summary>
               <div className="section-collapse-body">
                 <MutationBanner state={paymentState} />
                 <form action={paymentAction} className="field-grid" autoComplete="off">
                 <input type="hidden" name="module_key" value={data.moduleKey} />
-                <input type="hidden" name="amount" value={selectedChargeInternal?.totalDue ?? 0} />
+                <input type="hidden" name="amount" value={selectedChargeDevice?.totalDue ?? 0} />
                 <div className="field">
                   <input
                     value={chargeInternalSearch}
                     onChange={(event) => setChargeInternalSearch(event.target.value)}
-                    placeholder="Buscar interno"
+                    placeholder="Buscar interno o aparato"
                     autoComplete="off"
                     disabled={!canManageCharges || data.weekClosed}
                   />
-                  <input type="hidden" name="internal_id" value={selectedChargeInternalId} />
+                  <input type="hidden" name="internal_device_id" value={selectedChargeDeviceId} />
                   <div className="inline-search-list">
-                    {filteredChargeInternals.slice(0, 8).map((internal) => (
+                    {filteredChargeDevices.slice(0, 8).map((device) => (
                       <button
-                        key={internal.internalId}
+                        key={device.id}
                         type="button"
-                        className={`inline-search-item ${selectedChargeInternalId === internal.internalId ? "active" : ""}`}
-                        onClick={() => setSelectedChargeInternalId(internal.internalId)}
+                        className={`inline-search-item ${selectedChargeDeviceId === device.id ? "active" : ""}`}
+                        onClick={() => setSelectedChargeDeviceId(device.id)}
                         disabled={!canManageCharges || data.weekClosed}
                       >
-                        <strong>{internal.internalName}</strong>
-                        <span className="muted">{internal.internalLocation}</span>
+                        <strong>{device.internalName}</strong>
+                        <span className="muted">{`${device.internalLocation} · ${device.deviceTypeName}`}</span>
                       </button>
                     ))}
                   </div>
@@ -505,12 +596,12 @@ export function IntegratedModulePanel({
                   <div className="data-card" style={{ padding: "1rem" }}>
                     <strong>Total a pagar</strong>
                     <div style={{ marginTop: "0.3rem", fontSize: "1.2rem", fontWeight: 800 }}>
-                      ${selectedChargeInternal?.totalDue.toFixed(2) ?? "0.00"}
+                      ${selectedChargeDevice?.totalDue.toFixed(2) ?? "0.00"}
                     </div>
                     <div className="muted" style={{ marginTop: "0.5rem" }}>
-                      {selectedChargeInternal
-                        ? selectedChargeInternal.devices.map((device) => `${device.quantity} ${device.deviceTypeName}`).join(", ")
-                        : "Selecciona un interno para ver sus aparatos."}
+                      {selectedChargeDevice
+                        ? `${selectedChargeDevice.internalName} · ${selectedChargeDevice.internalLocation} · ${selectedChargeDevice.deviceTypeName}`
+                        : "Selecciona un aparato para ver su cuota semanal."}
                     </div>
                   </div>
                 </div>
@@ -518,7 +609,7 @@ export function IntegratedModulePanel({
                   <textarea name="notes" placeholder="Notas del pago" autoComplete="off" disabled={!canManageCharges || data.weekClosed} />
                 </div>
                 <div className="actions-row">
-                  <LoadingButton pending={paymentPending} label="Registrar pago" loadingLabel="Loading..." className="button" disabled={!canManageCharges || data.weekClosed || !selectedChargeInternal} />
+                  <LoadingButton pending={paymentPending} label="Registrar pago" loadingLabel="Loading..." className="button" disabled={!canManageCharges || data.weekClosed || !selectedChargeDevice} />
                 </div>
                 </form>
               </div>
@@ -567,6 +658,61 @@ export function IntegratedModulePanel({
                 </tbody>
               </table>
             </div>
+          </div>
+        </div>
+      ) : null}
+
+      {selectedPendingDevice ? (
+        <div className="modal-backdrop" onClick={() => setSelectedPendingDeviceId(null)}>
+          <div className="form-card compact" style={{ width: "min(100%, 760px)" }} onClick={(event) => event.stopPropagation()}>
+            <div className="profile-top">
+              <div className="record-title">
+                <strong className="section-title">Dar de alta aparato</strong>
+                <span>{`${selectedPendingDevice.internalName} · ${selectedPendingDevice.internalLocation} · ${selectedPendingDevice.deviceTypeName}`}</span>
+              </div>
+              <button type="button" className="button-soft" onClick={() => setSelectedPendingDeviceId(null)}>Cerrar</button>
+            </div>
+            <MutationBanner state={paymentState} />
+            <form action={paymentAction} className="field-grid" autoComplete="off">
+              <input type="hidden" name="module_key" value={data.moduleKey} />
+              <input type="hidden" name="internal_device_id" value={selectedPendingDevice.id} />
+              <input
+                type="hidden"
+                name="amount"
+                value={priceMap.get(selectedPendingDevice.deviceTypeId)?.activationPrice ?? 0}
+              />
+              <div className="field">
+                <select name="zone_id" defaultValue={selectedPendingDevice.zoneId ?? ""} disabled={!canManageCharges || data.weekClosed}>
+                  <option value="">Zona</option>
+                  {data.zones.map((zone) => (
+                    <option key={zone.id} value={zone.id}>
+                      {zone.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <div className="field"><input name="brand" placeholder="Marca" defaultValue={selectedPendingDevice.brand ?? ""} autoComplete="off" disabled={!canManageCharges || data.weekClosed} /></div>
+              <div className="field"><input name="model" placeholder="Modelo" defaultValue={selectedPendingDevice.model ?? ""} autoComplete="off" disabled={!canManageCharges || data.weekClosed} /></div>
+              <div className="field"><input name="imei" placeholder="IMEI O NS" defaultValue={selectedPendingDevice.imei ?? ""} autoComplete="off" disabled={!canManageCharges || data.weekClosed} /></div>
+              <div className="field"><input name="chip_number" placeholder="Numero interno" defaultValue={selectedPendingDevice.chipNumber ?? ""} autoComplete="off" disabled={!canManageCharges || data.weekClosed} /></div>
+              <div className="field" style={{ gridColumn: "1 / -1" }}>
+                <textarea name="characteristics" placeholder="Caracteristicas" defaultValue={selectedPendingDevice.characteristics ?? ""} autoComplete="off" disabled={!canManageCharges || data.weekClosed} />
+              </div>
+              <div className="field" style={{ gridColumn: "1 / -1" }}>
+                <div className="data-card" style={{ padding: "1rem" }}>
+                  <strong>Costo de alta</strong>
+                  <div style={{ marginTop: "0.3rem", fontSize: "1.2rem", fontWeight: 800 }}>
+                    ${(priceMap.get(selectedPendingDevice.deviceTypeId)?.activationPrice ?? 0).toFixed(2)}
+                  </div>
+                </div>
+              </div>
+              <div className="field" style={{ gridColumn: "1 / -1" }}>
+                <textarea name="notes" placeholder="Notas del alta" defaultValue={selectedPendingDevice.notes ?? ""} autoComplete="off" disabled={!canManageCharges || data.weekClosed} />
+              </div>
+              <div className="actions-row">
+                <LoadingButton pending={paymentPending} label="Generar alta" loadingLabel="Loading..." className="button" disabled={!canManageCharges || data.weekClosed} />
+              </div>
+            </form>
           </div>
         </div>
       ) : null}

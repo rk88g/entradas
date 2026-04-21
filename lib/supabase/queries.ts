@@ -1888,7 +1888,7 @@ export async function getModulePanelData(moduleKey: ModuleKey, includeInactiveIn
     supabase
       .from("internal_devices")
       .select(
-        "id, internal_id, module_key, device_type_id, zone_id, brand, model, characteristics, imei, chip_number, cameras_allowed, quantity, status, paid_through, weekly_price_override, discount_override, assigned_manually, notes, module_device_types!inner(name,module_key)"
+        "id, internal_id, module_key, device_type_id, zone_id, brand, model, characteristics, imei, chip_number, cameras_allowed, quantity, status, paid_through, weekly_price_override, discount_override, assigned_manually, notes, activated_at, module_device_types!inner(name,module_key)"
       )
       .neq("status", "baja")
       .order("created_at", { ascending: false }),
@@ -1974,6 +1974,16 @@ export async function getModulePanelData(moduleKey: ModuleKey, includeInactiveIn
     discountAmount: Number(item.discount_amount ?? 0),
     active: Boolean(item.active)
   }));
+  const priceMap = new Map(
+    prices.map((item) => [
+      item.deviceTypeId,
+      {
+        weeklyPrice: item.weeklyPrice,
+        activationPrice: item.activationPrice,
+        discountAmount: item.discountAmount
+      }
+    ])
+  );
 
   const internalMap = new Map(internals.map((item) => [item.id, item]));
   const zoneMap = new Map(zones.map((item) => [item.id, item]));
@@ -2012,7 +2022,8 @@ export async function getModulePanelData(moduleKey: ModuleKey, includeInactiveIn
         weeklyPriceOverride: item.weekly_price_override ?? undefined,
         discountOverride: item.discount_override ?? undefined,
         assignedManually: Boolean(item.assigned_manually),
-        notes: item.notes ?? undefined
+        notes: item.notes ?? undefined,
+        activatedAt: item.activated_at ?? null
       };
       })
     .filter((item) => item.moduleKey === moduleKey);
@@ -2057,6 +2068,22 @@ export async function getModulePanelData(moduleKey: ModuleKey, includeInactiveIn
     return Boolean(payment && payment.status === "pagado");
   });
   const pendingDevices = devices.filter((device) => device.status === "pendiente");
+  const activationPaidDevices = paidDevices.filter((device) => {
+    if (!device.activatedAt) {
+      return false;
+    }
+
+    const activatedDate = device.activatedAt.slice(0, 10);
+    return activatedDate >= start && activatedDate <= end;
+  });
+  const activationPendingTotal = pendingDevices.reduce(
+    (sum, device) => sum + (priceMap.get(device.deviceTypeId)?.activationPrice ?? 0),
+    0
+  );
+  const activationPaidTotal = activationPaidDevices.reduce(
+    (sum, device) => sum + Number(paymentMap.get(device.id)?.amount ?? 0),
+    0
+  );
 
   const totalsByZoneMap = new Map<string, ModuleFinanceSummary>();
   devices.forEach((device) => {
@@ -2100,6 +2127,9 @@ export async function getModulePanelData(moduleKey: ModuleKey, includeInactiveIn
     workers,
     unpaidDevices,
     paidDevices,
+    activationPaidDevices,
+    activationPendingTotal,
+    activationPaidTotal,
     totalsByZone: sortedTotalsByZone,
     totalIncome: sortedTotalsByZone.reduce((sum, item) => sum + item.totalPaid, 0),
     currentWeekLabel: `${start} al ${end}`,

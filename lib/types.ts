@@ -364,6 +364,7 @@ export interface InternalDeviceRecord {
   discountOverride?: number | null;
   assignedManually: boolean;
   notes?: string;
+  activatedAt?: string | null;
 }
 
 export interface WorkplaceRecord {
@@ -415,6 +416,9 @@ export interface ModulePanelData {
   unpaidDevices: InternalDeviceRecord[];
   paidDevices: InternalDeviceRecord[];
   pendingDevices: InternalDeviceRecord[];
+  activationPaidDevices: InternalDeviceRecord[];
+  activationPendingTotal: number;
+  activationPaidTotal: number;
   totalsByZone: ModuleFinanceSummary[];
   totalIncome: number;
   currentWeekLabel: string;
