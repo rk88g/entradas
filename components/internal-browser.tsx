@@ -16,6 +16,7 @@ import { DateRecord, InternalHistoryPayload, InternalProfile, ModuleDeviceType, 
 import {
   canManageMentions,
   formatLongDate,
+  formatLongDateWithWeekday,
   getDefaultDateStatusForRole,
   getInternalStatusMeta,
   maskValue
@@ -58,6 +59,14 @@ function getPassForDate(
 
 function compactMoney(value?: number | null) {
   return `$${Number(value ?? 0).toFixed(2)}`;
+}
+
+function normalizeVisitorSearch(value: string) {
+  return value
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
 }
 
 function getPassBadge(passExists: boolean) {
@@ -107,6 +116,7 @@ export function InternalBrowser({
   const [statusBannerStateKey, setStatusBannerStateKey] = useState(0);
   const [searchLoading, setSearchLoading] = useState(false);
   const [screenLoading, setScreenLoading] = useState(false);
+  const [visitorQuery, setVisitorQuery] = useState("");
   const [recentCreatedPass, setRecentCreatedPass] = useState<{ internoId: string; fechaVisita: string } | null>(null);
   const [createState, createAction, createPending] = useActionState(createInternalAction, mutationInitialState);
   const [passState, passAction, passPending] = useActionState(createPassAction, mutationInitialState);
@@ -129,6 +139,25 @@ export function InternalBrowser({
     selected?.visitors.filter((item) => selectedVisitorIds.includes(item.visitaId)) ?? [];
   const availableVisitors =
     selected?.visitors.filter((item) => !selectedVisitorIds.includes(item.visitaId)) ?? [];
+  const normalizedVisitorQuery = normalizeVisitorSearch(visitorQuery);
+  const filteredAvailableVisitors = availableVisitors.filter((item) => {
+    if (!normalizedVisitorQuery) {
+      return true;
+    }
+
+    return normalizeVisitorSearch(
+      `${item.visitor.fullName} ${item.parentesco} ${item.visitor.edad}`
+    ).includes(normalizedVisitorQuery);
+  });
+  const filteredSelectedVisitors = selectedVisitors.filter((item) => {
+    if (!normalizedVisitorQuery) {
+      return true;
+    }
+
+    return normalizeVisitorSearch(
+      `${item.visitor.fullName} ${item.parentesco} ${item.visitor.edad}`
+    ).includes(normalizedVisitorQuery);
+  });
   const selectedAdults = selectedVisitors.filter((item) => item.visitor.edad >= 18);
   const canSubmitPass =
     Boolean(selected) &&
@@ -221,6 +250,7 @@ export function InternalBrowser({
     setModalInternalId(profile.id);
     setSelectedVisitorIds([]);
     setSelectedDateValue(getDefaultDateValue(roleKey, openDate, nextDate));
+    setVisitorQuery("");
     setHistoryOpen(false);
     setHistorySections({});
     setFormSeed((current) => current + 1);
@@ -495,14 +525,14 @@ export function InternalBrowser({
                     <span>Pase</span>
                     <strong>{getPassBadge(Boolean(selectedPass))}</strong>
                   </div>
-                  <div className="mini-row"><span>Fecha</span><strong>{selectedDateValue ? formatLongDate(selectedDateValue) : "Sin fecha"}</strong></div>
+                  <div className="mini-row"><span>Fecha</span><strong>{selectedDateValue ? formatLongDateWithWeekday(selectedDateValue) : "Sin fecha"}</strong></div>
                   <div className="mini-row"><span>Laborando</span><strong>{selected.laborando ? "Si" : "No"}</strong></div>
                   <div className="mini-row"><span>Telefono</span><strong>{maskValue(selected.telefono || "No aplica", canViewSensitiveData)}</strong></div>
                 </div>
               </article>
 
               {selectedPass && !shouldSuppressExistingPassAlert ? (
-                <MutationBanner state={{ success: null, error: `Ese interno ya tiene pase para ${formatLongDate(selectedPass.fechaVisita)}.` }} />
+                <MutationBanner state={{ success: null, error: `Ese interno ya tiene pase para ${formatLongDateWithWeekday(selectedPass.fechaVisita)}.` }} />
               ) : null}
 
               {!canSubmitPass && selectedVisitors.length > 0 && selectedAdults.length === 0 ? (
@@ -510,10 +540,24 @@ export function InternalBrowser({
               ) : null}
 
               <section className="two-column-section visitor-columns-section">
+              <div className="field visitor-search-field" style={{ gridColumn: "1 / -1" }}>
+                <input
+                  value={visitorQuery}
+                  onChange={(event) => setVisitorQuery(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Escape") {
+                      event.preventDefault();
+                      setVisitorQuery("");
+                    }
+                  }}
+                  placeholder="Buscar visita del interno"
+                  autoComplete="off"
+                />
+              </div>
               <article className="data-card visitor-column-card">
                 <strong style={{ display: "block", marginBottom: "0.7rem" }}>No vendran</strong>
                 <div className="visitor-choice-grid visitor-column-list">
-                  {availableVisitors.length === 0 ? <span className="muted visitor-column-empty">Sin registros.</span> : availableVisitors.map((item) => (
+                  {filteredAvailableVisitors.length === 0 ? <span className="muted visitor-column-empty">Sin registros.</span> : filteredAvailableVisitors.map((item) => (
                     <button key={item.id} type="button" className="visitor-choice-item available" onClick={() => toggleVisitor(item.visitaId)}>
                       <strong>{item.visitor.fullName}</strong>
                       <span className="muted">{maskValue(item.visitor.edad, canViewSensitiveData)} años</span>
@@ -525,7 +569,7 @@ export function InternalBrowser({
               <article className="data-card visitor-column-card">
                 <strong style={{ display: "block", marginBottom: "0.7rem" }}>Vendran</strong>
                 <div className="visitor-choice-grid visitor-column-list">
-                  {selectedVisitors.length === 0 ? <span className="muted visitor-column-empty">Sin registros.</span> : selectedVisitors.map((item) => (
+                  {filteredSelectedVisitors.length === 0 ? <span className="muted visitor-column-empty">Sin registros.</span> : filteredSelectedVisitors.map((item) => (
                     <button key={item.id} type="button" className="visitor-choice-item selected" onClick={() => toggleVisitor(item.visitaId)}>
                       <strong>{item.visitor.fullName}</strong>
                       <span className="muted">{maskValue(item.visitor.edad, canViewSensitiveData)} años</span>
@@ -616,7 +660,7 @@ export function InternalBrowser({
                       <select id="fecha_visita_modal" value={selectedDateValue} onChange={(event) => setSelectedDateValue(event.target.value)}>
                         {availableDates.map((date) => (
                           <option key={date.id} value={date.fechaCompleta}>
-                            {formatLongDate(date.fechaCompleta)}
+                            {formatLongDateWithWeekday(date.fechaCompleta)}
                           </option>
                         ))}
                       </select>

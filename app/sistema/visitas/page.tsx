@@ -16,7 +16,7 @@ export default async function VisitasPage({
     getVisitasPage({
       query,
       page,
-      pageSize: 20
+      pageSize: 100
     })
   ]);
 

@@ -67,6 +67,23 @@ export function formatLongDate(input: string) {
   }
 }
 
+export function formatLongDateWithWeekday(input: string) {
+  try {
+    const value = parseLocalDate(input);
+    if (Number.isNaN(value.getTime())) {
+      return input || "-";
+    }
+
+    const weekday = new Intl.DateTimeFormat("es-MX", {
+      weekday: "long"
+    }).format(value);
+
+    return `${weekday} ${formatLongDate(input)}`;
+  } catch {
+    return input || "-";
+  }
+}
+
 export function formatShortDate(input: string) {
   try {
     const value = parseLocalDate(input);

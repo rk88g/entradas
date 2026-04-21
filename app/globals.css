@@ -916,6 +916,13 @@ tr:last-child td {
 .visitor-column-list {
   grid-template-columns: minmax(0, 1fr) !important;
   align-content: start;
+  max-height: 22rem;
+  overflow: auto;
+  padding-right: 0.2rem;
+}
+
+.visitor-search-field {
+  margin-bottom: 0.15rem;
 }
 
 .visitor-column-empty {
@@ -1734,7 +1741,7 @@ html[data-theme="dark"] .admin-tab.active {
 }
 
 .numbers-print-value {
-  font-size: 2.6rem;
+  font-size: 2.5rem;
   font-weight: 900;
   line-height: 1;
   justify-self: end;
@@ -2209,7 +2216,7 @@ html[data-theme="dark"] .admin-tab.active {
   }
 
   .apoyo-numbers-grid .numbers-print-value {
-    font-size: 3.45rem !important;
+    font-size: 2.5rem !important;
     font-weight: 900;
     line-height: 1;
   }

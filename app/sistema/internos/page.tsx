@@ -43,7 +43,7 @@ export default async function InternosPage({
   const paged = await getInternalProfilesPage({
     query,
     page,
-    pageSize: 20,
+    pageSize: 100,
     includeInactive: profile?.roleKey === "super-admin",
     openDateValue: openDate?.fechaCompleta,
     nextDateValue: nextDate?.fechaCompleta
