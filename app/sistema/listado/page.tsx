@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { PassListing } from "@/components/pass-listing";
 import {
   getCurrentUserProfile,
+  getFechas,
   getListado,
   getNextDate,
   getOpenDate
@@ -11,13 +12,14 @@ import { canAccessCoreSystem, canAccessScope, formatLongDate } from "@/lib/utils
 export default async function ListadoPage({
   searchParams
 }: {
-  searchParams?: Promise<{ mode?: string; autoprint?: string }>;
+  searchParams?: Promise<{ mode?: string; autoprint?: string; date?: string }>;
 }) {
   const resolvedSearchParams = (await searchParams) ?? {};
-  const [profile, openDate, nextDate] = await Promise.all([
+  const [profile, openDate, nextDate, fechas] = await Promise.all([
     getCurrentUserProfile(),
     getOpenDate(),
-    getNextDate()
+    getNextDate(),
+    getFechas()
   ]);
   const requestedMode = String(resolvedSearchParams.mode ?? "").trim();
   const initialMode =
@@ -28,6 +30,7 @@ export default async function ListadoPage({
       ? requestedMode
       : "listado";
   const autoPrint = String(resolvedSearchParams.autoprint ?? "") === "1";
+  const requestedDate = String(resolvedSearchParams.date ?? "").trim();
 
   if (profile?.moduleOnly && profile.accessibleModules.length > 0) {
     redirect(`/sistema/${profile.accessibleModules[0].moduleKey}`);
@@ -45,8 +48,20 @@ export default async function ListadoPage({
     redirect("/sistema/escaleras");
   }
 
+  const orderedDates = [...fechas].sort((left, right) => left.fechaCompleta.localeCompare(right.fechaCompleta));
+  const referenceDateValue = requestedDate || openDate?.fechaCompleta || nextDate?.fechaCompleta || orderedDates[orderedDates.length - 1]?.fechaCompleta || "";
+  const referenceIndex = Math.max(
+    0,
+    orderedDates.findIndex((item) => item.fechaCompleta === referenceDateValue)
+  );
+  const availableDates =
+    profile?.roleKey === "super-admin"
+      ? orderedDates.slice(Math.max(0, referenceIndex - 3), Math.min(orderedDates.length, referenceIndex + 3))
+      : [];
+  const selectedPrintDate = requestedDate || openDate?.fechaCompleta || availableDates[availableDates.length - 1]?.fechaCompleta || "";
+
   const [currentPrintListings, waitingListings] = await Promise.all([
-    openDate ? getListado({ fechaVisita: openDate.fechaCompleta }) : Promise.resolve([]),
+    selectedPrintDate ? getListado({ fechaVisita: selectedPrintDate }) : Promise.resolve([]),
     nextDate ? getListado({ fechaVisita: nextDate.fechaCompleta }) : Promise.resolve([])
   ]);
 
@@ -81,7 +96,8 @@ export default async function ListadoPage({
 
       <PassListing
         listings={currentPrintListings}
-        printDate={openDate?.fechaCompleta ?? ""}
+        printDate={selectedPrintDate}
+        availableDates={availableDates}
         initialMode={initialMode}
         autoPrint={autoPrint}
         roleKey={profile?.roleKey ?? "capturador"}

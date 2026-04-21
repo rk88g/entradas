@@ -1,12 +1,12 @@
 "use client";
 
 import { useActionState, useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { updatePassAction } from "@/app/sistema/actions";
 import { FullscreenLoading } from "@/components/fullscreen-loading";
 import { LoadingButton } from "@/components/loading-button";
 import { MutationBanner } from "@/components/mutation-banner";
-import { ListingRecord, MutationState, PassEditData, RoleKey } from "@/lib/types";
+import { DateRecord, ListingRecord, MutationState, PassEditData, RoleKey } from "@/lib/types";
 import { formatLongDate, sortListingsForPrint } from "@/lib/utils";
 
 type PrintMode = "listado" | "sexos" | "numeros" | "menciones";
@@ -289,17 +289,21 @@ function renderMentionPass(pass: ListingRecord) {
 export function PassListing({
   listings,
   printDate,
+  availableDates,
   initialMode = "listado",
   autoPrint = false,
   roleKey
 }: {
   listings: ListingRecord[];
   printDate: string;
+  availableDates: DateRecord[];
   initialMode?: PrintMode;
   autoPrint?: boolean;
   roleKey: RoleKey;
 }) {
   const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
   const [printMode, setPrintMode] = useState<PrintMode>(initialMode);
   const [query, setQuery] = useState("");
   const [editData, setEditData] = useState<PassEditData | null>(null);
@@ -486,11 +490,36 @@ export function PassListing({
     document.body.removeChild(link);
   }
 
+  function changePrintDate(nextDate: string) {
+    const params = new URLSearchParams(searchParams.toString());
+    if (nextDate) {
+      params.set("date", nextDate);
+    } else {
+      params.delete("date");
+    }
+
+    router.replace(params.size ? `${pathname}?${params.toString()}` : pathname, { scroll: false });
+  }
+
   return (
     <section className={`module-panel print-module-panel print-mode-${printMode}`}>
       <FullscreenLoading active={editScreenLoading || editLoading} label="Loading..." />
       <div className="pass-controls hide-print">
         <div className="toolbar">
+          {roleKey === "super-admin" && availableDates.length > 0 ? (
+            <div className="field" style={{ minWidth: "270px", marginRight: "0.4rem" }}>
+              <select
+                value={printDate}
+                onChange={(event) => changePrintDate(event.target.value)}
+              >
+                {availableDates.map((date) => (
+                  <option key={date.id} value={date.fechaCompleta}>
+                    {formatLongDate(date.fechaCompleta)}{date.estado ? ` - ${date.estado}` : ""}
+                  </option>
+                ))}
+              </select>
+            </div>
+          ) : null}
           <button
             type="button"
             className={`button-secondary listing-toggle ${printMode === "listado" ? "active" : ""}`}
