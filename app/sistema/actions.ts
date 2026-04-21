@@ -242,7 +242,21 @@ async function resolveZoneId(
   }
 
   if (!data?.id) {
-    return { zoneId: null, error: "La zona seleccionada ya no existe o no es valida." };
+    const zoneName = normalized.replace(/^legacy:/i, "").trim().toUpperCase();
+    const { data: insertedZone, error: insertError } = await supabase
+      .from("zones")
+      .insert({
+        name: zoneName,
+        active: true
+      })
+      .select("id")
+      .single();
+
+    if (insertError || !insertedZone?.id) {
+      return { zoneId: null, error: insertError?.message || "La zona seleccionada ya no existe o no es valida." };
+    }
+
+    return { zoneId: insertedZone.id, error: null };
   }
 
   return { zoneId: data.id, error: null };

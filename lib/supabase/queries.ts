@@ -1860,6 +1860,7 @@ export async function getModulePanelData(moduleKey: ModuleKey, includeInactiveIn
     internals,
     deviceTypesResponse,
     zonesResponse,
+    legacyZonesResponse,
     chargeRoutesResponse,
     pricesResponse,
     devicesResponse,
@@ -1878,13 +1879,18 @@ export async function getModulePanelData(moduleKey: ModuleKey, includeInactiveIn
       .eq("module_key", moduleKey)
       .eq("active", true)
       .order("sort_order", { ascending: true }),
-      supabase
-        .from("zones")
-        .select("id, name, active, sort_order")
-        .order("sort_order", { ascending: true })
-        .order("name", { ascending: true }),
-      supabase
-        .from("module_charge_routes")
+        supabase
+          .from("zones")
+          .select("id, name, active, sort_order")
+          .order("sort_order", { ascending: true })
+          .order("name", { ascending: true }),
+        supabase
+          .from("module_zones")
+          .select("name, active")
+          .eq("module_key", moduleKey)
+          .order("name", { ascending: true }),
+        supabase
+          .from("module_charge_routes")
         .select("id, module_key, zone_id, charge_weekday, active, zones!inner(name,sort_order)")
         .eq("module_key", moduleKey),
     supabase
@@ -1949,6 +1955,21 @@ export async function getModulePanelData(moduleKey: ModuleKey, includeInactiveIn
     active: Boolean(item.active),
     sortOrder: Number(item.sort_order ?? 0)
   }));
+  const legacyZones: ZoneRecord[] = (legacyZonesResponse.data ?? [])
+    .map((item, index) => ({
+      id: `legacy:${String(item.name ?? "").trim().toUpperCase()}`,
+      name: String(item.name ?? "").trim().toUpperCase(),
+      active: Boolean(item.active ?? true),
+      sortOrder: Number.MAX_SAFE_INTEGER - 1000 + index
+    }))
+    .filter((item) => item.name);
+  const mergedZones = [...zones];
+  const zoneNames = new Set(zones.map((item) => item.name.toUpperCase()));
+  legacyZones.forEach((zone) => {
+    if (!zoneNames.has(zone.name.toUpperCase())) {
+      mergedZones.push(zone);
+    }
+  });
 
   const chargeRoutes: ModuleChargeRoute[] = (chargeRoutesResponse.data ?? [])
     .map((item) => ({
@@ -1960,8 +1981,8 @@ export async function getModulePanelData(moduleKey: ModuleKey, includeInactiveIn
       active: Boolean(item.active)
     }))
     .sort((a, b) => {
-      const zoneA = zones.find((item) => item.id === a.zoneId);
-      const zoneB = zones.find((item) => item.id === b.zoneId);
+    const zoneA = mergedZones.find((item) => item.id === a.zoneId);
+    const zoneB = mergedZones.find((item) => item.id === b.zoneId);
       const sortA = zoneA?.sortOrder ?? Number.MAX_SAFE_INTEGER;
       const sortB = zoneB?.sortOrder ?? Number.MAX_SAFE_INTEGER;
       return sortA - sortB || a.chargeWeekday - b.chargeWeekday || a.zoneName.localeCompare(b.zoneName);
@@ -1992,9 +2013,9 @@ export async function getModulePanelData(moduleKey: ModuleKey, includeInactiveIn
   );
 
   const internalMap = new Map(internals.map((item) => [item.id, item]));
-  const zoneMap = new Map(zones.map((item) => [item.id, item]));
-  const activeZones = zones.filter((item) => item.active);
-  const visibleZones = activeZones.length > 0 ? activeZones : zones;
+  const zoneMap = new Map(mergedZones.map((item) => [item.id, item]));
+  const activeZones = mergedZones.filter((item) => item.active);
+  const visibleZones = activeZones.length > 0 ? activeZones : mergedZones;
   const cycleId = cyclesResponse.data?.id ?? null;
   const paymentMap = new Map(
     (paymentsResponse.data ?? [])
