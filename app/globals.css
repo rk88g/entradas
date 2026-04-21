@@ -1946,6 +1946,11 @@ html[data-theme="dark"] .admin-tab.active {
     background: white;
   }
 
+  .print-zone,
+  .print-zone * {
+    font-family: Arial, sans-serif !important;
+  }
+
   .module-panel,
   .app-panel,
   .data-card,
@@ -2011,19 +2016,19 @@ html[data-theme="dark"] .admin-tab.active {
   }
 
   .delivery-print .pass-title {
-    font-size: 0.95rem;
+    font-size: 12px;
     margin-top: 0;
   }
 
   .delivery-print .muted {
-    font-size: 0.72rem;
+    font-size: 12px;
     margin-top: 0.1cm;
   }
 
   .delivery-print-list {
     display: block;
     margin-top: 0.2cm;
-    font-size: 0.72rem;
+    font-size: 12px;
     line-height: 1.05;
   }
 
@@ -2084,13 +2089,18 @@ html[data-theme="dark"] .admin-tab.active {
   }
 
   .apoyo-secondary-grid .apoyo-pass-card {
-    min-height: 3.65cm;
-    height: 3.65cm;
-    padding: 0.18cm 0.24cm;
+    min-height: 5.3cm;
+    height: 5.3cm;
+    padding: 0.2cm 0.26cm;
     border-radius: 0;
     box-shadow: none;
     break-inside: avoid;
     page-break-inside: avoid;
+  }
+
+  .apoyo-secondary-grid {
+    grid-template-columns: 1fr;
+    gap: 0.14cm;
   }
 
   .apoyo-secondary-grid .apoyo-pass-list {
@@ -2110,18 +2120,33 @@ html[data-theme="dark"] .admin-tab.active {
   }
 
   .apoyo-pass-kicker {
-    font-size: 0.62rem;
+    font-size: 13.5px;
   }
 
   .apoyo-pass-date,
   .apoyo-pass-meta,
   .apoyo-pass-line,
   .apoyo-pass-section strong {
-    font-size: 0.6rem;
+    font-size: 13.5px;
   }
 
   .apoyo-pass-number {
     font-size: 2rem;
+  }
+
+  .apoyo-secondary-grid .apoyo-pass-kicker {
+    font-size: 12px;
+  }
+
+  .apoyo-secondary-grid .apoyo-pass-date,
+  .apoyo-secondary-grid .apoyo-pass-meta,
+  .apoyo-secondary-grid .apoyo-pass-line,
+  .apoyo-secondary-grid .apoyo-pass-section strong {
+    font-size: 12px;
+  }
+
+  .apoyo-secondary-grid .apoyo-pass-number {
+    font-size: 2.1rem;
   }
 
   .apoyo-pass-list,
@@ -2153,14 +2178,36 @@ html[data-theme="dark"] .admin-tab.active {
   }
 
   .apoyo-numbers-grid .delivery-print {
-    padding: 0.2cm 0;
-    border: 1px solid #cbd5e1;
+    padding: 0.08cm 0;
+    border: none;
     border-radius: 0;
     box-shadow: none;
   }
 
+  .apoyo-numbers-grid .numbers-print-list {
+    display: grid;
+    gap: 0.12cm;
+  }
+
   .apoyo-numbers-grid .numbers-print-row {
     grid-template-columns: 2cm minmax(0, 1fr) 2.2cm;
+    min-height: 1.98cm;
+    align-items: center;
+    border: 2px solid #0f172a;
+    padding: 0.14cm 0.18cm;
+    margin: 0;
+    font-size: 13.5px;
+    line-height: 1.1;
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .apoyo-numbers-grid .numbers-print-row span {
+    font-size: 13.5px;
+  }
+
+  .apoyo-numbers-grid .numbers-print-value {
+    font-size: 1.95rem;
   }
 
   .print-sheet-footer {
