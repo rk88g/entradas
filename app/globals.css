@@ -1301,10 +1301,6 @@ html[data-theme="dark"] .note-box {
   gap: 0.35rem;
 }
 
-.listing-print-page--blank {
-  display: none;
-}
-
 .listing-print-page-body {
   display: grid;
   gap: 0.35rem;
@@ -2206,17 +2202,13 @@ html[data-theme="dark"] .admin-tab.active {
   }
 
   .listing-print-page {
-    min-height: calc(35.56cm - 0.78cm - 0.16cm);
+    min-height: 35.56cm;
     display: flex !important;
     flex-direction: column;
-    justify-content: flex-end;
+    justify-content: flex-start;
     box-sizing: border-box;
     break-after: page;
     page-break-after: always;
-  }
-
-  .listing-print-page--blank {
-    display: block !important;
   }
 
   .listing-print-page:last-child {
@@ -2227,7 +2219,7 @@ html[data-theme="dark"] .admin-tab.active {
   .listing-print-page-body {
     flex: 1 1 auto;
     display: grid !important;
-    align-content: end;
+    align-content: start;
     gap: 0.12cm;
     margin: 0;
     padding: 0;
@@ -2422,6 +2414,14 @@ html[data-theme="dark"] .admin-tab.active {
     margin: 0 !important;
   }
 
+  .print-zone,
+  .print-module-panel,
+  .listing-print-page,
+  .listing-print-page-body {
+    margin: 0 !important;
+    padding-top: 0 !important;
+  }
+
   .print-module-panel,
   .print-module-panel.module-panel,
   .print-mode-listado.module-panel,
@@ -2444,7 +2444,7 @@ html[data-theme="dark"] .admin-tab.active {
 
   @page {
       size: legal portrait;
-      margin: 0.78cm 0.55cm 0.16cm 0.55cm;
+      margin: 0;
     }
   }
 

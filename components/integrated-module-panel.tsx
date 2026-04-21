@@ -223,7 +223,7 @@ export function IntegratedModulePanel({
               <strong>{`Semana del ${formatLongDate(data.currentWeekLabel.slice(0, 10))} al ${formatLongDate(data.currentWeekLabel.slice(-10))}`}</strong>
             </article>
 
-            <details className="data-card section-collapse">
+            <details className="data-card section-collapse" open>
               <summary>
                 <span>Resumen</span>
                 <span>{data.moduleName}</span>
