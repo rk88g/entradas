@@ -244,7 +244,7 @@ export function InternalBrowser({
   useEffect(() => {
     setQueryInput(query);
     setSearchLoading(false);
-  }, [query]);
+  }, [query, page, totalPages]);
 
   function openInternalModal(profile: InternalProfile) {
     setModalInternalId(profile.id);
@@ -307,6 +307,11 @@ export function InternalBrowser({
   }
 
   function goToPage(nextPage: number) {
+    if (nextPage === page) {
+      setSearchLoading(false);
+      return;
+    }
+
     setSearchLoading(true);
     const params = new URLSearchParams(searchParams.toString());
     if (query.trim()) {
@@ -325,9 +330,14 @@ export function InternalBrowser({
   }
 
   function applySearch(rawValue: string) {
+    const normalized = rawValue.trim();
+    if (normalized === query.trim() && page === 1) {
+      setSearchLoading(false);
+      return;
+    }
+
     setSearchLoading(true);
     const params = new URLSearchParams(searchParams.toString());
-    const normalized = rawValue.trim();
     if (normalized) {
       params.set("q", normalized);
     } else {

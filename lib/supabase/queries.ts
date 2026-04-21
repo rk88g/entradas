@@ -284,9 +284,29 @@ function mapVisitorRecord(
   };
 }
 
-async function getVisitorHistoryData(supabase: SupabaseClient) {
-  const [{ data: visitHistory }, { data: transferHistory }, { data: internals }] = await Promise.all([
-    fetchAllRows<{
+async function getVisitorHistoryData(supabase: SupabaseClient, visitorIds?: string[]) {
+  const normalizedVisitorIds = [...new Set((visitorIds ?? []).filter(Boolean))];
+  const fetchVisitHistory = async () => {
+    if (normalizedVisitorIds.length > 0) {
+      const rows: Array<{
+        listado_id: string;
+        visita_id: string;
+        interno_nombre: string;
+        fecha_visita: string;
+      }> = [];
+
+      for (const chunk of splitIntoChunks(normalizedVisitorIds)) {
+        const { data } = await supabase
+          .from("historial_ingresos")
+          .select("listado_id, visita_id, interno_nombre, fecha_visita")
+          .in("visita_id", chunk);
+        rows.push(...(data ?? []));
+      }
+
+      return { data: rows };
+    }
+
+    return fetchAllRows<{
       listado_id: string;
       visita_id: string;
       interno_nombre: string;
@@ -296,8 +316,30 @@ async function getVisitorHistoryData(supabase: SupabaseClient) {
         .from("historial_ingresos")
         .select("listado_id, visita_id, interno_nombre, fecha_visita")
         .range(from, to)
-    ),
-    fetchAllRows<{
+    );
+  };
+
+  const fetchTransferHistory = async () => {
+    if (normalizedVisitorIds.length > 0) {
+      const rows: Array<{
+        id: string;
+        visita_id: string;
+        interno_id: string;
+        created_at: string;
+      }> = [];
+
+      for (const chunk of splitIntoChunks(normalizedVisitorIds)) {
+        const { data } = await supabase
+          .from("visita_interno_historial")
+          .select("id, visita_id, interno_id, created_at")
+          .in("visita_id", chunk);
+        rows.push(...(data ?? []));
+      }
+
+      return { data: rows };
+    }
+
+    return fetchAllRows<{
       id: string;
       visita_id: string;
       interno_id: string;
@@ -307,19 +349,27 @@ async function getVisitorHistoryData(supabase: SupabaseClient) {
         .from("visita_interno_historial")
         .select("id, visita_id, interno_id, created_at")
         .range(from, to)
-    ),
-    fetchAllRows<{
-      id: string;
-      nombres: string;
-      apellido_pat: string;
-      apellido_mat: string | null;
-    }>((from, to) =>
-      supabase
-        .from("internos")
-        .select("id, nombres, apellido_pat, apellido_mat")
-        .range(from, to)
-    )
+    );
+  };
+
+  const [{ data: visitHistory }, { data: transferHistory }] = await Promise.all([
+    fetchVisitHistory(),
+    fetchTransferHistory()
   ]);
+  const internalIdsFromTransfers = [...new Set((transferHistory ?? []).map((item) => item.interno_id))];
+  const internals = internalIdsFromTransfers.length === 0
+    ? []
+    : (
+        await Promise.all(
+          splitIntoChunks(internalIdsFromTransfers).map(async (chunk) => {
+            const { data } = await supabase
+              .from("internos")
+              .select("id, nombres, apellido_pat, apellido_mat")
+              .in("id", chunk);
+            return data ?? [];
+          })
+        )
+      ).flat();
   const historyMap = new Map<string, string[]>();
   const detailedHistoryMap = new Map<string, VisitorHistoryEntry[]>();
   const internalNameMap = new Map(
@@ -926,24 +976,137 @@ export async function getVisitasPage(options?: {
   const query = options?.query?.trim() ?? "";
   const pageSize = Math.max(1, options?.pageSize ?? 20);
   const page = Math.max(1, options?.page ?? 1);
-  const allVisitors = await getVisitas();
-
-  const filtered = !query
-    ? allVisitors
-    : allVisitors.filter((visitor) => {
-        const normalized = query.toLowerCase();
-        return (
-          visitor.fullName.toLowerCase().includes(normalized) ||
-          (visitor.currentInternalName ?? "").toLowerCase().includes(normalized)
-        );
-      });
-
   const from = (page - 1) * pageSize;
-  const items = filtered.slice(from, from + pageSize);
+  const to = from + pageSize - 1;
+  const normalized = query.toLowerCase();
+
+  let matchingVisitorIds: string[] | null = null;
+
+  if (query) {
+    const visitorMatches = await supabase
+      .from("visitas")
+      .select("id")
+      .ilike("nombreCompleto", `%${query}%`)
+      .limit(5000);
+
+    const internalMatches = await supabase
+      .from("internos")
+      .select("id")
+      .or(
+        `nombres.ilike.%${query}%,apellido_pat.ilike.%${query}%,apellido_mat.ilike.%${query}%,ubicacion.ilike.%${query}%`
+      )
+      .limit(5000);
+
+    const visitorIdsFromNames = (visitorMatches.data ?? []).map((item) => item.id);
+    const internalIds = (internalMatches.data ?? []).map((item) => item.id);
+    const relationVisitorIds: string[] = [];
+
+    for (const chunk of splitIntoChunks(internalIds)) {
+      const { data } = await supabase
+        .from("interno_visitas")
+        .select("visita_id")
+        .in("interno_id", chunk);
+      relationVisitorIds.push(...(data ?? []).map((item) => item.visita_id));
+    }
+
+    matchingVisitorIds = [...new Set([...visitorIdsFromNames, ...relationVisitorIds])];
+
+    if (matchingVisitorIds.length === 0) {
+      return {
+        items: [],
+        total: 0,
+        page,
+        pageSize,
+        query
+      };
+    }
+  }
+
+  let countQuery = supabase
+    .from("visitas")
+    .select("id", { count: "exact", head: true });
+  let dataQuery = supabase
+    .from("visitas")
+    .select("id, nombreCompleto, fecha_nacimiento, edad, menor, sexo, parentesco, betada, telefono, created_at, updated_at")
+    .order("created_at", { ascending: false })
+    .range(from, to);
+
+  if (matchingVisitorIds) {
+    countQuery = countQuery.in("id", matchingVisitorIds);
+    dataQuery = dataQuery.in("id", matchingVisitorIds);
+  }
+
+  const [{ count }, { data, error }] = await Promise.all([countQuery, dataQuery]);
+
+  if (error || !data) {
+    return {
+      items: [],
+      total: 0,
+      page,
+      pageSize,
+      query
+    };
+  }
+
+  const visitorIds = data.map((item) => item.id);
+  const { historyMap, detailedHistoryMap } = await getVisitorHistoryData(supabase, visitorIds);
+  const relationRows: Array<{ visita_id: string; interno_id: string }> = [];
+
+  for (const chunk of splitIntoChunks(visitorIds)) {
+    const { data: relationData } = await supabase
+      .from("interno_visitas")
+      .select("visita_id, interno_id")
+      .in("visita_id", chunk);
+    relationRows.push(...(relationData ?? []));
+  }
+
+  const relationInternalIds = [...new Set(relationRows.map((item) => item.interno_id))];
+  const relationInternalsMap = await getInternosMap(supabase, relationInternalIds);
+  const currentRelationMap = new Map<string, { internoId: string; internoName: string }>();
+
+  relationRows.forEach((item) => {
+    const interno = relationInternalsMap.get(item.interno_id);
+    if (!interno || currentRelationMap.has(item.visita_id)) {
+      return;
+    }
+
+    currentRelationMap.set(item.visita_id, {
+      internoId: item.interno_id,
+      internoName: interno.fullName
+    });
+  });
+
+  const items = data
+    .map((item) => {
+      const currentRelation = currentRelationMap.get(item.id);
+      return {
+        ...mapVisitorRecord(
+          item,
+          historyMap.get(item.id) ?? [],
+          detailedHistoryMap.get(item.id) ?? []
+        ),
+        currentInternalId: currentRelation?.internoId,
+        currentInternalName: currentRelation?.internoName
+      };
+    })
+    .filter((item) => {
+      if (!item.currentInternalId || !item.currentInternalName) {
+        return false;
+      }
+
+      if (!normalized) {
+        return true;
+      }
+
+      return (
+        item.fullName.toLowerCase().includes(normalized) ||
+        (item.currentInternalName ?? "").toLowerCase().includes(normalized)
+      );
+    });
 
   return {
     items,
-    total: filtered.length,
+    total: count ?? items.length,
     page,
     pageSize,
     query
