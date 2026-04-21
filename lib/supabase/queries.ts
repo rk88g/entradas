@@ -1909,8 +1909,6 @@ export async function getModulePanelData(moduleKey: ModuleKey, includeInactiveIn
   const visibleDeviceTypes = allowedDeviceNames
     ? deviceTypes.filter((item) => allowedDeviceNames.has(normalizeDeviceTypeName(item.name)))
     : deviceTypes;
-  const visibleDeviceTypeIds = new Set(visibleDeviceTypes.map((item) => item.id));
-
   const zones: ZoneRecord[] = (zonesResponse.data ?? []).map((item) => ({
     id: item.id,
     name: item.name,
@@ -1960,18 +1958,18 @@ export async function getModulePanelData(moduleKey: ModuleKey, includeInactiveIn
   );
 
   const devices: InternalDeviceRecord[] = (devicesResponse.data ?? [])
-    .map((item) => {
-      const internal = internalMap.get(item.internal_id);
-      const zone = item.zone_id ? zoneMap.get(item.zone_id) : undefined;
-      const typeRelation = getFirstRelation(item.module_device_types);
-      return {
+      .map((item) => {
+        const internal = internalMap.get(item.internal_id);
+        const zone = item.zone_id ? zoneMap.get(item.zone_id) : undefined;
+        const typeRelation = getFirstRelation(item.module_device_types);
+        return {
         id: item.id,
         internalId: item.internal_id,
         internalName: internal?.fullName ?? "Interno sin nombre",
         internalLocation: internal?.ubicacion ?? "",
-        moduleKey: ensureModuleKey(typeRelation?.module_key ?? item.module_key),
-        deviceTypeId: item.device_type_id,
-        deviceTypeName: typeRelation?.name ?? "Aparato",
+          moduleKey: ensureModuleKey(item.module_key ?? typeRelation?.module_key),
+          deviceTypeId: item.device_type_id,
+          deviceTypeName: typeRelation?.name ?? "Aparato",
         zoneId: item.zone_id ?? undefined,
         zoneName: zone?.name ?? getFirstRelation(item.zones)?.name ?? undefined,
         brand: item.brand ?? undefined,
@@ -1988,8 +1986,18 @@ export async function getModulePanelData(moduleKey: ModuleKey, includeInactiveIn
         assignedManually: Boolean(item.assigned_manually),
         notes: item.notes ?? undefined
       };
-    })
-    .filter((item) => item.moduleKey === moduleKey && visibleDeviceTypeIds.has(item.deviceTypeId));
+      })
+    .filter((item) => {
+      if (item.moduleKey !== moduleKey) {
+        return false;
+      }
+
+      if (!allowedDeviceNames) {
+        return true;
+      }
+
+      return allowedDeviceNames.has(normalizeDeviceTypeName(item.deviceTypeName));
+    });
 
   const userMap = new Map(
     (userProfilesResponse.data ?? []).map((item) => [item.id, item.full_name ?? "Usuario"])
@@ -2293,7 +2301,7 @@ async function countVisibleModuleDevices(
   const allowedNames = getAllowedModuleDeviceNames(moduleKey);
   return data.filter((item) => {
     const relation = getFirstRelation(item.module_device_types);
-    const resolvedModuleKey = ensureModuleKey(relation?.module_key ?? item.module_key);
+    const resolvedModuleKey = ensureModuleKey(item.module_key ?? relation?.module_key);
     const typeName = normalizeDeviceTypeName(relation?.name);
 
     if (resolvedModuleKey !== moduleKey) {
@@ -2370,12 +2378,12 @@ export async function getIntegratedModuleCounts() {
     };
   }
 
-  return data.reduce(
-    (acc, item) => {
-      const relation = getFirstRelation(item.module_device_types);
-      const moduleKey = ensureModuleKey(relation?.module_key ?? item.module_key);
-      const allowedNames = getAllowedModuleDeviceNames(moduleKey);
-      const typeName = relation?.name;
+    return data.reduce(
+      (acc, item) => {
+        const relation = getFirstRelation(item.module_device_types);
+        const moduleKey = ensureModuleKey(item.module_key ?? relation?.module_key);
+        const allowedNames = getAllowedModuleDeviceNames(moduleKey);
+        const typeName = relation?.name;
       if (
         (moduleKey === "visual" || moduleKey === "comunicacion") &&
         (!allowedNames || (typeName ? allowedNames.has(normalizeDeviceTypeName(typeName)) : false))
