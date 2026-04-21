@@ -460,7 +460,8 @@ export function PassListing({
   function openPdf() {
     const params = new URLSearchParams({
       mode: printMode,
-      date: printDate
+      date: printDate,
+      ts: String(Date.now())
     });
 
     if (query.trim()) {
