@@ -469,12 +469,12 @@ export function PassListing({
 
     const fileName =
       printMode === "sexos"
-        ? "HOMBRES - MUJERES - COMANDAS.pdf"
+        ? "COMANDAS.pdf"
         : printMode === "numeros"
-          ? "NUMERO DE PASE.pdf"
+          ? "NUMERO_PASES.pdf"
           : printMode === "menciones"
             ? "MENCIONES.pdf"
-            : "LISTADO - AG.pdf";
+            : "AG.pdf";
 
     const link = document.createElement("a");
     link.href = `/api/listado/pdf?${params.toString()}`;

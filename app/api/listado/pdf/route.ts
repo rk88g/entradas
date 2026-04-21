@@ -14,18 +14,18 @@ function resolveMode(value: string | null): ListingPdfMode {
 
 function getPdfFileName(mode: ListingPdfMode) {
   if (mode === "sexos") {
-    return "HOMBRES - MUJERES - COMANDAS.pdf";
+    return "COMANDAS.pdf";
   }
 
   if (mode === "numeros") {
-    return "NUMERO DE PASE.pdf";
+    return "NUMERO_PASES.pdf";
   }
 
   if (mode === "menciones") {
     return "MENCIONES.pdf";
   }
 
-  return "LISTADO - AG.pdf";
+  return "AG.pdf";
 }
 
 export async function GET(request: NextRequest) {

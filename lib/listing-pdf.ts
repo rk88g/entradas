@@ -1,3 +1,5 @@
+import fontkit from "@pdf-lib/fontkit";
+import { readFile } from "fs/promises";
 import { PDFDocument, PDFFont, PDFPage, StandardFonts, rgb } from "pdf-lib";
 import { ListingRecord, PassVisitor } from "@/lib/types";
 import { formatLongDate, sortListingsForPrint } from "@/lib/utils";
@@ -22,8 +24,33 @@ const COLORS = {
 };
 const LISTADO_TEXT_SIZE = 10.125; // 13.5px
 const SECONDARY_LISTING_TEXT_SIZE = 9; // 12px
-const PASS_NUMBER_TEXT_SIZE = 10.125; // 13.5px
+const PASS_NUMBER_TEXT_SIZE = 9; // 12px
 const PASS_NUMBER_SIZE = 28;
+
+async function loadPdfFonts(pdf: PDFDocument) {
+  pdf.registerFontkit(fontkit);
+
+  try {
+    const [regularBytes, boldBytes] = await Promise.all([
+      readFile("C:\\Windows\\Fonts\\arial.ttf"),
+      readFile("C:\\Windows\\Fonts\\arialbd.ttf")
+    ]);
+
+    const [regularFont, boldFont] = await Promise.all([
+      pdf.embedFont(regularBytes, { subset: true }),
+      pdf.embedFont(boldBytes, { subset: true })
+    ]);
+
+    return { regularFont, boldFont };
+  } catch {
+    const [regularFont, boldFont] = await Promise.all([
+      pdf.embedFont(StandardFonts.Helvetica),
+      pdf.embedFont(StandardFonts.HelveticaBold)
+    ]);
+
+    return { regularFont, boldFont };
+  }
+}
 
 function normalizeSearchText(value?: string | null) {
   return String(value ?? "")
@@ -636,8 +663,7 @@ export async function generateListingPdf(options: {
   query?: string | null;
 }) {
   const pdf = await PDFDocument.create();
-  const regularFont = await pdf.embedFont(StandardFonts.Helvetica);
-  const boldFont = await pdf.embedFont(StandardFonts.HelveticaBold);
+  const { regularFont, boldFont } = await loadPdfFonts(pdf);
   const filtered = filterListingsForPdf(options.listings, options.printDate, options.mode, options.query);
 
   if (options.mode === "listado") {
