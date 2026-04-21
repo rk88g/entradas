@@ -12,6 +12,22 @@ function resolveMode(value: string | null): ListingPdfMode {
   return "listado";
 }
 
+function getPdfFileName(mode: ListingPdfMode) {
+  if (mode === "sexos") {
+    return "HOMBRES - MUJERES - COMANDAS.pdf";
+  }
+
+  if (mode === "numeros") {
+    return "NUMERO DE PASE.pdf";
+  }
+
+  if (mode === "menciones") {
+    return "MENCIONES.pdf";
+  }
+
+  return "LISTADO - AG.pdf";
+}
+
 export async function GET(request: NextRequest) {
   const profile = await getCurrentUserProfile();
   if (!profile?.active) {
@@ -47,7 +63,7 @@ export async function GET(request: NextRequest) {
     query
   });
 
-  const fileName = `listado-${mode}-${printDate}.pdf`;
+  const fileName = getPdfFileName(mode);
   return new NextResponse(Buffer.from(pdfBytes), {
     status: 200,
     headers: {

@@ -495,13 +495,6 @@ export function PassListing({
           >
             PDF
           </button>
-          <button
-            type="button"
-            className="button-secondary listing-toggle"
-            onClick={() => window.print()}
-          >
-            Imprimir
-          </button>
         </div>
         <div className="field" style={{ marginTop: "0.8rem" }}>
               <input

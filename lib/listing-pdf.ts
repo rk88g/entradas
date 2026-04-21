@@ -44,6 +44,11 @@ function getCompactVisibleVisitors(pass: ListingRecord) {
   };
 }
 
+function getListingVisitors(pass: ListingRecord) {
+  const { visibleVisitors, underTwelveCount } = getVisibleVisitors(pass);
+  return { visibleVisitors, underTwelveCount };
+}
+
 function splitMentions(menciones?: string) {
   const lines = (menciones ?? "")
     .split(/\r?\n/)
@@ -271,7 +276,7 @@ function drawMainListingCard(options: {
     borderWidth: 1.5
   });
 
-  const { listedVisitors, hiddenVisitorsCount, underTwelveCount } = getCompactVisibleVisitors(pass);
+  const { visibleVisitors, underTwelveCount } = getListingVisitors(pass);
   const { basic, special } = splitMentions(pass.menciones);
   const extraSpecials = splitMentions(pass.especiales);
   const specialLines = [
@@ -281,68 +286,65 @@ function drawMainListingCard(options: {
     ...(!pass.especiales?.trim() && formatDeviceSummary(pass) ? [formatDeviceSummary(pass) as string] : [])
   ];
 
-  let cursorTop = top + 8;
-  drawTextLine(page, "REGISTRO PASE PARA TERRAZA", innerX, cursorTop, 10.2, boldFont);
-  drawTextLine(page, formatLongDate(pass.fechaVisita), innerX + 168, cursorTop, 10.2, regularFont, COLORS.muted);
+  const listingTextSize = 10.125;
+  const detailTextSize = 9.2;
+  const compactGap = 0.7;
+  let cursorTop = top + 6;
+  drawTextLine(page, "REGISTRO PASE PARA TERRAZA", innerX, cursorTop, listingTextSize, boldFont);
+  drawTextLine(page, formatLongDate(pass.fechaVisita), innerX + 170, cursorTop, listingTextSize, regularFont, COLORS.muted);
   drawTextLine(page, String(pass.numeroPase ?? "-"), rightX, top + 6, 29, boldFont);
 
-  cursorTop += 22;
-  drawTextLine(page, "PPL:", innerX, cursorTop, 10.2, boldFont);
-  drawTextLine(page, pass.internoNombre, innerX + 28, cursorTop, 10.2, regularFont);
+  cursorTop += 17;
+  drawTextLine(page, "PPL:", innerX, cursorTop, listingTextSize, boldFont);
+  drawTextLine(page, pass.internoNombre, innerX + 28, cursorTop, listingTextSize, regularFont);
 
-  cursorTop += 18;
-  drawTextLine(page, "Ubicacion:", innerX, cursorTop, 10.2, boldFont);
-  drawTextLine(page, pass.internoUbicacion, innerX + 54, cursorTop, 10.2, regularFont);
-
-  cursorTop += 20;
-  drawTextLine(page, "Visitas:", innerX, cursorTop, 10.2, boldFont);
   cursorTop += 14;
+  drawTextLine(page, "Ubicacion:", innerX, cursorTop, listingTextSize, boldFont);
+  drawTextLine(page, pass.internoUbicacion, innerX + 54, cursorTop, listingTextSize, regularFont);
 
-  listedVisitors.forEach((visitor) => {
-    cursorTop = drawWrappedBlock({
-      page,
-      font: regularFont,
+  cursorTop += 15;
+  drawTextLine(page, "Visitas:", innerX, cursorTop, listingTextSize, boldFont);
+  cursorTop += 11;
+
+  const visitorLines = [
+    ...visibleVisitors.map((visitor) => ({
       text: formatVisitorLine(visitor),
-      x: innerX,
-      top: cursorTop,
-      width: innerWidth,
-      size: 9.6,
-      maxLines: 1
-    });
+      color: visitor.edad >= 12 && visitor.edad <= 17 ? COLORS.danger : COLORS.text
+    })),
+    ...(underTwelveCount > 0
+      ? [{ text: `+ ${underTwelveCount} ${underTwelveCount === 1 ? "menor" : "menores"}`, color: COLORS.danger }]
+      : [])
+  ];
+  const useTwoColumns = visitorLines.length > 6;
+  const visitorFontSize = visitorLines.length > 12 ? 8.55 : visitorLines.length > 8 ? 8.9 : 9.2;
+  const visitorLineHeight = visitorFontSize + 0.45;
+  const columns = useTwoColumns ? 2 : 1;
+  const columnGap = 10;
+  const columnWidth = useTwoColumns ? (innerWidth - columnGap) / 2 : innerWidth;
+  const rowsPerColumn = Math.ceil(visitorLines.length / columns);
+  const startTop = cursorTop;
+
+  visitorLines.forEach((line, index) => {
+    const columnIndex = useTwoColumns ? Math.floor(index / rowsPerColumn) : 0;
+    const rowIndex = useTwoColumns ? index % rowsPerColumn : index;
+    const textX = innerX + columnIndex * (columnWidth + columnGap);
+    const textTop = startTop + rowIndex * visitorLineHeight;
+    drawTextLine(
+      page,
+      ellipsizeLine(line.text, regularFont, visitorFontSize, columnWidth),
+      textX,
+      textTop,
+      visitorFontSize,
+      regularFont,
+      line.color
+    );
   });
-
-  if (underTwelveCount > 0) {
-    cursorTop = drawWrappedBlock({
-      page,
-      font: regularFont,
-      text: `+ ${underTwelveCount} ${underTwelveCount === 1 ? "menor" : "menores"}`,
-      x: innerX,
-      top: cursorTop,
-      width: innerWidth,
-      size: 9.6,
-      color: COLORS.danger,
-      maxLines: 1
-    });
-  }
-
-  if (hiddenVisitorsCount > 0) {
-    cursorTop = drawWrappedBlock({
-      page,
-      font: regularFont,
-      text: `+ ${hiddenVisitorsCount} visitas en Hombres / Mujeres`,
-      x: innerX,
-      top: cursorTop,
-      width: innerWidth,
-      size: 9.6,
-      color: COLORS.warning,
-      maxLines: 1
-    });
-  }
+  cursorTop = startTop + rowsPerColumn * visitorLineHeight;
 
   if (basic.length > 0) {
-    cursorTop += 8;
-    drawTextLine(page, "Peticion:", innerX, cursorTop, 10.2, boldFont);
-    cursorTop += 14;
+    cursorTop += 3;
+    drawTextLine(page, "Peticion:", innerX, cursorTop, listingTextSize, boldFont);
+    cursorTop += 10;
     basic.slice(0, 2).forEach((item) => {
       cursorTop = drawWrappedBlock({
         page,
@@ -351,28 +353,30 @@ function drawMainListingCard(options: {
         x: innerX,
         top: cursorTop,
         width: innerWidth,
-        size: 9.2,
+        size: detailTextSize,
         color: COLORS.warning,
-        maxLines: 1
+        maxLines: 1,
+        lineGap: compactGap
       });
     });
   }
 
   if (specialLines.length > 0) {
-    cursorTop += 8;
-    drawTextLine(page, "Peticion especial:", innerX, cursorTop, 10.2, boldFont);
-    cursorTop += 14;
+    cursorTop += 3;
+    drawTextLine(page, "Peticion especial:", innerX, cursorTop, listingTextSize, boldFont, COLORS.danger);
+    cursorTop += 10;
     specialLines.slice(0, 2).forEach((item) => {
       cursorTop = drawWrappedBlock({
         page,
-        font: regularFont,
+        font: boldFont,
         text: item,
         x: innerX,
         top: cursorTop,
         width: innerWidth,
-        size: 9.2,
+        size: detailTextSize,
         color: COLORS.danger,
-        maxLines: 1
+        maxLines: 1,
+        lineGap: compactGap
       });
     });
   }
@@ -421,16 +425,17 @@ function drawSecondaryCard(options: {
     color: COLORS.danger
   });
 
-  let cursorTop = top + 8;
-  drawTextLine(page, title, innerX, cursorTop, 9.2, boldFont);
-  drawTextLine(page, date, innerX + 98, cursorTop, 9.2, regularFont, COLORS.muted);
-  cursorTop += 18;
-  drawTextLine(page, "PPL:", innerX, cursorTop, 9.2, boldFont);
-  drawTextLine(page, internalName, innerX + 24, cursorTop, 9.2, regularFont);
-  cursorTop += 16;
-  drawTextLine(page, "Ubicacion:", innerX, cursorTop, 9.2, boldFont);
-  drawTextLine(page, location, innerX + 50, cursorTop, 9.2, regularFont);
-  cursorTop += 18;
+  const textSize = 9;
+  let cursorTop = top + 6;
+  drawTextLine(page, title, innerX, cursorTop, textSize, boldFont);
+  drawTextLine(page, date, innerX + 98, cursorTop, textSize, regularFont, COLORS.muted);
+  cursorTop += 15;
+  drawTextLine(page, "PPL:", innerX, cursorTop, textSize, boldFont);
+  drawTextLine(page, internalName, innerX + 24, cursorTop, textSize, regularFont);
+  cursorTop += 13;
+  drawTextLine(page, "Ubicacion:", innerX, cursorTop, textSize, boldFont);
+  drawTextLine(page, location, innerX + 50, cursorTop, textSize, regularFont);
+  cursorTop += 14;
 
   bodyLines.slice(0, 8).forEach((line) => {
     cursorTop = drawWrappedBlock({
@@ -440,9 +445,10 @@ function drawSecondaryCard(options: {
       x: innerX,
       top: cursorTop,
       width: innerWidth,
-      size: 9.2,
+      size: textSize,
       color: line.color ?? COLORS.text,
-      maxLines: 2
+      maxLines: 2,
+      lineGap: 0.45
     });
   });
 }
@@ -519,7 +525,10 @@ function drawSexosMode(pdf: PDFDocument, listings: ListingRecord[], regularFont:
       pass,
       title: section.label,
       bodyLines: [
-        ...section.visitors.map((visitor) => ({ text: formatVisitorLine(visitor) })),
+        ...section.visitors.map((visitor) => ({
+          text: formatVisitorLine(visitor),
+          color: visitor.edad >= 12 && visitor.edad <= 17 ? COLORS.danger : COLORS.text
+        })),
         ...(section.childrenCount > 0
           ? [{ text: `+ ${section.childrenCount} ${section.childrenCount === 1 ? "menor" : "menores"}`, color: COLORS.danger }]
           : [])
