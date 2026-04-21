@@ -200,6 +200,17 @@ export interface DashboardStat {
   hint: string;
 }
 
+export interface HomeDashboardSnapshot {
+  internals: number;
+  visits: number;
+  openPassCount: number;
+  waitingPassCount: number;
+  visual: number;
+  comunicacion: number;
+  escaleras: number;
+  generatedAt: string;
+}
+
 export interface ListingBuilderData {
   openDate: DateRecord | null;
   nextDate: DateRecord | null;

@@ -32,6 +32,7 @@ import {
   ModuleStaffAssignment,
   ModuleWorkerRecord,
   DangerZoneConfigData,
+  HomeDashboardSnapshot,
   InternalEquipmentMovementRecord,
   InternalFineRecord,
   InternalNoteRecord,
@@ -2162,6 +2163,86 @@ export async function getDashboardSummary() {
     nextOpenDate: fechas.find((item) => item.estado === "abierto" && !item.cierre) ?? null,
     listingStats,
     activeVisitors: visitas.filter((item) => !item.betada).length
+  };
+}
+
+async function getEscalerasTodayCount(supabase: SupabaseClient, fechaVisita: string) {
+  const { data: passes, error } = await supabase
+    .from("listado")
+    .select("id, menciones, especiales")
+    .eq("fecha_visita", fechaVisita);
+
+  if (error || !passes || passes.length === 0) {
+    return 0;
+  }
+
+  const passIds = passes.map((item) => item.id);
+  const itemPassIds = new Set<string>();
+
+  for (const chunk of splitIntoChunks(passIds, 200)) {
+    const { data: itemRows, error: itemError } = await fetchAllRows<{ listado_id: string }>((from, to) =>
+      supabase
+        .from("listing_device_items")
+        .select("listado_id")
+        .in("listado_id", chunk)
+        .range(from, to)
+    );
+
+    if (itemError || !itemRows) {
+      continue;
+    }
+
+    itemRows.forEach((item) => itemPassIds.add(item.listado_id));
+  }
+
+  return passes.filter((item) => item.menciones?.trim() || item.especiales?.trim() || itemPassIds.has(item.id)).length;
+}
+
+export async function getHomeDashboardSnapshot(): Promise<HomeDashboardSnapshot> {
+  const supabase = await createServerSupabaseClient();
+  const [openDate, nextDate] = await Promise.all([getOpenDate(), getNextDate()]);
+
+  const [
+    internalsResponse,
+    visitsResponse,
+    openPassResponse,
+    waitingPassResponse,
+    visualResponse,
+    comunicacionResponse,
+    escalerasCount
+  ] = await Promise.all([
+    supabase.from("internos").select("id", { count: "exact", head: true }).eq("estatus", "activo"),
+    supabase.from("interno_visitas").select("visita_id", { count: "exact", head: true }),
+    openDate
+      ? supabase
+          .from("listado")
+          .select("id", { count: "exact", head: true })
+          .eq("fecha_visita", openDate.fechaCompleta)
+      : Promise.resolve({ count: 0, error: null }),
+    nextDate
+      ? supabase
+          .from("listado")
+          .select("id", { count: "exact", head: true })
+          .eq("fecha_visita", nextDate.fechaCompleta)
+      : Promise.resolve({ count: 0, error: null }),
+    supabase.from("internal_devices").select("id", { count: "exact", head: true }).eq("module_key", "visual").neq("status", "baja"),
+    supabase
+      .from("internal_devices")
+      .select("id", { count: "exact", head: true })
+      .eq("module_key", "comunicacion")
+      .neq("status", "baja"),
+    getEscalerasTodayCount(supabase, getTodayDate())
+  ]);
+
+  return {
+    internals: internalsResponse.count ?? 0,
+    visits: visitsResponse.count ?? 0,
+    openPassCount: openPassResponse.count ?? 0,
+    waitingPassCount: waitingPassResponse.count ?? 0,
+    visual: visualResponse.count ?? 0,
+    comunicacion: comunicacionResponse.count ?? 0,
+    escaleras: escalerasCount,
+    generatedAt: new Date().toISOString()
   };
 }
 
