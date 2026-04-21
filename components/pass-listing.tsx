@@ -163,7 +163,6 @@ function renderSeparatedPasses(pass: ListingRecord) {
           <div className="apoyo-pass-kicker">{section.label}</div>
           <div className="apoyo-pass-date">{formatLongDate(pass.fechaVisita)}</div>
         </div>
-        <div className="apoyo-pass-number">{pass.numeroPase ?? "-"}</div>
       </div>
 
       <div className="apoyo-pass-meta">
@@ -213,7 +212,6 @@ function renderMentionPass(pass: ListingRecord) {
           <div className="apoyo-pass-kicker">Menciones</div>
           <div className="apoyo-pass-date">{formatLongDate(pass.fechaVisita)}</div>
         </div>
-        <div className="apoyo-pass-number">{pass.numeroPase ?? "-"}</div>
       </div>
 
       <div className="apoyo-pass-meta">
@@ -281,17 +279,6 @@ export function PassListing({
     return () => window.clearTimeout(timeout);
   }, [autoPrint, printMode]);
 
-  function openPrintBundle() {
-    const baseUrl = `${window.location.origin}/sistema/listado`;
-    const modes: PrintMode[] = ["listado", "sexos", "numeros", "menciones"];
-
-    modes.forEach((mode, index) => {
-      window.setTimeout(() => {
-        window.open(`${baseUrl}?mode=${mode}&autoprint=1`, "_blank", "noopener,noreferrer");
-      }, index * 180);
-    });
-  }
-
   const filtered = useMemo(() => {
     const normalized = query.trim().toLowerCase();
     const byDate = listings
@@ -353,13 +340,6 @@ export function PassListing({
             onClick={() => window.print()}
           >
             Imprimir
-          </button>
-          <button
-            type="button"
-            className="button-secondary listing-toggle"
-            onClick={openPrintBundle}
-          >
-            Descargar 4
           </button>
         </div>
         <div className="field" style={{ marginTop: "0.8rem" }}>
