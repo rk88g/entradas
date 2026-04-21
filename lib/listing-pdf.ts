@@ -30,6 +30,7 @@ const LISTADO_TEXT_PX = 13.5;
 const SECONDARY_LISTING_TEXT_PX = 12;
 const PASS_NUMBER_TEXT_PX = 12;
 const PASS_NUMBER_SIZE = 28;
+const COMPACT_LINE_GAP = 0.4;
 
 async function loadPdfFonts(pdf: PDFDocument) {
   pdf.registerFontkit(fontkit);
@@ -247,7 +248,7 @@ function drawWrappedBlock(options: {
 }) {
   const { page, font, text, x, width, size, maxLines = Number.MAX_SAFE_INTEGER } = options;
   const color = options.color ?? COLORS.text;
-  const lineGap = options.lineGap ?? size * 0.28;
+  const lineGap = options.lineGap ?? COMPACT_LINE_GAP;
   const allLines = wrapText(text, font, size, width);
   const lines = allLines.slice(0, maxLines).map((line, index) =>
     index === maxLines - 1 && allLines.length > maxLines ? ellipsizeLine(line, font, size, width) : line
@@ -271,7 +272,7 @@ function measureWrappedBlockHeight(options: {
   lineGap?: number;
 }) {
   const { font, text, width, size, maxLines = Number.MAX_SAFE_INTEGER } = options;
-  const lineGap = options.lineGap ?? size * 0.28;
+  const lineGap = options.lineGap ?? COMPACT_LINE_GAP;
   const allLines = wrapText(text, font, size, width);
   const lines = allLines.slice(0, maxLines);
   if (lines.length === 0) {
@@ -372,7 +373,7 @@ function drawMainListingCard(options: {
       : [])
   ];
   const visitorFontSize = ptFromPx(LISTADO_TEXT_PX);
-  const visitorLineHeight = visitorFontSize + 0.2;
+  const visitorLineHeight = visitorFontSize + COMPACT_LINE_GAP;
   const sectionTitleSize = ptFromPx(LISTADO_TEXT_PX);
   const sectionTopGap = 3;
   const sectionAfterTitleGap = 10;
