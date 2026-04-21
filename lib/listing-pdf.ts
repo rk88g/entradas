@@ -323,7 +323,7 @@ function drawMainListingCard(options: {
   let cursorTop = top + 6;
   drawTextLine(page, "REGISTRO PASE PARA TERRAZA", innerX, cursorTop, listingTextSize, boldFont);
   drawTextLine(page, formatLongDate(pass.fechaVisita), innerX + 170, cursorTop, listingTextSize, regularFont, COLORS.muted);
-  drawTextLine(page, String(pass.numeroPase ?? "-"), rightX, top + 6, 29, boldFont);
+  drawTextLine(page, String(pass.numeroPase ?? "-"), rightX, top + 6, PASS_NUMBER_SIZE, boldFont);
 
   cursorTop += 17;
   drawTextLine(page, "PPL:", innerX, cursorTop, listingTextSize, boldFont);
@@ -347,8 +347,8 @@ function drawMainListingCard(options: {
       : [])
   ];
   const useTwoColumns = visitorLines.length > 6;
-  const visitorFontSize = visitorLines.length > 12 ? 8.55 : visitorLines.length > 8 ? 8.9 : LISTADO_TEXT_SIZE;
-  const visitorLineHeight = visitorFontSize + 0.45;
+  const visitorFontSize = LISTADO_TEXT_SIZE;
+  const visitorLineHeight = visitorFontSize + 0.35;
   const columns = useTwoColumns ? 2 : 1;
   const columnGap = 10;
   const columnWidth = useTwoColumns ? (innerWidth - columnGap) / 2 : innerWidth;
