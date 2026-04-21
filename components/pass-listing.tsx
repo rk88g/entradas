@@ -507,7 +507,7 @@ export function PassListing({
       <div className="pass-controls hide-print">
         <div className="toolbar">
           {roleKey === "super-admin" && availableDates.length > 0 ? (
-            <div className="field" style={{ minWidth: "270px", marginRight: "0.4rem" }}>
+            <div className="field" style={{ width: "100%", flexBasis: "100%" }}>
               <select
                 value={printDate}
                 onChange={(event) => changePrintDate(event.target.value)}
