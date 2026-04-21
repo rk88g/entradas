@@ -128,8 +128,12 @@ export function InternalBrowser({
   const [visitorQuery, setVisitorQuery] = useState("");
   const [allowDuplicatePass, setAllowDuplicatePass] = useState(false);
   const [recentCreatedPass, setRecentCreatedPass] = useState<{ internoId: string; fechaVisita: string } | null>(null);
-  const [visitorBirthInputMode, setVisitorBirthInputMode] = useState<"fecha" | "edad">("fecha");
+  const [visitorBirthInputMode, setVisitorBirthInputMode] = useState<"fecha" | "edad">("edad");
+  const [visitorNameInput, setVisitorNameInput] = useState("");
   const [visitorAgeInput, setVisitorAgeInput] = useState("");
+  const [visitorBirthDateInput, setVisitorBirthDateInput] = useState("");
+  const [visitorSexInput, setVisitorSexInput] = useState("");
+  const [visitorParentescoInput, setVisitorParentescoInput] = useState("");
   const [createState, createAction, createPending] = useActionState(createInternalAction, mutationInitialState);
   const [passState, passAction, passPending] = useActionState(createPassAction, mutationInitialState);
   const [visitorState, visitorAction, visitorPending] = useActionState(createVisitorAction, mutationInitialState);
@@ -180,6 +184,15 @@ export function InternalBrowser({
     selectedVisitors.length > 0 &&
     selectedAdults.length > 0 &&
     (!duplicateRequiresAuthorization || allowDuplicatePass);
+  const hasVisitorBirthValue =
+    visitorBirthInputMode === "edad"
+      ? Boolean(visitorAgeInput.trim()) && Boolean(getEstimatedBirthDateFromAge(visitorAgeInput))
+      : Boolean(visitorBirthDateInput.trim());
+  const canSubmitVisitor =
+    Boolean(visitorNameInput.trim()) &&
+    Boolean(visitorSexInput.trim()) &&
+    hasVisitorBirthValue &&
+    (canUseFallbackParentesco || Boolean(visitorParentescoInput.trim()));
   const shouldSuppressExistingPassAlert =
     Boolean(
       selected &&
@@ -219,8 +232,12 @@ export function InternalBrowser({
     if (visitorState.success) {
       visitorFormRef.current?.reset();
       setFormSeed((current) => current + 1);
-      setVisitorBirthInputMode("fecha");
+      setVisitorBirthInputMode("edad");
+      setVisitorNameInput("");
       setVisitorAgeInput("");
+      setVisitorBirthDateInput("");
+      setVisitorSexInput("");
+      setVisitorParentescoInput("");
       router.refresh();
     }
   }, [router, visitorState.success]);
@@ -272,8 +289,12 @@ export function InternalBrowser({
       setHistoryOpen(false);
       setHistorySections({});
       setFormSeed((current) => current + 1);
-      setVisitorBirthInputMode("fecha");
+      setVisitorBirthInputMode("edad");
+      setVisitorNameInput("");
       setVisitorAgeInput("");
+      setVisitorBirthDateInput("");
+      setVisitorSexInput("");
+      setVisitorParentescoInput("");
       setModalBannerResetKey((current) => current + 1);
     setRecentCreatedPass(null);
     pendingPassContextRef.current = null;
@@ -643,7 +664,7 @@ export function InternalBrowser({
                   }}
                   >
                     <input type="hidden" name="interno_id" value={selected.id} />
-                    <div className="field" style={{ gridColumn: "1 / -1" }}><input name="nombreCompleto" placeholder="Nombre completo" autoComplete="off" required /></div>
+                    <div className="field" style={{ gridColumn: "1 / -1" }}><input name="nombreCompleto" placeholder="Nombre completo" autoComplete="off" required value={visitorNameInput} onChange={(event) => setVisitorNameInput(event.target.value)} /></div>
                     <div className="field">
                       <select
                         name="birth_input_mode"
@@ -655,7 +676,7 @@ export function InternalBrowser({
                       </select>
                     </div>
                     {visitorBirthInputMode === "fecha" ? (
-                      <div className="field"><input name="fecha_nacimiento" type="date" autoComplete="off" required /></div>
+                      <div className="field"><input name="fecha_nacimiento" type="date" autoComplete="off" required value={visitorBirthDateInput} onChange={(event) => setVisitorBirthDateInput(event.target.value)} /></div>
                     ) : (
                       <div className="field">
                         <input
@@ -675,7 +696,7 @@ export function InternalBrowser({
                       </div>
                     )}
                     <div className="field">
-                      <select name="sexo" defaultValue="" required>
+                      <select name="sexo" value={visitorSexInput} onChange={(event) => setVisitorSexInput(event.target.value)} required>
                         <option value="" disabled>Sexo</option>
                         <option value="hombre">Hombre</option>
                         <option value="mujer">Mujer</option>
@@ -687,6 +708,8 @@ export function InternalBrowser({
                         placeholder={canUseFallbackParentesco ? "Parentesco o SN" : "Parentesco"}
                         autoComplete="off"
                         required={!canUseFallbackParentesco}
+                        value={visitorParentescoInput}
+                        onChange={(event) => setVisitorParentescoInput(event.target.value)}
                       />
                       {canUseFallbackParentesco ? <small className="muted">Si lo dejas vacio se guardara como SN.</small> : null}
                     </div>
@@ -702,7 +725,7 @@ export function InternalBrowser({
                     <textarea name="notas" placeholder="Notas" autoComplete="off" />
                   </div>
                   <div className="actions-row">
-                    <LoadingButton pending={visitorPending} label="Guardar visita" loadingLabel="Loading..." className="button-secondary" />
+                    <LoadingButton pending={visitorPending} label="Guardar visita" loadingLabel="Loading..." className="button-secondary" disabled={!canSubmitVisitor} />
                   </div>
                 </form>
               </article>

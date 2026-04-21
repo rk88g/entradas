@@ -60,7 +60,7 @@ export function VisitorManager({
   const [selectedCreateInternal, setSelectedCreateInternal] = useState<InternalSearchOption | null>(null);
   const [searchLoading, setSearchLoading] = useState(false);
   const [screenLoading, setScreenLoading] = useState(false);
-  const [birthInputMode, setBirthInputMode] = useState<"fecha" | "edad">("fecha");
+  const [birthInputMode, setBirthInputMode] = useState<"fecha" | "edad">("edad");
   const [ageInput, setAgeInput] = useState("");
   const [createState, createAction, createPending] = useActionState(createVisitorAction, mutationInitialState);
   const [reassignState, reassignAction, reassignPending] = useActionState(reassignVisitorAction, mutationInitialState);
