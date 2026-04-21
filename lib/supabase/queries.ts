@@ -2276,6 +2276,42 @@ async function getEscalerasTodayCount(supabase: SupabaseClient, fechaVisita: str
   return passes.filter((item) => item.menciones?.trim() || item.especiales?.trim() || itemPassIds.has(item.id)).length;
 }
 
+async function countVisibleModuleDevices(
+  supabase: SupabaseClient,
+  moduleKey: ModuleKey,
+  status?: string
+) {
+  const { data, error } = await supabase
+    .from("internal_devices")
+    .select("status, module_key, module_device_types!inner(name,module_key)")
+    .neq("status", "baja");
+
+  if (error || !data) {
+    return 0;
+  }
+
+  const allowedNames = getAllowedModuleDeviceNames(moduleKey);
+  return data.filter((item) => {
+    const relation = getFirstRelation(item.module_device_types);
+    const resolvedModuleKey = ensureModuleKey(relation?.module_key ?? item.module_key);
+    const typeName = normalizeDeviceTypeName(relation?.name);
+
+    if (resolvedModuleKey !== moduleKey) {
+      return false;
+    }
+
+    if (allowedNames && !allowedNames.has(typeName)) {
+      return false;
+    }
+
+    if (status && item.status !== status) {
+      return false;
+    }
+
+    return true;
+  }).length;
+}
+
 export async function getHomeDashboardSnapshot(): Promise<HomeDashboardSnapshot> {
   const supabase = await createServerSupabaseClient();
   const [openDate, nextDate] = await Promise.all([getOpenDate(), getNextDate()]);
@@ -2285,8 +2321,8 @@ export async function getHomeDashboardSnapshot(): Promise<HomeDashboardSnapshot>
     visitsResponse,
     openPassResponse,
     waitingPassResponse,
-    visualResponse,
-    comunicacionResponse,
+    visualPendingCount,
+    comunicacionPendingCount,
     escalerasCount
   ] = await Promise.all([
     supabase.from("internos").select("id", { count: "exact", head: true }).eq("estatus", "activo"),
@@ -2303,12 +2339,8 @@ export async function getHomeDashboardSnapshot(): Promise<HomeDashboardSnapshot>
           .select("id", { count: "exact", head: true })
           .eq("fecha_visita", nextDate.fechaCompleta)
       : Promise.resolve({ count: 0, error: null }),
-    supabase.from("internal_devices").select("id", { count: "exact", head: true }).eq("module_key", "visual").neq("status", "baja"),
-    supabase
-      .from("internal_devices")
-      .select("id", { count: "exact", head: true })
-      .eq("module_key", "comunicacion")
-      .neq("status", "baja"),
+      countVisibleModuleDevices(supabase, "visual", "pendiente"),
+      countVisibleModuleDevices(supabase, "comunicacion", "pendiente"),
     getEscalerasTodayCount(supabase, getTodayDate())
   ]);
 
@@ -2317,8 +2349,8 @@ export async function getHomeDashboardSnapshot(): Promise<HomeDashboardSnapshot>
     visits: visitsResponse.count ?? 0,
     openPassCount: openPassResponse.count ?? 0,
     waitingPassCount: waitingPassResponse.count ?? 0,
-    visual: visualResponse.count ?? 0,
-    comunicacion: comunicacionResponse.count ?? 0,
+    visual: visualPendingCount,
+    comunicacion: comunicacionPendingCount,
     escaleras: escalerasCount,
     generatedAt: new Date().toISOString()
   };

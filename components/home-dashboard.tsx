@@ -6,7 +6,7 @@ import { HomeDashboardSnapshot, UserProfile } from "@/lib/types";
 import { canAccessCoreSystem, canAccessScope } from "@/lib/utils";
 
 const HOME_SUMMARY_TTL_MS = 24 * 60 * 60 * 1000;
-const HOME_SUMMARY_CACHE_VERSION = 1;
+const HOME_SUMMARY_CACHE_VERSION = 2;
 
 type CachedHomeDashboardSnapshot = {
   version: number;

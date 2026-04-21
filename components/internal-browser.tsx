@@ -173,11 +173,13 @@ export function InternalBrowser({
   });
   const selectedAdults = selectedVisitors.filter((item) => item.visitor.edad >= 18);
   const canRenderPassButton = !selectedPass || roleKey === "super-admin";
+  const duplicateRequiresAuthorization = roleKey === "super-admin" && Boolean(selectedPass);
   const canSubmitPass =
     Boolean(selected) &&
     Boolean(selectedDateValue) &&
     selectedVisitors.length > 0 &&
-    selectedAdults.length > 0;
+    selectedAdults.length > 0 &&
+    (!duplicateRequiresAuthorization || allowDuplicatePass);
   const shouldSuppressExistingPassAlert =
     Boolean(
       selected &&
@@ -746,27 +748,23 @@ export function InternalBrowser({
                       </select>
                       </div>
 
-                      {roleKey === "super-admin" && selectedPass ? (
-                        <label
-                          className="record-pill"
-                          style={{
-                            display: "flex",
-                            alignItems: "center",
-                            gap: "0.8rem",
-                            gridColumn: "1 / -1",
-                            cursor: "pointer"
-                          }}
-                        >
-                          <input
-                            type="checkbox"
-                            checked={allowDuplicatePass}
-                            onChange={(event) => setAllowDuplicatePass(event.target.checked)}
-                          />
-                          <span>
-                            Autorizo generar otro pase para este interno en la misma fecha.
-                          </span>
-                        </label>
-                      ) : null}
+                        {roleKey === "super-admin" && selectedPass ? (
+                          <label
+                            className="duplicate-pass-approval"
+                          >
+                            <input
+                              type="checkbox"
+                              className="duplicate-pass-approval-input"
+                              checked={allowDuplicatePass}
+                              onChange={(event) => setAllowDuplicatePass(event.target.checked)}
+                            />
+                            <span className="duplicate-pass-approval-box" aria-hidden="true" />
+                            <span className="duplicate-pass-approval-copy">
+                              <strong>Autorizar pase duplicado</strong>
+                              <small>Generar otro pase para este interno en la misma fecha.</small>
+                            </span>
+                          </label>
+                        ) : null}
 
                       {canManageMentions(roleKey) ? (
                       <>
