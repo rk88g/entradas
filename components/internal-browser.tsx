@@ -172,13 +172,12 @@ export function InternalBrowser({
     ).includes(normalizedVisitorQuery);
   });
   const selectedAdults = selectedVisitors.filter((item) => item.visitor.edad >= 18);
-  const canOverrideDuplicatePass = roleKey === "super-admin" && Boolean(selectedPass) && allowDuplicatePass;
+  const canRenderPassButton = !selectedPass || roleKey === "super-admin";
   const canSubmitPass =
     Boolean(selected) &&
     Boolean(selectedDateValue) &&
     selectedVisitors.length > 0 &&
-    selectedAdults.length > 0 &&
-    (!selectedPass || canOverrideDuplicatePass);
+    selectedAdults.length > 0;
   const shouldSuppressExistingPassAlert =
     Boolean(
       selected &&
@@ -791,11 +790,11 @@ export function InternalBrowser({
                       </>
                     ) : null}
 
-                    {!selectedPass ? (
-                      <div className="actions-row">
-                        <LoadingButton pending={passPending} label="CREAR PASE" loadingLabel="Loading..." className="button" disabled={!canSubmitPass} />
-                      </div>
-                    ) : null}
+                      {canRenderPassButton ? (
+                        <div className="actions-row">
+                          <LoadingButton pending={passPending} label="CREAR PASE" loadingLabel="Loading..." className="button" disabled={!canSubmitPass} />
+                        </div>
+                      ) : null}
                   </form>
               </article>
 
