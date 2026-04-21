@@ -48,7 +48,7 @@ export default async function TicketsPage({
     getSupportUnreadCount()
   ]);
 
-  const activeTicketId = selectedTicketId || ticketsPage.items[0]?.id || "";
+  const activeTicketId = selectedTicketId;
   const initialMessages = activeTicketId ? await getSupportTicketMessages(activeTicketId) : [];
 
   return (

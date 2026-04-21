@@ -41,19 +41,25 @@ const mutationInitialState: MutationState = {
 };
 
 function getTicketStatusVariant(status: SupportTicketStatus) {
-  if (status === "cerrado" || status === "realizado") {
-    return "ok" as const;
+  switch (status) {
+    case "realizado":
+      return "ok" as const;
+    case "no autorizado":
+      return "danger" as const;
+    case "escribiendo codigo":
+      return "info" as const;
+    case "en platicas":
+      return "violet" as const;
+    case "en autorizacion":
+      return "amber" as const;
+    case "pruebas":
+      return "sky" as const;
+    case "cerrado":
+      return "off" as const;
+    case "abierto":
+    default:
+      return "warn" as const;
   }
-
-  if (status === "no autorizado") {
-    return "danger" as const;
-  }
-
-  if (status === "en autorizacion" || status === "pruebas" || status === "escribiendo codigo") {
-    return "warn" as const;
-  }
-
-  return "off" as const;
 }
 
 function formatDateTime(value: string) {

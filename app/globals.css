@@ -592,6 +592,26 @@ html[data-theme="dark"] .role-badge {
   color: var(--danger);
 }
 
+.status-badge.info {
+  background: #dbeafe;
+  color: #1d4ed8;
+}
+
+.status-badge.violet {
+  background: #ede9fe;
+  color: #6d28d9;
+}
+
+.status-badge.sky {
+  background: #e0f2fe;
+  color: #0369a1;
+}
+
+.status-badge.amber {
+  background: #fef3c7;
+  color: #b45309;
+}
+
 .chip {
   background: #eef3f8;
   color: var(--muted);
@@ -706,6 +726,7 @@ html[data-theme="dark"] .role-badge {
   overflow: auto;
   border: 1px solid var(--line);
   border-radius: 18px;
+  -webkit-overflow-scrolling: touch;
 }
 
 .responsive-mobile-table table {
@@ -2054,6 +2075,53 @@ html[data-theme="dark"] .admin-tab.active {
   th,
   td {
     padding: 0.85rem 0.75rem;
+  }
+
+  .danger-zone-panel .responsive-mobile-table {
+    overflow-x: auto;
+    overflow-y: hidden;
+    border: 1px solid var(--line);
+    border-radius: 18px;
+    background: transparent;
+  }
+
+  .danger-zone-panel .responsive-mobile-table table {
+    display: table;
+    width: 100%;
+    min-width: 720px;
+  }
+
+  .danger-zone-panel .responsive-mobile-table thead {
+    display: table-header-group;
+  }
+
+  .danger-zone-panel .responsive-mobile-table tbody {
+    display: table-row-group;
+  }
+
+  .danger-zone-panel .responsive-mobile-table tr {
+    display: table-row;
+    border: none;
+    background: transparent;
+    padding: 0;
+  }
+
+  .danger-zone-panel .responsive-mobile-table th,
+  .danger-zone-panel .responsive-mobile-table td {
+    display: table-cell;
+    width: auto;
+    padding: 0.85rem 0.75rem;
+    white-space: nowrap;
+    border-bottom: 1px solid #e8edf5;
+  }
+
+  .danger-zone-panel .responsive-mobile-table td::before {
+    content: none;
+  }
+
+  html[data-theme="dark"] .danger-zone-panel .responsive-mobile-table th,
+  html[data-theme="dark"] .danger-zone-panel .responsive-mobile-table td {
+    border-bottom-color: #23324a;
   }
 }
 
