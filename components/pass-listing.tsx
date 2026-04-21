@@ -6,6 +6,14 @@ import { formatLongDate, sortListingsForPrint } from "@/lib/utils";
 
 type PrintMode = "listado" | "sexos" | "numeros" | "menciones";
 
+function normalizeSearchText(value?: string | null) {
+  return String(value ?? "")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .toLowerCase()
+    .trim();
+}
+
 function getVisibleVisitors(pass: ListingRecord) {
   const visibleVisitors = pass.visitantes.filter((visitor) => visitor.edad >= 12);
   const underTwelveCount = pass.visitantes.filter((visitor) => visitor.edad < 12).length;
@@ -290,14 +298,20 @@ export function PassListing({
   }, [autoPrint, printMode]);
 
   const filtered = useMemo(() => {
-    const normalized = query.trim().toLowerCase();
+    const normalized = normalizeSearchText(query);
     const byDate = listings
       .filter((item) => item.fechaVisita === printDate)
       .filter(
         (item) =>
           !normalized ||
-          item.internoNombre.toLowerCase().includes(normalized) ||
-          item.internoUbicacion.toLowerCase().includes(normalized)
+          normalizeSearchText(item.internoNombre).includes(normalized) ||
+          normalizeSearchText(item.internoUbicacion).includes(normalized) ||
+          String(item.numeroPase ?? "").includes(normalized) ||
+          item.visitantes.some((visitor) =>
+            normalizeSearchText(visitor.nombre).includes(normalized)
+          ) ||
+          normalizeSearchText(item.menciones).includes(normalized) ||
+          normalizeSearchText(item.especiales).includes(normalized)
       );
     const sorted = sortListingsForPrint(byDate);
     if (printMode === "menciones") {
@@ -310,7 +324,7 @@ export function PassListing({
     }
 
     return sorted;
-  }, [listings, printDate, printMode]);
+  }, [listings, printDate, printMode, query]);
 
   return (
     <section className="module-panel">
