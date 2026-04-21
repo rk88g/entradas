@@ -341,11 +341,11 @@ function drawMainListingCard(options: {
 
   cursorTop += 17;
   drawTextLine(page, "PPL:", innerX, cursorTop, LISTADO_TEXT_SIZE, boldFont);
-  drawTextLine(page, pass.internoNombre, innerX + 28, cursorTop, LISTADO_TEXT_SIZE, regularFont);
+  drawTextLine(page, pass.internoNombre, innerX + 36, cursorTop, LISTADO_TEXT_SIZE, regularFont);
 
   cursorTop += 14;
   drawTextLine(page, "Ubicacion:", innerX, cursorTop, LISTADO_TEXT_SIZE, boldFont);
-  drawTextLine(page, pass.internoUbicacion, innerX + 54, cursorTop, LISTADO_TEXT_SIZE, regularFont);
+  drawTextLine(page, pass.internoUbicacion, innerX + 68, cursorTop, LISTADO_TEXT_SIZE, regularFont);
 
   cursorTop += 15;
   drawTextLine(page, "Visitas:", innerX, cursorTop, LISTADO_TEXT_SIZE, boldFont);
@@ -516,10 +516,10 @@ function drawSecondaryCard(options: {
   drawTextLine(page, date, dateX, cursorTop, SECONDARY_LISTING_TEXT_SIZE, regularFont, COLORS.muted);
   cursorTop += 15;
   drawTextLine(page, "PPL:", innerX, cursorTop, SECONDARY_LISTING_TEXT_SIZE, boldFont);
-  drawTextLine(page, internalName, innerX + 24, cursorTop, SECONDARY_LISTING_TEXT_SIZE, regularFont);
+  drawTextLine(page, internalName, innerX + 31, cursorTop, SECONDARY_LISTING_TEXT_SIZE, regularFont);
   cursorTop += 13;
   drawTextLine(page, "Ubicacion:", innerX, cursorTop, SECONDARY_LISTING_TEXT_SIZE, boldFont);
-  drawTextLine(page, location, innerX + 50, cursorTop, SECONDARY_LISTING_TEXT_SIZE, regularFont);
+  drawTextLine(page, location, innerX + 62, cursorTop, SECONDARY_LISTING_TEXT_SIZE, regularFont);
   cursorTop += 14;
 
   bodyLines.slice(0, 8).forEach((line) => {
