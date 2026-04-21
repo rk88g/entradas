@@ -21,6 +21,15 @@ function formatHistoryDate(value: string) {
   return formatLongDate(normalized);
 }
 
+function getEstimatedBirthDateFromAge(ageValue: string) {
+  const age = Number(ageValue);
+  if (!Number.isFinite(age) || age < 0 || age > 120) {
+    return "";
+  }
+
+  return `01/01/${new Date().getFullYear() - age}`;
+}
+
 export function VisitorManager({
   visitors,
   query,
@@ -51,6 +60,8 @@ export function VisitorManager({
   const [selectedCreateInternal, setSelectedCreateInternal] = useState<InternalSearchOption | null>(null);
   const [searchLoading, setSearchLoading] = useState(false);
   const [screenLoading, setScreenLoading] = useState(false);
+  const [birthInputMode, setBirthInputMode] = useState<"fecha" | "edad">("fecha");
+  const [ageInput, setAgeInput] = useState("");
   const [createState, createAction, createPending] = useActionState(createVisitorAction, mutationInitialState);
   const [reassignState, reassignAction, reassignPending] = useActionState(reassignVisitorAction, mutationInitialState);
   const createFormRef = useRef<HTMLFormElement>(null);
@@ -58,6 +69,7 @@ export function VisitorManager({
   const selectedVisitor = visitors.find((visitor) => visitor.id === selectedVisitorId) ?? null;
   const canReassign = roleKey === "super-admin";
   const canManageAvailability = roleKey === "super-admin" || roleKey === "control";
+  const canUseFallbackParentesco = canManageAvailability;
   const reassignedInternalCount = selectedVisitor
     ? new Set(
         [...selectedVisitor.historialInterno, selectedVisitor.currentInternalName ?? ""].filter(Boolean)
@@ -68,6 +80,8 @@ export function VisitorManager({
     if (createState.success) {
       createFormRef.current?.reset();
       setSelectedCreateInternal(null);
+      setBirthInputMode("fecha");
+      setAgeInput("");
       router.refresh();
     }
   }, [createState.success, router]);
@@ -359,24 +373,61 @@ export function VisitorManager({
           {sectionsOpen.nueva ? (
             <div className="section-collapse-body">
               <MutationBanner state={createState} />
-              <form ref={createFormRef} action={createAction} className="field-grid" autoComplete="off" onSubmitCapture={() => setScreenLoading(true)}>
-                <RemoteInternalSearchField
-                  name="interno_id"
-                  selected={selectedCreateInternal}
-                  onSelect={setSelectedCreateInternal}
-                  placeholder="Buscar interno por nombre o ubicacion"
-                />
+                <form ref={createFormRef} action={createAction} className="field-grid" autoComplete="off" onSubmitCapture={() => setScreenLoading(true)}>
+                  <RemoteInternalSearchField
+                    name="interno_id"
+                    selected={selectedCreateInternal}
+                    onSelect={setSelectedCreateInternal}
+                    placeholder="Buscar interno por nombre o ubicacion"
+                  />
 
-                <div className="field" style={{ gridColumn: "1 / -1" }}><input name="nombreCompleto" placeholder="Nombre completo" autoComplete="off" required /></div>
-                <div className="field"><input name="fecha_nacimiento" type="date" autoComplete="off" required /></div>
-                <div className="field">
-                  <select name="sexo" defaultValue="" required>
-                    <option value="" disabled>Sexo</option>
-                    <option value="hombre">Hombre</option>
-                    <option value="mujer">Mujer</option>
-                  </select>
-                </div>
-                <div className="field"><input name="parentesco" placeholder="Parentesco" autoComplete="off" required /></div>
+                  <div className="field" style={{ gridColumn: "1 / -1" }}><input name="nombreCompleto" placeholder="Nombre completo" autoComplete="off" required /></div>
+                  <div className="field">
+                    <select
+                      name="birth_input_mode"
+                      value={birthInputMode}
+                      onChange={(event) => setBirthInputMode(event.target.value as "fecha" | "edad")}
+                    >
+                      <option value="fecha">Capturar por fecha</option>
+                      <option value="edad">Capturar por edad</option>
+                    </select>
+                  </div>
+                  {birthInputMode === "fecha" ? (
+                    <div className="field"><input name="fecha_nacimiento" type="date" autoComplete="off" required /></div>
+                  ) : (
+                    <div className="field">
+                      <input
+                        name="edad"
+                        type="number"
+                        min={0}
+                        max={120}
+                        placeholder="Edad"
+                        autoComplete="off"
+                        required
+                        value={ageInput}
+                        onChange={(event) => setAgeInput(event.target.value)}
+                      />
+                      {ageInput ? (
+                        <small className="muted">Nacimiento estimado: {getEstimatedBirthDateFromAge(ageInput) || "Edad invalida"}</small>
+                      ) : null}
+                    </div>
+                  )}
+                  <div className="field">
+                    <select name="sexo" defaultValue="" required>
+                      <option value="" disabled>Sexo</option>
+                      <option value="hombre">Hombre</option>
+                      <option value="mujer">Mujer</option>
+                    </select>
+                  </div>
+                  <div className="field">
+                    <input
+                      name="parentesco"
+                      placeholder={canUseFallbackParentesco ? "Parentesco o SN" : "Parentesco"}
+                      autoComplete="off"
+                      required={!canUseFallbackParentesco}
+                    />
+                    {canUseFallbackParentesco ? <small className="muted">Si lo dejas vacio se guardara como SN.</small> : null}
+                  </div>
                 {canManageAvailability ? (
                   <div className="field">
                     <select name="betada" defaultValue="false">

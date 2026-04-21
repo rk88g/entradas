@@ -69,6 +69,15 @@ function normalizeVisitorSearch(value: string) {
     .trim();
 }
 
+function getEstimatedBirthDateFromAge(ageValue: string) {
+  const age = Number(ageValue);
+  if (!Number.isFinite(age) || age < 0 || age > 120) {
+    return "";
+  }
+
+  return `01/01/${new Date().getFullYear() - age}`;
+}
+
 function getPassBadge(passExists: boolean) {
   return passExists ? (
     <StatusBadge variant="warn">Con pase</StatusBadge>
@@ -119,6 +128,8 @@ export function InternalBrowser({
   const [visitorQuery, setVisitorQuery] = useState("");
   const [allowDuplicatePass, setAllowDuplicatePass] = useState(false);
   const [recentCreatedPass, setRecentCreatedPass] = useState<{ internoId: string; fechaVisita: string } | null>(null);
+  const [visitorBirthInputMode, setVisitorBirthInputMode] = useState<"fecha" | "edad">("fecha");
+  const [visitorAgeInput, setVisitorAgeInput] = useState("");
   const [createState, createAction, createPending] = useActionState(createInternalAction, mutationInitialState);
   const [passState, passAction, passPending] = useActionState(createPassAction, mutationInitialState);
   const [visitorState, visitorAction, visitorPending] = useActionState(createVisitorAction, mutationInitialState);
@@ -128,6 +139,7 @@ export function InternalBrowser({
   const handledPassSuccessKeyRef = useRef<number | null>(null);
   const pendingPassContextRef = useRef<{ internoId: string; fechaVisita: string } | null>(null);
   const canManageVisitorAvailability = roleKey === "super-admin" || roleKey === "control";
+  const canUseFallbackParentesco = canManageVisitorAvailability;
 
   const availableDates = useMemo(() => getDateOptions(openDate, nextDate), [openDate, nextDate]);
   const selected = profiles.find((item) => item.id === modalInternalId) ?? null;
@@ -206,6 +218,8 @@ export function InternalBrowser({
     if (visitorState.success) {
       visitorFormRef.current?.reset();
       setFormSeed((current) => current + 1);
+      setVisitorBirthInputMode("fecha");
+      setVisitorAgeInput("");
       router.refresh();
     }
   }, [router, visitorState.success]);
@@ -252,12 +266,14 @@ export function InternalBrowser({
     setModalInternalId(profile.id);
     setSelectedVisitorIds([]);
     setSelectedDateValue(getDefaultDateValue(roleKey, openDate, nextDate));
-    setVisitorQuery("");
-    setAllowDuplicatePass(false);
-    setHistoryOpen(false);
-    setHistorySections({});
-    setFormSeed((current) => current + 1);
-    setModalBannerResetKey((current) => current + 1);
+      setVisitorQuery("");
+      setAllowDuplicatePass(false);
+      setHistoryOpen(false);
+      setHistorySections({});
+      setFormSeed((current) => current + 1);
+      setVisitorBirthInputMode("fecha");
+      setVisitorAgeInput("");
+      setModalBannerResetKey((current) => current + 1);
     setRecentCreatedPass(null);
     pendingPassContextRef.current = null;
     handledPassSuccessKeyRef.current = null;
@@ -624,18 +640,55 @@ export function InternalBrowser({
                     setVisitorBannerStateKey((current) => current + 1);
                     setScreenLoading(true);
                   }}
-                >
-                  <input type="hidden" name="interno_id" value={selected.id} />
-                  <div className="field" style={{ gridColumn: "1 / -1" }}><input name="nombreCompleto" placeholder="Nombre completo" autoComplete="off" required /></div>
-                  <div className="field"><input name="fecha_nacimiento" type="date" autoComplete="off" required /></div>
-                  <div className="field">
-                    <select name="sexo" defaultValue="" required>
-                      <option value="" disabled>Sexo</option>
-                      <option value="hombre">Hombre</option>
-                      <option value="mujer">Mujer</option>
-                    </select>
-                  </div>
-                  <div className="field"><input name="parentesco" placeholder="Parentesco" autoComplete="off" required /></div>
+                  >
+                    <input type="hidden" name="interno_id" value={selected.id} />
+                    <div className="field" style={{ gridColumn: "1 / -1" }}><input name="nombreCompleto" placeholder="Nombre completo" autoComplete="off" required /></div>
+                    <div className="field">
+                      <select
+                        name="birth_input_mode"
+                        value={visitorBirthInputMode}
+                        onChange={(event) => setVisitorBirthInputMode(event.target.value as "fecha" | "edad")}
+                      >
+                        <option value="fecha">Capturar por fecha</option>
+                        <option value="edad">Capturar por edad</option>
+                      </select>
+                    </div>
+                    {visitorBirthInputMode === "fecha" ? (
+                      <div className="field"><input name="fecha_nacimiento" type="date" autoComplete="off" required /></div>
+                    ) : (
+                      <div className="field">
+                        <input
+                          name="edad"
+                          type="number"
+                          min={0}
+                          max={120}
+                          placeholder="Edad"
+                          autoComplete="off"
+                          required
+                          value={visitorAgeInput}
+                          onChange={(event) => setVisitorAgeInput(event.target.value)}
+                        />
+                        {visitorAgeInput ? (
+                          <small className="muted">Nacimiento estimado: {getEstimatedBirthDateFromAge(visitorAgeInput) || "Edad invalida"}</small>
+                        ) : null}
+                      </div>
+                    )}
+                    <div className="field">
+                      <select name="sexo" defaultValue="" required>
+                        <option value="" disabled>Sexo</option>
+                        <option value="hombre">Hombre</option>
+                        <option value="mujer">Mujer</option>
+                      </select>
+                    </div>
+                    <div className="field">
+                      <input
+                        name="parentesco"
+                        placeholder={canUseFallbackParentesco ? "Parentesco o SN" : "Parentesco"}
+                        autoComplete="off"
+                        required={!canUseFallbackParentesco}
+                      />
+                      {canUseFallbackParentesco ? <small className="muted">Si lo dejas vacio se guardara como SN.</small> : null}
+                    </div>
                   {canManageVisitorAvailability ? (
                     <div className="field">
                       <select name="betada" defaultValue="false">

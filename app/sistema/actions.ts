@@ -49,9 +49,8 @@ function parseDateParts(dateValue: string) {
 }
 
 function buildBirthDateFromAge(age: number) {
-  const today = new Date();
-  const birthDate = new Date(today.getFullYear() - age, today.getMonth(), today.getDate());
-  return birthDate.toISOString().slice(0, 10);
+  const currentYear = new Date().getFullYear();
+  return `${currentYear - age}-01-01`;
 }
 
 function buildInternalExpediente() {
@@ -64,6 +63,27 @@ function buildForcedPassword() {
 
 function normalizeFullName(value: string) {
   return value.replace(/\s+/g, " ").trim();
+}
+
+function resolveVisitorBirthDate(formData: FormData) {
+  const inputMode = String(formData.get("birth_input_mode") ?? "fecha").trim().toLowerCase();
+  const rawBirthDate = String(formData.get("fecha_nacimiento") ?? "").trim();
+  const rawAge = String(formData.get("edad") ?? "").trim();
+
+  if (inputMode === "edad") {
+    const age = Number(rawAge);
+    if (!Number.isFinite(age) || age < 0 || age > 120) {
+      return { birthDate: "", error: "Debes capturar una edad valida." };
+    }
+
+    return { birthDate: buildBirthDateFromAge(age), error: null };
+  }
+
+  if (!rawBirthDate) {
+    return { birthDate: "", error: "Debes capturar la fecha de nacimiento." };
+  }
+
+  return { birthDate: rawBirthDate, error: null };
 }
 
 function looksLikeUuid(value: string) {
@@ -671,29 +691,30 @@ export async function createVisitorAction(
   try {
     const profile = await requireProfile();
     const supabase = await createServerSupabaseClient();
+    const canUseFallbackParentesco = ["super-admin", "control"].includes(profile.roleKey);
+    const resolvedBirthDate = resolveVisitorBirthDate(formData);
+    if (resolvedBirthDate.error) {
+      return failure(resolvedBirthDate.error);
+    }
+
+    const parentescoInput = String(formData.get("parentesco") ?? "").trim();
 
     const visitorPayload = {
       nombreCompleto: normalizeFullName(String(formData.get("nombreCompleto") ?? "")),
-      fecha_nacimiento: String(formData.get("fecha_nacimiento") ?? "").trim(),
+      fecha_nacimiento: resolvedBirthDate.birthDate,
       sexo: String(formData.get("sexo") ?? "sin-definir").trim(),
-      parentesco: String(formData.get("parentesco") ?? "").trim(),
+      parentesco: parentescoInput || (canUseFallbackParentesco ? "SN" : ""),
       telefono: String(formData.get("telefono") ?? "").trim() || "No aplica",
-      betada:
-        ["super-admin", "control"].includes(profile.roleKey) &&
-        String(formData.get("betada") ?? "false") === "true",
+      betada: canUseFallbackParentesco && String(formData.get("betada") ?? "false") === "true",
       notas: String(formData.get("notas") ?? "").trim() || null,
       created_by: profile.id
     };
 
     const internalId = String(formData.get("interno_id") ?? "").trim();
 
-    if (
-      !visitorPayload.nombreCompleto ||
-      !visitorPayload.fecha_nacimiento ||
-      !visitorPayload.parentesco
-    ) {
-      return failure("Completa los datos obligatorios.");
-    }
+      if (!visitorPayload.nombreCompleto || !visitorPayload.fecha_nacimiento || !visitorPayload.parentesco) {
+        return failure("Completa los datos obligatorios.");
+      }
 
     if (!internalId) {
       return failure("Debes asignar la visita a un interno.");
