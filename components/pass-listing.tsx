@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { ListingRecord } from "@/lib/types";
 import { formatLongDate, sortListingsForPrint } from "@/lib/utils";
 
@@ -253,13 +253,44 @@ function renderMentionPass(pass: ListingRecord) {
 
 export function PassListing({
   listings,
-  printDate
+  printDate,
+  initialMode = "listado",
+  autoPrint = false
 }: {
   listings: ListingRecord[];
   printDate: string;
+  initialMode?: PrintMode;
+  autoPrint?: boolean;
 }) {
-  const [printMode, setPrintMode] = useState<PrintMode>("listado");
+  const [printMode, setPrintMode] = useState<PrintMode>(initialMode);
   const [query, setQuery] = useState("");
+
+  useEffect(() => {
+    setPrintMode(initialMode);
+  }, [initialMode]);
+
+  useEffect(() => {
+    if (!autoPrint) {
+      return;
+    }
+
+    const timeout = window.setTimeout(() => {
+      window.print();
+    }, 300);
+
+    return () => window.clearTimeout(timeout);
+  }, [autoPrint, printMode]);
+
+  function openPrintBundle() {
+    const baseUrl = `${window.location.origin}/sistema/listado`;
+    const modes: PrintMode[] = ["listado", "sexos", "numeros", "menciones"];
+
+    modes.forEach((mode, index) => {
+      window.setTimeout(() => {
+        window.open(`${baseUrl}?mode=${mode}&autoprint=1`, "_blank", "noopener,noreferrer");
+      }, index * 180);
+    });
+  }
 
   const filtered = useMemo(() => {
     const normalized = query.trim().toLowerCase();
@@ -322,6 +353,13 @@ export function PassListing({
             onClick={() => window.print()}
           >
             Imprimir
+          </button>
+          <button
+            type="button"
+            className="button-secondary listing-toggle"
+            onClick={openPrintBundle}
+          >
+            Descargar 4
           </button>
         </div>
         <div className="field" style={{ marginTop: "0.8rem" }}>

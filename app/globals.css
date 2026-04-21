@@ -2083,7 +2083,7 @@ html[data-theme="dark"] .admin-tab.active {
     break-inside: avoid;
     page-break-inside: avoid;
     box-shadow: none;
-    border: 1px solid #d6c4a2;
+    border: 2px solid #0f172a;
     width: 100%;
     border-radius: 0;
   }
@@ -2096,6 +2096,8 @@ html[data-theme="dark"] .admin-tab.active {
     box-shadow: none;
     break-inside: avoid;
     page-break-inside: avoid;
+    border: none;
+    border-bottom: 2px dashed #c23030;
   }
 
   .apoyo-secondary-grid {
@@ -2186,7 +2188,7 @@ html[data-theme="dark"] .admin-tab.active {
 
   .apoyo-numbers-grid .numbers-print-list {
     display: grid;
-    gap: 0.12cm;
+    gap: 0.18cm;
   }
 
   .apoyo-numbers-grid .numbers-print-row {
@@ -2194,7 +2196,7 @@ html[data-theme="dark"] .admin-tab.active {
     min-height: 1.98cm;
     align-items: center;
     border: 2px solid #0f172a;
-    padding: 0.14cm 0.18cm;
+    padding: 0.05cm 0.1cm;
     margin: 0;
     font-size: 13.5px;
     line-height: 1.1;

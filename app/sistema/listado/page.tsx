@@ -8,12 +8,26 @@ import {
 } from "@/lib/supabase/queries";
 import { canAccessCoreSystem, canAccessScope, formatLongDate } from "@/lib/utils";
 
-export default async function ListadoPage() {
+export default async function ListadoPage({
+  searchParams
+}: {
+  searchParams?: Promise<{ mode?: string; autoprint?: string }>;
+}) {
+  const resolvedSearchParams = (await searchParams) ?? {};
   const [profile, openDate, nextDate] = await Promise.all([
     getCurrentUserProfile(),
     getOpenDate(),
     getNextDate()
   ]);
+  const requestedMode = String(resolvedSearchParams.mode ?? "").trim();
+  const initialMode =
+    requestedMode === "listado" ||
+    requestedMode === "sexos" ||
+    requestedMode === "numeros" ||
+    requestedMode === "menciones"
+      ? requestedMode
+      : "listado";
+  const autoPrint = String(resolvedSearchParams.autoprint ?? "") === "1";
 
   if (profile?.moduleOnly && profile.accessibleModules.length > 0) {
     redirect(`/sistema/${profile.accessibleModules[0].moduleKey}`);
@@ -68,6 +82,8 @@ export default async function ListadoPage() {
       <PassListing
         listings={currentPrintListings}
         printDate={openDate?.fechaCompleta ?? ""}
+        initialMode={initialMode}
+        autoPrint={autoPrint}
       />
     </>
   );
