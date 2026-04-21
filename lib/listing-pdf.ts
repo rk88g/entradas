@@ -22,7 +22,7 @@ const COLORS = {
   warning: rgb(0.79, 0.34, 0.1),
   danger: rgb(0.76, 0.19, 0.19)
 };
-function px(value: number) {
+function ptFromPx(value: number) {
   return value * 0.75;
 }
 
@@ -323,23 +323,23 @@ function drawMainListingCard(options: {
 
   const compactGap = 0.7;
   const titleText = "REGISTRO PASE PARA TERRAZA";
-  const titleWidth = boldFont.widthOfTextAtSize(titleText, px(LISTADO_TEXT_PX));
+  const titleWidth = boldFont.widthOfTextAtSize(titleText, ptFromPx(LISTADO_TEXT_PX));
   const dateX = innerX + titleWidth + 10;
   let cursorTop = top + 6;
-  drawTextLine(page, titleText, innerX, cursorTop, px(LISTADO_TEXT_PX), boldFont);
-  drawTextLine(page, formatLongDate(pass.fechaVisita), dateX, cursorTop, px(LISTADO_TEXT_PX), regularFont, COLORS.muted);
+  drawTextLine(page, titleText, innerX, cursorTop, ptFromPx(LISTADO_TEXT_PX), boldFont);
+  drawTextLine(page, formatLongDate(pass.fechaVisita), dateX, cursorTop, ptFromPx(LISTADO_TEXT_PX), regularFont, COLORS.muted);
   drawTextLine(page, String(pass.numeroPase ?? "-"), rightX, top + 6, PASS_NUMBER_SIZE, boldFont);
 
   cursorTop += 17;
-  drawTextLine(page, "PPL:", innerX, cursorTop, px(LISTADO_TEXT_PX), boldFont);
-  drawTextLine(page, pass.internoNombre, innerX + 28, cursorTop, px(LISTADO_TEXT_PX), regularFont);
+  drawTextLine(page, "PPL:", innerX, cursorTop, ptFromPx(LISTADO_TEXT_PX), boldFont);
+  drawTextLine(page, pass.internoNombre, innerX + 28, cursorTop, ptFromPx(LISTADO_TEXT_PX), regularFont);
 
   cursorTop += 14;
-  drawTextLine(page, "Ubicacion:", innerX, cursorTop, px(LISTADO_TEXT_PX), boldFont);
-  drawTextLine(page, pass.internoUbicacion, innerX + 54, cursorTop, px(LISTADO_TEXT_PX), regularFont);
+  drawTextLine(page, "Ubicacion:", innerX, cursorTop, ptFromPx(LISTADO_TEXT_PX), boldFont);
+  drawTextLine(page, pass.internoUbicacion, innerX + 54, cursorTop, ptFromPx(LISTADO_TEXT_PX), regularFont);
 
   cursorTop += 15;
-  drawTextLine(page, "Visitas:", innerX, cursorTop, px(LISTADO_TEXT_PX), boldFont);
+  drawTextLine(page, "Visitas:", innerX, cursorTop, ptFromPx(LISTADO_TEXT_PX), boldFont);
   cursorTop += 11;
 
   const visitorLines = [
@@ -352,7 +352,7 @@ function drawMainListingCard(options: {
       : [])
   ];
   const useTwoColumns = visitorLines.length > 6;
-  const visitorFontSize = px(LISTADO_TEXT_PX);
+  const visitorFontSize = ptFromPx(LISTADO_TEXT_PX);
   const visitorLineHeight = 10.45;
   const columns = useTwoColumns ? 2 : 1;
   const columnGap = 10;
@@ -379,7 +379,7 @@ function drawMainListingCard(options: {
 
   if (basic.length > 0) {
     cursorTop += 3;
-    drawTextLine(page, "Peticion:", innerX, cursorTop, px(LISTADO_TEXT_PX), boldFont);
+    drawTextLine(page, "Peticion:", innerX, cursorTop, ptFromPx(LISTADO_TEXT_PX), boldFont);
     cursorTop += 10;
     basic.slice(0, 2).forEach((item) => {
       cursorTop = drawWrappedBlock({
@@ -389,7 +389,7 @@ function drawMainListingCard(options: {
         x: innerX,
         top: cursorTop,
         width: innerWidth,
-        size: px(LISTADO_TEXT_PX),
+        size: ptFromPx(LISTADO_TEXT_PX),
         color: COLORS.warning,
         maxLines: 1,
         lineGap: compactGap
@@ -399,7 +399,7 @@ function drawMainListingCard(options: {
 
   if (specialLines.length > 0) {
     cursorTop += 3;
-    drawTextLine(page, "Peticion especial:", innerX, cursorTop, px(LISTADO_TEXT_PX), boldFont, COLORS.danger);
+    drawTextLine(page, "Peticion especial:", innerX, cursorTop, ptFromPx(LISTADO_TEXT_PX), boldFont, COLORS.danger);
     cursorTop += 10;
     specialLines.slice(0, 2).forEach((item) => {
       cursorTop = drawWrappedBlock({
@@ -409,7 +409,7 @@ function drawMainListingCard(options: {
         x: innerX,
         top: cursorTop,
         width: innerWidth,
-        size: px(LISTADO_TEXT_PX),
+        size: ptFromPx(LISTADO_TEXT_PX),
         color: COLORS.danger,
         maxLines: 1,
         lineGap: compactGap
@@ -461,17 +461,17 @@ function drawSecondaryCard(options: {
     color: COLORS.danger
   });
 
-  const titleWidth = boldFont.widthOfTextAtSize(title, px(SECONDARY_LISTING_TEXT_PX));
+  const titleWidth = boldFont.widthOfTextAtSize(title, ptFromPx(SECONDARY_LISTING_TEXT_PX));
   const dateX = innerX + titleWidth + 10;
   let cursorTop = top + 6;
-  drawTextLine(page, title, innerX, cursorTop, px(SECONDARY_LISTING_TEXT_PX), boldFont);
-  drawTextLine(page, date, dateX, cursorTop, px(SECONDARY_LISTING_TEXT_PX), regularFont, COLORS.muted);
+  drawTextLine(page, title, innerX, cursorTop, ptFromPx(SECONDARY_LISTING_TEXT_PX), boldFont);
+  drawTextLine(page, date, dateX, cursorTop, ptFromPx(SECONDARY_LISTING_TEXT_PX), regularFont, COLORS.muted);
   cursorTop += 15;
-  drawTextLine(page, "PPL:", innerX, cursorTop, px(SECONDARY_LISTING_TEXT_PX), boldFont);
-  drawTextLine(page, internalName, innerX + 24, cursorTop, px(SECONDARY_LISTING_TEXT_PX), regularFont);
+  drawTextLine(page, "PPL:", innerX, cursorTop, ptFromPx(SECONDARY_LISTING_TEXT_PX), boldFont);
+  drawTextLine(page, internalName, innerX + 24, cursorTop, ptFromPx(SECONDARY_LISTING_TEXT_PX), regularFont);
   cursorTop += 13;
-  drawTextLine(page, "Ubicacion:", innerX, cursorTop, px(SECONDARY_LISTING_TEXT_PX), boldFont);
-  drawTextLine(page, location, innerX + 50, cursorTop, px(SECONDARY_LISTING_TEXT_PX), regularFont);
+  drawTextLine(page, "Ubicacion:", innerX, cursorTop, ptFromPx(SECONDARY_LISTING_TEXT_PX), boldFont);
+  drawTextLine(page, location, innerX + 50, cursorTop, ptFromPx(SECONDARY_LISTING_TEXT_PX), regularFont);
   cursorTop += 14;
 
   bodyLines.slice(0, 8).forEach((line) => {
@@ -482,7 +482,7 @@ function drawSecondaryCard(options: {
       x: innerX,
       top: cursorTop,
       width: innerWidth,
-      size: px(SECONDARY_LISTING_TEXT_PX),
+      size: ptFromPx(SECONDARY_LISTING_TEXT_PX),
       color: line.color ?? COLORS.text,
       maxLines: 2,
       lineGap: 0.45
@@ -523,7 +523,7 @@ function drawNumbersRow(options: {
     x: x + 10,
     top: textTop,
     width: leftWidth - 12,
-    size: px(PASS_NUMBER_TEXT_PX),
+    size: ptFromPx(PASS_NUMBER_TEXT_PX),
     maxLines: 1
   });
   drawWrappedBlock({
@@ -533,7 +533,7 @@ function drawNumbersRow(options: {
     x: x + leftWidth + 4,
     top: textTop,
     width: middleWidth,
-    size: px(PASS_NUMBER_TEXT_PX),
+    size: ptFromPx(PASS_NUMBER_TEXT_PX),
     maxLines: 2
   });
   drawTextLine(
