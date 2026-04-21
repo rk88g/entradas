@@ -2059,6 +2059,10 @@ export async function createModuleZoneAction(
     }
 
     revalidatePath("/sistema/admin");
+    revalidatePath("/sistema/visual");
+    revalidatePath("/sistema/comunicacion");
+    revalidatePath("/sistema/escaleras");
+    revalidatePath("/sistema/rentas");
     return success("Zona guardada.");
   } catch (error) {
     return failure(error instanceof Error ? error.message : "No se pudo guardar la zona.");

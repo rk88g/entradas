@@ -134,6 +134,38 @@ function ensureModuleKey(value?: string | null): ModuleKey {
   return "rentas";
 }
 
+async function getConfiguredZones(supabase: SupabaseClient): Promise<ZoneRecord[]> {
+  let zoneRows:
+    | Array<{ id: string; name: string; active: boolean | null; sort_order: number | null }>
+    | null
+    | undefined = null;
+
+  const { data } = await supabase
+    .from("zones")
+    .select("id, name, active, sort_order")
+    .order("sort_order", { ascending: true })
+    .order("name", { ascending: true });
+
+  zoneRows = data ?? [];
+
+  if (zoneRows.length === 0 && isSupabaseAdminConfigured()) {
+    const adminSupabase = createSupabaseAdminClient();
+    const { data: adminZones } = await adminSupabase
+      .from("zones")
+      .select("id, name, active, sort_order")
+      .order("sort_order", { ascending: true })
+      .order("name", { ascending: true });
+    zoneRows = adminZones ?? [];
+  }
+
+  return (zoneRows ?? []).map((item) => ({
+    id: item.id,
+    name: item.name,
+    active: Boolean(item.active),
+    sortOrder: Number(item.sort_order ?? 0)
+  }));
+}
+
 async function fetchAllRows<T>(
   queryFactory: (from: number, to: number) => PromiseLike<{ data: T[] | null; error: unknown }>,
   chunkSize = 1000
@@ -1859,7 +1891,6 @@ export async function getModulePanelData(moduleKey: ModuleKey, includeInactiveIn
   const [
     internals,
     deviceTypesResponse,
-    zonesResponse,
     chargeRoutesResponse,
     pricesResponse,
     devicesResponse,
@@ -1878,11 +1909,6 @@ export async function getModulePanelData(moduleKey: ModuleKey, includeInactiveIn
       .eq("module_key", moduleKey)
       .eq("active", true)
       .order("sort_order", { ascending: true }),
-    supabase
-      .from("zones")
-      .select("id, name, active, sort_order")
-      .order("sort_order", { ascending: true })
-      .order("name", { ascending: true }),
     supabase
       .from("module_charge_routes")
       .select("id, module_key, zone_id, charge_weekday, active, zones!inner(name,sort_order)")
@@ -1943,23 +1969,7 @@ export async function getModulePanelData(moduleKey: ModuleKey, includeInactiveIn
   const visibleDeviceTypes = allowedDeviceNames
     ? deviceTypes.filter((item) => allowedDeviceNames.has(normalizeDeviceTypeName(item.name)))
     : deviceTypes;
-  let zoneRows = zonesResponse.data ?? [];
-  if (zoneRows.length === 0 && isSupabaseAdminConfigured()) {
-    const adminSupabase = createSupabaseAdminClient();
-    const { data: adminZones } = await adminSupabase
-      .from("zones")
-      .select("id, name, active, sort_order")
-      .order("sort_order", { ascending: true })
-      .order("name", { ascending: true });
-    zoneRows = adminZones ?? [];
-  }
-
-  const zones: ZoneRecord[] = zoneRows.map((item) => ({
-    id: item.id,
-    name: item.name,
-    active: Boolean(item.active),
-    sortOrder: Number(item.sort_order ?? 0)
-  }));
+  const zones = await getConfiguredZones(supabase);
   const mergedZones = [...zones];
 
   const chargeRoutes: ModuleChargeRoute[] = (chargeRoutesResponse.data ?? [])
@@ -2454,6 +2464,7 @@ export async function getIntegratedModuleCounts() {
 
 export async function getAdminPanelData() {
   const supabase = await createServerSupabaseClient();
+  const configuredZones = await getConfiguredZones(supabase);
   const [
     connectionLogsResponse,
     auditLogsResponse,
@@ -2463,7 +2474,6 @@ export async function getAdminPanelData() {
     permissionScopesResponse,
     rolePermissionGrantsResponse,
     userPermissionGrantsResponse,
-    zonesResponse,
     chargeRoutesResponse,
     pricesResponse,
     deviceTypesResponse,
@@ -2524,14 +2534,9 @@ export async function getAdminPanelData() {
     supabase
       .from("user_permission_grants")
       .select("id, user_profile_id, scope_key, access_level"),
-      supabase
-        .from("zones")
-        .select("id, name, active, sort_order")
-        .order("sort_order", { ascending: true })
-        .order("name", { ascending: true }),
-      supabase
-        .from("module_charge_routes")
-        .select("id, module_key, zone_id, charge_weekday, active, zones!inner(name,sort_order)")
+    supabase
+      .from("module_charge_routes")
+      .select("id, module_key, zone_id, charge_weekday, active, zones!inner(name,sort_order)")
         .order("module_key", { ascending: true }),
     supabase
       .from("module_prices")
@@ -2682,12 +2687,7 @@ export async function getAdminPanelData() {
   });
   const config: DangerZoneConfigData = {
     cutoffWeekday,
-    zones: (zonesResponse.data ?? []).map((item) => ({
-      id: item.id,
-      name: item.name,
-      active: Boolean(item.active),
-      sortOrder: Number(item.sort_order ?? 0)
-    })),
+    zones: configuredZones,
     chargeRoutes: (chargeRoutesResponse.data ?? [])
       .map((item) => ({
         id: item.id,
@@ -2698,10 +2698,10 @@ export async function getAdminPanelData() {
         active: Boolean(item.active)
       }))
       .sort((a, b) => {
-        const zoneA = (zonesResponse.data ?? []).find((item) => item.id === a.zoneId);
-        const zoneB = (zonesResponse.data ?? []).find((item) => item.id === b.zoneId);
-        const sortA = Number(zoneA?.sort_order ?? Number.MAX_SAFE_INTEGER);
-        const sortB = Number(zoneB?.sort_order ?? Number.MAX_SAFE_INTEGER);
+        const zoneA = configuredZones.find((item) => item.id === a.zoneId);
+        const zoneB = configuredZones.find((item) => item.id === b.zoneId);
+        const sortA = Number(zoneA?.sortOrder ?? Number.MAX_SAFE_INTEGER);
+        const sortB = Number(zoneB?.sortOrder ?? Number.MAX_SAFE_INTEGER);
         return (
           a.moduleKey.localeCompare(b.moduleKey) ||
           sortA - sortB ||
