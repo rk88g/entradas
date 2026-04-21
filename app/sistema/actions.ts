@@ -184,6 +184,39 @@ async function getPassArticlePayload(formData: FormData) {
   return articlePairs;
 }
 
+type PassDevicePayloadItem = {
+  deviceTypeId: string;
+  quantity: number;
+};
+
+function mergePassDevicePayload(items: PassDevicePayloadItem[]) {
+  const merged = new Map<string, number>();
+
+  for (const item of items) {
+    const deviceTypeId = String(item.deviceTypeId ?? "").trim();
+    const quantity = Math.max(0, Number(item.quantity ?? 0));
+    if (!deviceTypeId || !Number.isFinite(quantity) || quantity < 1) {
+      continue;
+    }
+
+    merged.set(deviceTypeId, (merged.get(deviceTypeId) ?? 0) + quantity);
+  }
+
+  return [...merged.entries()].map(([deviceTypeId, quantity]) => ({
+    deviceTypeId,
+    quantity
+  }));
+}
+
+function explodePassDevicePayload(items: PassDevicePayloadItem[]) {
+  return items.flatMap((item) =>
+    Array.from({ length: Math.max(1, Number(item.quantity ?? 1)) }, () => ({
+      deviceTypeId: item.deviceTypeId,
+      quantity: 1
+    }))
+  );
+}
+
 function appendDeviceSummaryToSpecials(
   specialsText: string,
   deviceSummary: string | null
@@ -1257,7 +1290,7 @@ export async function createPassAction(
     const allowDuplicatePass = String(formData.get("allow_duplicate_pass") ?? "").trim() === "true";
     const mentions = String(formData.get("menciones") ?? "").trim();
     const specials = String(formData.get("especiales") ?? "").trim();
-    const articlePayload = await getPassArticlePayload(formData);
+    const typedArticlePayload = await getPassArticlePayload(formData);
     const targetDate = await getDateByValue(targetDateValue);
 
     if (!internoId) {
@@ -1356,15 +1389,17 @@ export async function createPassAction(
       return failure("Debes incluir al menos un adulto en el pase.");
     }
 
+    const articlePayload = mergePassDevicePayload(typedArticlePayload);
+
     let articleSummary: string | null = null;
-    if (articlePayload.length > 0) {
+    if (typedArticlePayload.length > 0) {
       const { data: articleTypes, error: articleTypeError } = await supabase
         .from("module_device_types")
         .select("id, name")
         .eq("active", true)
         .in(
           "id",
-          articlePayload.map((item) => item.deviceTypeId)
+          typedArticlePayload.map((item) => item.deviceTypeId)
         );
 
       if (articleTypeError) {
@@ -1372,7 +1407,7 @@ export async function createPassAction(
       }
 
       const articleNameMap = new Map((articleTypes ?? []).map((item) => [item.id, item.name]));
-      articleSummary = articlePayload
+      articleSummary = typedArticlePayload
         .map((item) => {
           const name = articleNameMap.get(item.deviceTypeId);
           if (!name || item.quantity < 1) {
@@ -1471,7 +1506,7 @@ export async function updatePassAction(
     const visitorIds = [...new Set(formData.getAll("visitor_ids").map((item) => String(item).trim()).filter(Boolean))];
     const mentions = String(formData.get("menciones") ?? "").trim();
     const specials = String(formData.get("especiales") ?? "").trim();
-    const articlePayload = await getPassArticlePayload(formData);
+    const typedArticlePayload = await getPassArticlePayload(formData);
 
     if (!passId || !internoId) {
       return failure("No se encontro el pase a editar.");
@@ -1523,15 +1558,17 @@ export async function updatePassAction(
       return failure("Debes incluir al menos un adulto en el pase.");
     }
 
+    const articlePayload = mergePassDevicePayload(typedArticlePayload);
+
     let articleSummary: string | null = null;
-    if (articlePayload.length > 0) {
+    if (typedArticlePayload.length > 0) {
       const { data: articleTypes, error: articleTypeError } = await supabase
         .from("module_device_types")
         .select("id, name")
         .eq("active", true)
         .in(
           "id",
-          articlePayload.map((item) => item.deviceTypeId)
+          typedArticlePayload.map((item) => item.deviceTypeId)
         );
 
       if (articleTypeError) {
@@ -1539,7 +1576,7 @@ export async function updatePassAction(
       }
 
       const articleNameMap = new Map((articleTypes ?? []).map((item) => [item.id, item.name]));
-      articleSummary = articlePayload
+      articleSummary = typedArticlePayload
         .map((item) => {
           const name = articleNameMap.get(item.deviceTypeId);
           if (!name || item.quantity < 1) {
@@ -1573,12 +1610,12 @@ export async function updatePassAction(
     }
 
     const normalizeItems = (items: Array<{ device_type_id?: string; deviceTypeId?: string; quantity: number }>) =>
-      [...items]
-        .map((item) => ({
+      mergePassDevicePayload(
+        items.map((item) => ({
           deviceTypeId: String(item.deviceTypeId ?? item.device_type_id ?? ""),
           quantity: Math.max(1, Number(item.quantity ?? 1))
         }))
-        .sort((a, b) => a.deviceTypeId.localeCompare(b.deviceTypeId) || a.quantity - b.quantity);
+      ).sort((a, b) => a.deviceTypeId.localeCompare(b.deviceTypeId) || a.quantity - b.quantity);
 
     const currentNormalizedItems = JSON.stringify(normalizeItems(currentDeviceItemRows ?? []));
     const nextNormalizedItems = JSON.stringify(normalizeItems(articlePayload));
@@ -1636,7 +1673,7 @@ export async function updatePassAction(
 
       if (articlePayload.length > 0) {
         const { error: insertItemsError } = await supabase.from("listing_device_items").insert(
-          articlePayload.map((item) => ({
+          explodePassDevicePayload(articlePayload).map((item) => ({
             listado_id: passId,
             device_type_id: item.deviceTypeId,
             quantity: item.quantity
@@ -1709,7 +1746,14 @@ export async function updatePassAction(
         if (pendingDevicesPayload.length > 0) {
           const { error: recreatePendingError } = await supabase
             .from("internal_devices")
-            .insert(pendingDevicesPayload);
+            .insert(
+              pendingDevicesPayload.flatMap((item) =>
+                Array.from({ length: Math.max(1, Number(item.quantity ?? 1)) }, () => ({
+                  ...item,
+                  quantity: 1
+                }))
+              )
+            );
 
           if (recreatePendingError) {
             return failure(recreatePendingError.message || "No se pudieron recrear los aparatos pendientes del pase.");
@@ -2261,7 +2305,6 @@ export async function registerModulePaymentAction(
       return failure("La semana ya esta cerrada y no admite cambios.");
     }
 
-    const allowedDeviceNames = getAllowedModuleDeviceNames(moduleKey as "visual" | "comunicacion" | "escaleras" | "rentas");
     const targetDevices = internalId
       ? await supabase
           .from("internal_devices")
@@ -2279,21 +2322,7 @@ export async function registerModulePaymentAction(
     if (targetDevices.error || !targetDevices.data || targetDevices.data.length === 0) {
       return failure(targetDevices.error?.message || "No se encontraron aparatos para cobrar.");
     }
-
-    const filteredTargetDevices = (targetDevices.data ?? []).filter((device) => {
-      const deviceTypeRelation = device.module_device_types as
-        | Array<{ name?: string }>
-        | { name?: string }
-        | null;
-      const typeName = Array.isArray(deviceTypeRelation)
-        ? deviceTypeRelation[0]?.name
-        : deviceTypeRelation?.name;
-      return !allowedDeviceNames || (typeName ? allowedDeviceNames.has(normalizeDeviceTypeName(typeName)) : false);
-    });
-
-    if (filteredTargetDevices.length === 0) {
-      return failure("No se encontraron aparatos validos para este bloque.");
-    }
+    const filteredTargetDevices = targetDevices.data ?? [];
 
     const deviceTypeIds = [...new Set(filteredTargetDevices.map((device) => device.device_type_id))];
     const { data: modulePrices } = deviceTypeIds.length
@@ -2423,7 +2452,6 @@ export async function closeModuleWeekAction(
       return failure("No se encontro la semana activa.");
     }
 
-    const allowedDeviceNames = getAllowedModuleDeviceNames(moduleKey as "visual" | "comunicacion" | "escaleras" | "rentas");
     const { data: devices } = await supabase
       .from("internal_devices")
       .select("id, zone_id, status, module_device_types!inner(name)")
@@ -2431,14 +2459,7 @@ export async function closeModuleWeekAction(
       .neq("status", "baja");
 
     const activeDeviceIds = (devices ?? [])
-      .filter((item) => {
-        const typeName = item.module_device_types?.[0]?.name;
-        if (allowedDeviceNames && (!typeName || !allowedDeviceNames.has(normalizeDeviceTypeName(typeName)))) {
-          return false;
-        }
-
-        return item.status === "activo";
-      })
+      .filter((item) => item.status === "activo")
       .map((item) => item.id);
     if (activeDeviceIds.length > 0) {
       const { data: paidItems } = await supabase

@@ -92,6 +92,32 @@ function ensureRoleKey(value?: string | null): RoleKey {
   return "capturador";
 }
 
+function mergePassDeviceItems<
+  T extends {
+    deviceTypeId: string;
+    moduleKey: ModuleKey;
+    name: string;
+    quantity: number;
+  }
+>(items: T[]) {
+  const merged = new Map<string, T>();
+
+  items.forEach((item) => {
+    const current = merged.get(item.deviceTypeId);
+    if (current) {
+      current.quantity += Math.max(1, Number(item.quantity ?? 1));
+      return;
+    }
+
+    merged.set(item.deviceTypeId, {
+      ...item,
+      quantity: Math.max(1, Number(item.quantity ?? 1))
+    });
+  });
+
+  return [...merged.values()];
+}
+
 function ensureSex(value?: string | null): VisitorSex {
   if (value === "hombre" || value === "mujer") {
     return value;
@@ -634,22 +660,24 @@ async function buildListingsForRows(
         especiales: item.especiales ?? undefined,
         createdAt: item.created_at,
         visitantes,
-        deviceItems: (deviceMap.get(item.id) ?? [])
-          .map((device) => {
-            const deviceType = device.module_device_types?.[0];
-          if (!deviceType) {
-            return null;
-          }
+        deviceItems: mergePassDeviceItems(
+          (deviceMap.get(item.id) ?? [])
+            .map((device) => {
+              const deviceType = device.module_device_types?.[0];
+              if (!deviceType) {
+                return null;
+              }
 
-          return {
-            id: device.id,
-            deviceTypeId: device.device_type_id,
-            moduleKey: ensureModuleKey(deviceType.module_key),
-            name: deviceType.name,
-            quantity: device.quantity
-          };
-        })
-        .filter((item): item is ListingRecord["deviceItems"][number] => item !== null)
+              return {
+                id: device.id,
+                deviceTypeId: device.device_type_id,
+                moduleKey: ensureModuleKey(deviceType.module_key),
+                name: deviceType.name,
+                quantity: device.quantity
+              };
+            })
+            .filter((device): device is ListingRecord["deviceItems"][number] => device !== null)
+        )
       };
     });
 }
@@ -1987,17 +2015,7 @@ export async function getModulePanelData(moduleKey: ModuleKey, includeInactiveIn
         notes: item.notes ?? undefined
       };
       })
-    .filter((item) => {
-      if (item.moduleKey !== moduleKey) {
-        return false;
-      }
-
-      if (!allowedDeviceNames) {
-        return true;
-      }
-
-      return allowedDeviceNames.has(normalizeDeviceTypeName(item.deviceTypeName));
-    });
+    .filter((item) => item.moduleKey === moduleKey);
 
   const userMap = new Map(
     (userProfilesResponse.data ?? []).map((item) => [item.id, item.full_name ?? "Usuario"])
@@ -2298,17 +2316,11 @@ async function countVisibleModuleDevices(
     return 0;
   }
 
-  const allowedNames = getAllowedModuleDeviceNames(moduleKey);
   return data.filter((item) => {
     const relation = getFirstRelation(item.module_device_types);
     const resolvedModuleKey = ensureModuleKey(item.module_key ?? relation?.module_key);
-    const typeName = normalizeDeviceTypeName(relation?.name);
 
     if (resolvedModuleKey !== moduleKey) {
-      return false;
-    }
-
-    if (allowedNames && !allowedNames.has(typeName)) {
       return false;
     }
 
@@ -2382,12 +2394,7 @@ export async function getIntegratedModuleCounts() {
       (acc, item) => {
         const relation = getFirstRelation(item.module_device_types);
         const moduleKey = ensureModuleKey(item.module_key ?? relation?.module_key);
-        const allowedNames = getAllowedModuleDeviceNames(moduleKey);
-        const typeName = relation?.name;
-      if (
-        (moduleKey === "visual" || moduleKey === "comunicacion") &&
-        (!allowedNames || (typeName ? allowedNames.has(normalizeDeviceTypeName(typeName)) : false))
-      ) {
+      if (moduleKey === "visual" || moduleKey === "comunicacion") {
         acc[moduleKey] += 1;
       }
       return acc;
