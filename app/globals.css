@@ -2194,11 +2194,19 @@ html[data-theme="dark"] .admin-tab.active {
     padding: 0 !important;
   }
 
+  .apoyo-numbers-grid {
+    display: grid;
+    gap: 0;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
   .listing-print-page {
     min-height: calc(35.56cm - 0.78cm - 0.16cm);
     display: flex !important;
     flex-direction: column;
     justify-content: space-between;
+    box-sizing: border-box;
     break-after: page;
     page-break-after: always;
   }
@@ -2213,6 +2221,8 @@ html[data-theme="dark"] .admin-tab.active {
     display: grid !important;
     align-content: center;
     gap: 0.12cm;
+    margin: 0;
+    padding: 0;
   }
 
   .apoyo-print-grid .listing-card-stack {
@@ -2338,7 +2348,7 @@ html[data-theme="dark"] .admin-tab.active {
   }
 
   .apoyo-numbers-grid .delivery-print {
-    padding: 0.08cm 0;
+    padding: 0 !important;
     border: none;
     border-radius: 0;
     box-shadow: none;
@@ -2400,14 +2410,18 @@ html[data-theme="dark"] .admin-tab.active {
   }
 
   .module-panel {
-    padding-bottom: 0.9cm !important;
+    padding: 0 !important;
     margin: 0 !important;
   }
 
+  .print-module-panel,
+  .print-module-panel.module-panel,
+  .print-mode-listado.module-panel,
   .print-mode-numeros.module-panel,
   .print-mode-sexos.module-panel,
   .print-mode-menciones.module-panel {
-    padding-bottom: 0 !important;
+    padding: 0 !important;
+    margin: 0 !important;
   }
 
   .print-mode-numeros .print-sheet-footer,
