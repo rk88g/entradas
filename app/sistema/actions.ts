@@ -1233,6 +1233,7 @@ export async function createPassAction(
     const internoId = String(formData.get("interno_id") ?? "").trim();
     const visitorIds = [...new Set(formData.getAll("visitor_ids").map((item) => String(item).trim()).filter(Boolean))];
     const targetDateValue = String(formData.get("fecha_visita") ?? "").trim();
+    const allowDuplicatePass = String(formData.get("allow_duplicate_pass") ?? "").trim() === "true";
     const mentions = String(formData.get("menciones") ?? "").trim();
     const specials = String(formData.get("especiales") ?? "").trim();
     const articlePayload = await getPassArticlePayload(formData);
@@ -1268,17 +1269,25 @@ export async function createPassAction(
       return failure("Tu rol no puede capturar peticiones especiales.");
     }
 
-    const { data: existingPass } = await supabase
-      .from("listado")
-      .select("id, status")
-      .eq("interno_id", internoId)
-      .eq("fecha_id", targetDate.id)
-      .neq("status", "cancelado")
-      .maybeSingle();
+      const { data: existingPass } = await supabase
+        .from("listado")
+        .select("id, status, created_at")
+        .eq("interno_id", internoId)
+        .eq("fecha_id", targetDate.id)
+        .neq("status", "cancelado")
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
 
-    if (existingPass) {
-      return failure("Ese interno ya tiene pase para la fecha seleccionada.");
-    }
+      if (existingPass) {
+        if (profile.roleKey !== "super-admin") {
+          return failure("Ese interno ya tiene pase para la fecha seleccionada.");
+        }
+
+        if (!allowDuplicatePass) {
+          return failure("Ese interno ya tiene pase para la fecha seleccionada. Marca la autorizacion para generar otro pase.");
+        }
+      }
 
     const { data: relationRows, error: relationError } = await supabase
       .from("interno_visitas")
@@ -1371,21 +1380,26 @@ export async function createPassAction(
         ? appendDeviceSummaryToSpecials(specials, articleSummary)
         : null;
 
-    const { data: insertedPass, error: insertError } = await supabase.rpc("create_support_pass", {
-      p_interno_id: internoId,
-      p_fecha_id: targetDate.id,
-      p_fecha_visita: targetDate.fechaCompleta,
-      p_created_by: profile.id,
-      p_numero_pase: nextNumber,
-      p_menciones: canManageMentions(profile.roleKey) && mentions ? mentions : null,
-      p_especiales: specialText,
-      p_visitor_ids: orderedVisitors.map((visitor) => visitor.id),
-      p_device_items: articlePayload
-    });
+      const { data: insertedPass, error: insertError } = await supabase.rpc("create_support_pass", {
+        p_interno_id: internoId,
+        p_fecha_id: targetDate.id,
+        p_fecha_visita: targetDate.fechaCompleta,
+        p_created_by: profile.id,
+        p_duplicate_authorized_by: existingPass && profile.roleKey === "super-admin" && allowDuplicatePass ? profile.id : null,
+        p_numero_pase: nextNumber,
+        p_menciones: canManageMentions(profile.roleKey) && mentions ? mentions : null,
+        p_especiales: specialText,
+        p_visitor_ids: orderedVisitors.map((visitor) => visitor.id),
+        p_device_items: articlePayload
+      });
 
-    if (insertError?.code === "23505") {
-      return failure("Ese interno ya tiene pase para la fecha seleccionada.");
-    }
+      if (insertError?.code === "23505") {
+        return failure(
+          profile.roleKey === "super-admin"
+            ? "Ese interno ya tiene pase para la fecha seleccionada. Autoriza explicitamente el duplicado para crear otro."
+            : "Ese interno ya tiene pase para la fecha seleccionada."
+        );
+      }
 
     if (insertError || !insertedPass) {
       return failure(insertError?.message || "No se pudo crear el pase.");
@@ -1404,12 +1418,13 @@ export async function createPassAction(
       actionKey: "create",
       entityType: "pase",
       entityId: passId,
-      afterData: {
-        internoId: internoId,
-        fechaVisita: targetDate.fechaCompleta,
-        visitorIds,
-        mentions,
-        specials,
+        afterData: {
+          internoId: internoId,
+          fechaVisita: targetDate.fechaCompleta,
+          duplicateAuthorized: Boolean(existingPass && allowDuplicatePass && profile.roleKey === "super-admin"),
+          visitorIds,
+          mentions,
+          specials,
         articlePayload
       }
     });

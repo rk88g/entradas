@@ -117,6 +117,7 @@ export function InternalBrowser({
   const [searchLoading, setSearchLoading] = useState(false);
   const [screenLoading, setScreenLoading] = useState(false);
   const [visitorQuery, setVisitorQuery] = useState("");
+  const [allowDuplicatePass, setAllowDuplicatePass] = useState(false);
   const [recentCreatedPass, setRecentCreatedPass] = useState<{ internoId: string; fechaVisita: string } | null>(null);
   const [createState, createAction, createPending] = useActionState(createInternalAction, mutationInitialState);
   const [passState, passAction, passPending] = useActionState(createPassAction, mutationInitialState);
@@ -159,12 +160,13 @@ export function InternalBrowser({
     ).includes(normalizedVisitorQuery);
   });
   const selectedAdults = selectedVisitors.filter((item) => item.visitor.edad >= 18);
+  const canOverrideDuplicatePass = roleKey === "super-admin" && Boolean(selectedPass) && allowDuplicatePass;
   const canSubmitPass =
     Boolean(selected) &&
     Boolean(selectedDateValue) &&
     selectedVisitors.length > 0 &&
     selectedAdults.length > 0 &&
-    !selectedPass;
+    (!selectedPass || canOverrideDuplicatePass);
   const shouldSuppressExistingPassAlert =
     Boolean(
       selected &&
@@ -251,6 +253,7 @@ export function InternalBrowser({
     setSelectedVisitorIds([]);
     setSelectedDateValue(getDefaultDateValue(roleKey, openDate, nextDate));
     setVisitorQuery("");
+    setAllowDuplicatePass(false);
     setHistoryOpen(false);
     setHistorySections({});
     setFormSeed((current) => current + 1);
@@ -267,6 +270,12 @@ export function InternalBrowser({
         : [...current, visitaId]
     );
   }
+
+  useEffect(() => {
+    if (!selectedPass) {
+      setAllowDuplicatePass(false);
+    }
+  }, [selectedPass]);
 
   function toggleHistorySection(sectionKey: string) {
     setHistorySections((current) => ({
@@ -541,9 +550,17 @@ export function InternalBrowser({
                 </div>
               </article>
 
-              {selectedPass && !shouldSuppressExistingPassAlert ? (
-                <MutationBanner state={{ success: null, error: `Ese interno ya tiene pase para ${formatLongDateWithWeekday(selectedPass.fechaVisita)}.` }} />
-              ) : null}
+                {selectedPass && !shouldSuppressExistingPassAlert ? (
+                  <MutationBanner
+                    state={{
+                      success: null,
+                      error:
+                        roleKey === "super-admin"
+                          ? `Ese interno ya tiene pase para ${formatLongDateWithWeekday(selectedPass.fechaVisita)}. Si necesitas otro, autorizalo aqui mismo para generar un nuevo pase.`
+                          : `Ese interno ya tiene pase para ${formatLongDateWithWeekday(selectedPass.fechaVisita)}.`
+                    }}
+                  />
+                ) : null}
 
               {!canSubmitPass && selectedVisitors.length > 0 && selectedAdults.length === 0 ? (
                 <MutationBanner state={{ success: null, error: "Debes incluir al menos un adulto en el pase." }} />
@@ -659,11 +676,12 @@ export function InternalBrowser({
                     setScreenLoading(true);
                   }}
                 >
-                    <input type="hidden" name="interno_id" value={selected.id} />
-                    <input type="hidden" name="fecha_visita" value={selectedDateValue} />
-                    {selectedVisitorIds.map((visitorId) => (
-                      <input key={visitorId} type="hidden" name="visitor_ids" value={visitorId} />
-                    ))}
+                      <input type="hidden" name="interno_id" value={selected.id} />
+                      <input type="hidden" name="fecha_visita" value={selectedDateValue} />
+                      <input type="hidden" name="allow_duplicate_pass" value={allowDuplicatePass ? "true" : "false"} />
+                      {selectedVisitorIds.map((visitorId) => (
+                        <input key={visitorId} type="hidden" name="visitor_ids" value={visitorId} />
+                      ))}
 
                     <div className="field">
                       <label htmlFor="fecha_visita_modal">Fecha del pase</label>
@@ -674,9 +692,31 @@ export function InternalBrowser({
                           </option>
                         ))}
                       </select>
-                    </div>
+                      </div>
 
-                    {canManageMentions(roleKey) ? (
+                      {roleKey === "super-admin" && selectedPass ? (
+                        <label
+                          className="record-pill"
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: "0.8rem",
+                            gridColumn: "1 / -1",
+                            cursor: "pointer"
+                          }}
+                        >
+                          <input
+                            type="checkbox"
+                            checked={allowDuplicatePass}
+                            onChange={(event) => setAllowDuplicatePass(event.target.checked)}
+                          />
+                          <span>
+                            Autorizo generar otro pase para este interno en la misma fecha.
+                          </span>
+                        </label>
+                      ) : null}
+
+                      {canManageMentions(roleKey) ? (
                       <>
                         <div className="field" style={{ gridColumn: "1 / -1" }}>
                           <textarea name="menciones" placeholder="Peticiones basicas" autoComplete="off" style={{ borderColor: "#d97706", boxShadow: "0 0 0 3px rgba(217,119,6,0.10)" }} />
