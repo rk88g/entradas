@@ -2205,7 +2205,7 @@ html[data-theme="dark"] .admin-tab.active {
     min-height: calc(35.56cm - 0.78cm - 0.16cm);
     display: flex !important;
     flex-direction: column;
-    justify-content: space-between;
+    justify-content: flex-start;
     box-sizing: border-box;
     break-after: page;
     page-break-after: always;
@@ -2219,7 +2219,7 @@ html[data-theme="dark"] .admin-tab.active {
   .listing-print-page-body {
     flex: 1 1 auto;
     display: grid !important;
-    align-content: center;
+    align-content: start;
     gap: 0.12cm;
     margin: 0;
     padding: 0;
@@ -2406,7 +2406,7 @@ html[data-theme="dark"] .admin-tab.active {
     left: auto !important;
     right: auto !important;
     bottom: auto !important;
-    margin-top: 0.08cm;
+    margin-top: auto;
   }
 
   .module-panel {
