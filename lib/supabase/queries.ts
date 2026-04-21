@@ -1844,15 +1844,15 @@ export async function getModulePanelData(moduleKey: ModuleKey, includeInactiveIn
       .eq("module_key", moduleKey)
       .eq("active", true)
       .order("sort_order", { ascending: true }),
-    supabase
-      .from("zones")
-      .select("id, name, active")
-      .order("name", { ascending: true }),
-    supabase
-      .from("module_charge_routes")
-      .select("id, module_key, zone_id, charge_weekday, active, zones!inner(name)")
-      .eq("module_key", moduleKey)
-      .order("charge_weekday", { ascending: true }),
+      supabase
+        .from("zones")
+        .select("id, name, active, sort_order")
+        .order("sort_order", { ascending: true })
+        .order("name", { ascending: true }),
+      supabase
+        .from("module_charge_routes")
+        .select("id, module_key, zone_id, charge_weekday, active, zones!inner(name,sort_order)")
+        .eq("module_key", moduleKey),
     supabase
       .from("module_prices")
       .select("id, module_key, device_type_id, weekly_price, activation_price, fine_price, maintenance_price, retention_price, discount_amount, active, module_device_types!inner(name)")
@@ -1914,17 +1914,26 @@ export async function getModulePanelData(moduleKey: ModuleKey, includeInactiveIn
   const zones: ZoneRecord[] = (zonesResponse.data ?? []).map((item) => ({
     id: item.id,
     name: item.name,
-    active: Boolean(item.active)
+    active: Boolean(item.active),
+    sortOrder: Number(item.sort_order ?? 0)
   }));
 
-  const chargeRoutes: ModuleChargeRoute[] = (chargeRoutesResponse.data ?? []).map((item) => ({
-    id: item.id,
-    moduleKey: ensureModuleKey(item.module_key),
-    zoneId: item.zone_id,
-    zoneName: getFirstRelation(item.zones)?.name ?? "Zona",
-    chargeWeekday: item.charge_weekday,
-    active: Boolean(item.active)
-  }));
+  const chargeRoutes: ModuleChargeRoute[] = (chargeRoutesResponse.data ?? [])
+    .map((item) => ({
+      id: item.id,
+      moduleKey: ensureModuleKey(item.module_key),
+      zoneId: item.zone_id,
+      zoneName: getFirstRelation(item.zones)?.name ?? "Zona",
+      chargeWeekday: item.charge_weekday,
+      active: Boolean(item.active)
+    }))
+    .sort((a, b) => {
+      const zoneA = zones.find((item) => item.id === a.zoneId);
+      const zoneB = zones.find((item) => item.id === b.zoneId);
+      const sortA = zoneA?.sortOrder ?? Number.MAX_SAFE_INTEGER;
+      const sortB = zoneB?.sortOrder ?? Number.MAX_SAFE_INTEGER;
+      return sortA - sortB || a.chargeWeekday - b.chargeWeekday || a.zoneName.localeCompare(b.zoneName);
+    });
 
   const prices: ModulePriceRecord[] = (pricesResponse.data ?? []).map((item) => ({
     id: item.id,
@@ -2046,6 +2055,14 @@ export async function getModulePanelData(moduleKey: ModuleKey, includeInactiveIn
     totalsByZoneMap.set(zoneId, current);
   });
 
+  const sortedTotalsByZone = [...totalsByZoneMap.values()].sort((a, b) => {
+    const zoneA = a.zoneId ? zoneMap.get(a.zoneId) : undefined;
+    const zoneB = b.zoneId ? zoneMap.get(b.zoneId) : undefined;
+    const sortA = zoneA?.sortOrder ?? Number.MAX_SAFE_INTEGER;
+    const sortB = zoneB?.sortOrder ?? Number.MAX_SAFE_INTEGER;
+    return sortA - sortB || a.zoneName.localeCompare(b.zoneName);
+  });
+
   return {
     moduleKey,
     moduleName,
@@ -2057,8 +2074,8 @@ export async function getModulePanelData(moduleKey: ModuleKey, includeInactiveIn
     workers,
     unpaidDevices,
     paidDevices,
-    totalsByZone: [...totalsByZoneMap.values()].sort((a, b) => a.zoneName.localeCompare(b.zoneName)),
-    totalIncome: [...totalsByZoneMap.values()].reduce((sum, item) => sum + item.totalPaid, 0),
+    totalsByZone: sortedTotalsByZone,
+    totalIncome: sortedTotalsByZone.reduce((sum, item) => sum + item.totalPaid, 0),
     currentWeekLabel: `${start} al ${end}`,
     weekClosed: Boolean(cyclesResponse.data?.closed),
     currentCycleId: cyclesResponse.data?.id,
@@ -2411,15 +2428,15 @@ export async function getAdminPanelData() {
     supabase
       .from("user_permission_grants")
       .select("id, user_profile_id, scope_key, access_level"),
-    supabase
-      .from("zones")
-      .select("id, name, active")
-      .order("name", { ascending: true }),
-    supabase
-      .from("module_charge_routes")
-      .select("id, module_key, zone_id, charge_weekday, active, zones!inner(name)")
-      .order("module_key", { ascending: true })
-      .order("charge_weekday", { ascending: true }),
+      supabase
+        .from("zones")
+        .select("id, name, active, sort_order")
+        .order("sort_order", { ascending: true })
+        .order("name", { ascending: true }),
+      supabase
+        .from("module_charge_routes")
+        .select("id, module_key, zone_id, charge_weekday, active, zones!inner(name,sort_order)")
+        .order("module_key", { ascending: true }),
     supabase
       .from("module_prices")
       .select(
@@ -2572,16 +2589,30 @@ export async function getAdminPanelData() {
     zones: (zonesResponse.data ?? []).map((item) => ({
       id: item.id,
       name: item.name,
-      active: Boolean(item.active)
+      active: Boolean(item.active),
+      sortOrder: Number(item.sort_order ?? 0)
     })),
-    chargeRoutes: (chargeRoutesResponse.data ?? []).map((item) => ({
-      id: item.id,
-      moduleKey: ensureModuleKey(item.module_key),
-      zoneId: item.zone_id,
-      zoneName: getFirstRelation(item.zones)?.name ?? "Zona",
-      chargeWeekday: item.charge_weekday,
-      active: Boolean(item.active)
-    })),
+    chargeRoutes: (chargeRoutesResponse.data ?? [])
+      .map((item) => ({
+        id: item.id,
+        moduleKey: ensureModuleKey(item.module_key),
+        zoneId: item.zone_id,
+        zoneName: getFirstRelation(item.zones)?.name ?? "Zona",
+        chargeWeekday: item.charge_weekday,
+        active: Boolean(item.active)
+      }))
+      .sort((a, b) => {
+        const zoneA = (zonesResponse.data ?? []).find((item) => item.id === a.zoneId);
+        const zoneB = (zonesResponse.data ?? []).find((item) => item.id === b.zoneId);
+        const sortA = Number(zoneA?.sort_order ?? Number.MAX_SAFE_INTEGER);
+        const sortB = Number(zoneB?.sort_order ?? Number.MAX_SAFE_INTEGER);
+        return (
+          a.moduleKey.localeCompare(b.moduleKey) ||
+          sortA - sortB ||
+          a.chargeWeekday - b.chargeWeekday ||
+          a.zoneName.localeCompare(b.zoneName)
+        );
+      }),
     prices: (pricesResponse.data ?? []).map((item) => ({
       id: item.id,
       moduleKey: ensureModuleKey(item.module_key),

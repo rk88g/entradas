@@ -161,6 +161,15 @@ function renderMainPass(pass: ListingRecord) {
   );
 }
 
+function chunkListingPages<T>(items: T[], size: number) {
+  const pages: T[][] = [];
+  for (let index = 0; index < items.length; index += size) {
+    pages.push(items.slice(index, index + size));
+  }
+
+  return pages;
+}
+
 function renderSeparatedPasses(pass: ListingRecord) {
   const { visibleVisitors, underTwelveCount } = getVisibleVisitors(pass);
   const hasMen = visibleVisitors.some((visitor) => visitor.sexo === "hombre");
@@ -362,6 +371,10 @@ export function PassListing({
 
     return sorted;
   }, [listings, printDate, printMode, query]);
+  const listingPages = useMemo(
+    () => (printMode === "listado" ? chunkListingPages(filtered, 5) : []),
+    [filtered, printMode]
+  );
 
   const filteredEditVisitors = useMemo(() => {
     if (!editData) {
@@ -502,17 +515,30 @@ export function PassListing({
             <h3>Sin pases</h3>
           </div>
         ) : printMode === "listado" ? (
-          filtered.map((pass) => (
-            <div key={pass.id} className="listing-card-stack">
-              {roleKey === "super-admin" ? (
-                <div className="listing-card-actions hide-print">
-                  <button type="button" className="button-soft" onClick={() => void openEditModal(pass.id)}>
-                    Editar pase
-                  </button>
-                </div>
-              ) : null}
-              {renderMainPass(pass)}
-            </div>
+          listingPages.map((page, pageIndex) => (
+            <section
+              key={`listing-page-${pageIndex}`}
+              className={`listing-print-page ${pageIndex < listingPages.length - 1 ? "listing-print-page-break" : ""}`}
+            >
+              <div className="listing-print-page-body">
+                {page.map((pass) => (
+                  <div key={pass.id} className="listing-card-stack">
+                    {roleKey === "super-admin" ? (
+                      <div className="listing-card-actions hide-print">
+                        <button type="button" className="button-soft" onClick={() => void openEditModal(pass.id)}>
+                          Editar pase
+                        </button>
+                      </div>
+                    ) : null}
+                    {renderMainPass(pass)}
+                  </div>
+                ))}
+              </div>
+              <div className="print-sheet-footer listing-page-footer">
+                <div>#70-TODO LO NO AGREGADO EN LA PETICION DE SU PASE NO TENDRA AUTORIZACION PARA ENTRAR.</div>
+                <div>#70-TODO LO QUE VENGA EN PETICION ESPECIAL / ENTREGAR A ADUANA PARA SU REVISION.</div>
+              </div>
+            </section>
           ))
         ) : printMode === "sexos" ? (
           filtered.flatMap((pass) => renderSeparatedPasses(pass))
@@ -533,14 +559,7 @@ export function PassListing({
         )}
       </div>
 
-      {printMode === "listado" ? (
-        <div className="print-sheet-footer">
-          <div>#70-TODO LO NO AGREGADO EN LA PETICION DE SU PASE NO TENDRA AUTORIZACION PARA ENTRAR.</div>
-          <div>#70-TODO LO QUE VENGA EN PETICION ESPECIAL / ENTREGAR A ADUANA PARA SU REVISION.</div>
-        </div>
-      ) : null}
-
-      {editData ? (
+        {editData ? (
         <div className="modal-backdrop hide-print" onClick={closeEditModal}>
           <section className="modal-sheet" onClick={(event) => event.stopPropagation()}>
             <div className="modal-header">

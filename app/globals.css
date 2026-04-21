@@ -1283,6 +1283,29 @@ html[data-theme="dark"] .note-box {
   justify-content: flex-end;
 }
 
+.admin-table-row-form {
+  display: grid;
+  grid-template-columns: 8rem minmax(0, 1fr) 8rem 8rem;
+  align-items: center;
+  gap: 0.75rem;
+  padding: 0.55rem 0.75rem;
+  border-bottom: 1px solid var(--line);
+}
+
+.admin-table-row-form > div {
+  min-width: 0;
+}
+
+.listing-print-page {
+  display: grid;
+  gap: 0.35rem;
+}
+
+.listing-print-page-body {
+  display: grid;
+  gap: 0.35rem;
+}
+
 .delivery-print-list {
   display: none;
 }
@@ -1870,11 +1893,16 @@ html[data-theme="dark"] .admin-tab.active {
 }
 
 @media (max-width: 640px) {
-  .page-shell {
-    width: min(calc(100% - 1rem), var(--max-width));
-  }
+    .page-shell {
+      width: min(calc(100% - 1rem), var(--max-width));
+    }
 
-  .login-card,
+    .admin-table-row-form {
+      grid-template-columns: 1fr;
+      gap: 0.5rem;
+    }
+  
+    .login-card,
   .login-hero,
   .app-panel,
   .module-panel,
@@ -2094,23 +2122,39 @@ html[data-theme="dark"] .admin-tab.active {
   }
 
   .apoyo-print-grid {
-      display: block !important;
-      grid-template-columns: 1fr;
-      gap: 0.08cm;
-      margin: 0 !important;
-      padding: 0 !important;
-    }
+    display: grid;
+    gap: 0.15cm;
+    margin: 0 !important;
+    padding: 0 !important;
+  }
+
+  .listing-print-page {
+    min-height: calc(35.56cm - 0.78cm - 0.16cm);
+    display: flex !important;
+    flex-direction: column;
+    justify-content: space-between;
+    break-after: page;
+    page-break-after: always;
+  }
+
+  .listing-print-page:last-child {
+    break-after: auto;
+    page-break-after: auto;
+  }
+
+  .listing-print-page-body {
+    flex: 1 1 auto;
+    display: grid !important;
+    align-content: center;
+    gap: 0.12cm;
+  }
 
   .apoyo-print-grid .listing-card-stack {
-      display: block !important;
-      margin: 0 0 0.08cm 0 !important;
-      padding: 0 !important;
-      break-inside: avoid;
-      page-break-inside: avoid;
-    }
-
-  .apoyo-print-grid .listing-card-stack:last-child {
-    margin-bottom: 0 !important;
+    display: block !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    break-inside: avoid;
+    page-break-inside: avoid;
   }
 
   .apoyo-print-grid .listing-card-actions {
@@ -2120,18 +2164,18 @@ html[data-theme="dark"] .admin-tab.active {
   }
 
   .apoyo-print-grid .apoyo-pass-card {
-      display: flex;
-      flex-direction: column;
-      min-height: 6.7cm;
-      height: 6.7cm;
-      padding: 0.22cm 0.28cm;
-      overflow: hidden;
-      break-inside: avoid;
-      page-break-inside: avoid;
-    box-shadow: none;
-    border: 2px solid #0f172a;
-    width: 100%;
-    border-radius: 0;
+    display: flex;
+    flex-direction: column;
+    min-height: 6.2cm;
+    height: 6.2cm;
+    padding: 0.22cm 0.28cm;
+    overflow: hidden;
+    break-inside: avoid;
+    page-break-inside: avoid;
+      box-shadow: none;
+      border: 2px solid #0f172a;
+      width: 100%;
+      border-radius: 0;
   }
 
   .apoyo-secondary-grid .apoyo-pass-card {
@@ -2270,16 +2314,24 @@ html[data-theme="dark"] .admin-tab.active {
   }
 
   .print-sheet-footer {
-      display: block;
-      position: fixed;
-      left: 0.55cm;
-      right: 0.55cm;
-      bottom: 0.02cm;
-      color: #c23030;
-      font-size: 0.48rem;
-      line-height: 1.05;
-      background: white;
-    }
+    display: block;
+    position: fixed;
+    left: 0.55cm;
+    right: 0.55cm;
+    bottom: 0.02cm;
+    color: #c23030;
+    font-size: 0.48rem;
+    line-height: 1.05;
+    background: white;
+  }
+
+  .listing-page-footer {
+    position: static !important;
+    left: auto !important;
+    right: auto !important;
+    bottom: auto !important;
+    margin-top: 0.08cm;
+  }
 
   .module-panel {
     padding-bottom: 0.9cm !important;
@@ -2295,8 +2347,8 @@ html[data-theme="dark"] .admin-tab.active {
   .print-mode-numeros .print-sheet-footer,
   .print-mode-sexos .print-sheet-footer,
   .print-mode-menciones .print-sheet-footer {
-    display: none !important;
-  }
+      display: none !important;
+    }
 
   .hide-print {
     display: none !important;

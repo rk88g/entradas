@@ -11,6 +11,7 @@ import {
   saveModuleSettingsAction,
   saveUserPermissionGrantAction,
   saveWorkplacePositionAction,
+  updateModuleZoneSortOrderAction,
   updateInternalIdentityAction,
   updateAuthUserPasswordAction,
   updateVisitorIdentityAction
@@ -107,6 +108,7 @@ export function AdminControlPanel({
   const [visitorIdentityState, visitorIdentityAction, visitorIdentityPending] = useActionState(updateVisitorIdentityAction, mutationInitialState);
   const [cutoffState, cutoffAction, cutoffPending] = useActionState(saveModuleSettingsAction, mutationInitialState);
   const [zoneState, zoneAction, zonePending] = useActionState(createModuleZoneAction, mutationInitialState);
+  const [zoneSortState, zoneSortAction, zoneSortPending] = useActionState(updateModuleZoneSortOrderAction, mutationInitialState);
   const [routeState, routeAction, routePending] = useActionState(createModuleChargeRouteAction, mutationInitialState);
   const [priceState, priceAction, pricePending] = useActionState(saveModulePriceAction, mutationInitialState);
   const [workplaceState, workplaceAction, workplacePending] = useActionState(createWorkplaceAction, mutationInitialState);
@@ -219,38 +221,66 @@ export function AdminControlPanel({
               <span>Zonas</span>
               <span>{config.zones.length} registros</span>
             </summary>
-            <div className="section-collapse-body">
-              <MutationBanner state={zoneState} />
-              <form action={zoneAction} className="field-grid" autoComplete="off">
-              <div className="field">
-                <input name="name" placeholder="Codigo de zona, por ejemplo M8" autoComplete="off" />
-              </div>
-              <div className="actions-row">
-                <LoadingButton pending={zonePending} label="Guardar zona" loadingLabel="Loading..." className="button-secondary" />
-              </div>
-              </form>
+              <div className="section-collapse-body">
+                <MutationBanner state={zoneState} />
+                <MutationBanner state={zoneSortState} />
+                <form action={zoneAction} className="field-grid" autoComplete="off">
+                <div className="field">
+                  <input name="name" placeholder="Codigo de zona, por ejemplo M8" autoComplete="off" />
+                </div>
+                <div className="field">
+                  <input name="sort_order" type="number" min={1} placeholder="Orden" autoComplete="off" />
+                </div>
+                <div className="actions-row">
+                  <LoadingButton pending={zonePending} label="Guardar zona" loadingLabel="Loading..." className="button-secondary" />
+                </div>
+                </form>
 
-              <div className="table-wrap compact-table responsive-mobile-table" style={{ marginTop: "0.8rem" }}>
-                <table>
-                  <thead>
-                    <tr>
-                      <th>Zona</th>
-                      <th>Activo</th>
-                    </tr>
-                  </thead>
-                  <tbody>
-                    {config.zones.length === 0 ? (
+                <div className="table-wrap compact-table responsive-mobile-table" style={{ marginTop: "0.8rem" }}>
+                  <table>
+                    <thead>
                       <tr>
-                        <td colSpan={2}>Sin zonas.</td>
+                        <th>Orden</th>
+                        <th>Zona</th>
+                        <th>Activo</th>
+                        <th>Guardar</th>
                       </tr>
-                    ) : (
-                      config.zones.map((zone) => (
-                        <tr key={zone.id}>
-                          <td data-label="Zona">{zone.name}</td>
-                          <td data-label="Activo">{zone.active ? "Si" : "No"}</td>
+                    </thead>
+                    <tbody>
+                      {config.zones.length === 0 ? (
+                        <tr>
+                          <td colSpan={4}>Sin zonas.</td>
                         </tr>
-                      ))
-                    )}
+                      ) : (
+                        config.zones.map((zone) => (
+                          <tr key={zone.id}>
+                            <td colSpan={4} style={{ padding: 0, border: "none" }}>
+                              <form action={zoneSortAction} className="admin-table-row-form" autoComplete="off">
+                                <input type="hidden" name="zone_id" value={zone.id} />
+                                <div data-label="Orden">
+                                  <input
+                                    name="sort_order"
+                                    type="number"
+                                    min={1}
+                                    defaultValue={zone.sortOrder}
+                                    style={{ width: "6rem" }}
+                                  />
+                                </div>
+                                <div data-label="Zona">{zone.name}</div>
+                                <div data-label="Activo">{zone.active ? "Si" : "No"}</div>
+                                <div data-label="Guardar">
+                                  <LoadingButton
+                                    pending={zoneSortPending}
+                                    label="Guardar"
+                                    loadingLabel="Loading..."
+                                    className="button-soft"
+                                  />
+                                </div>
+                              </form>
+                            </td>
+                          </tr>
+                        ))
+                      )}
                   </tbody>
                 </table>
               </div>

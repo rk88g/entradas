@@ -1758,21 +1758,39 @@ export async function createModuleZoneAction(
     if (profile.roleKey !== "super-admin") {
       return failure("Solo super-admin puede guardar zonas.");
     }
-    const supabase = await createServerSupabaseClient();
-    const name = String(formData.get("name") ?? "").trim();
+      const supabase = await createServerSupabaseClient();
+      const name = String(formData.get("name") ?? "").trim();
+      const sortOrderInput = String(formData.get("sort_order") ?? "").trim();
 
-    if (!name) {
-      return failure("Debes escribir el nombre de la zona.");
-    }
+      if (!name) {
+        return failure("Debes escribir el nombre de la zona.");
+      }
 
       if (!/^M[A-Z0-9]+$/i.test(name)) {
         return failure("La zona debe tener formato M seguido de numeros o letras, por ejemplo M8 o MI.");
       }
 
-    const { error } = await supabase.from("zones").insert({
-      name,
-      created_by: profile.id
-    });
+      let sortOrder = Number(sortOrderInput);
+      if (!sortOrderInput) {
+        const { data: lastZone } = await supabase
+          .from("zones")
+          .select("sort_order")
+          .order("sort_order", { ascending: false })
+          .limit(1)
+          .maybeSingle();
+
+        sortOrder = Number(lastZone?.sort_order ?? 0) + 1;
+      }
+
+      if (!Number.isInteger(sortOrder) || sortOrder <= 0) {
+        return failure("Debes capturar un orden valido para la zona.");
+      }
+
+      const { error } = await supabase.from("zones").insert({
+        name,
+        sort_order: sortOrder,
+        created_by: profile.id
+      });
 
     if (error) {
       return failure(error.message || "No se pudo guardar la zona.");
@@ -1782,6 +1800,44 @@ export async function createModuleZoneAction(
     return success("Zona guardada.");
   } catch (error) {
     return failure(error instanceof Error ? error.message : "No se pudo guardar la zona.");
+  }
+}
+
+export async function updateModuleZoneSortOrderAction(
+  _prevState: MutationState,
+  formData: FormData
+): Promise<MutationState> {
+  try {
+    const profile = await requireProfile();
+    if (profile.roleKey !== "super-admin") {
+      return failure("Solo super-admin puede ordenar zonas.");
+    }
+
+    const supabase = await createServerSupabaseClient();
+    const zoneId = String(formData.get("zone_id") ?? "").trim();
+    const sortOrder = Number(formData.get("sort_order") ?? 0);
+
+    if (!zoneId || !Number.isInteger(sortOrder) || sortOrder <= 0) {
+      return failure("Debes indicar la zona y un orden valido.");
+    }
+
+    const { error } = await supabase
+      .from("zones")
+      .update({ sort_order: sortOrder })
+      .eq("id", zoneId);
+
+    if (error) {
+      return failure(error.message || "No se pudo actualizar el orden de la zona.");
+    }
+
+    revalidatePath("/sistema/admin");
+    revalidatePath("/sistema/visual");
+    revalidatePath("/sistema/comunicacion");
+    revalidatePath("/sistema/escaleras");
+    revalidatePath("/sistema/rentas");
+    return success("Orden de zona actualizado.");
+  } catch (error) {
+    return failure(error instanceof Error ? error.message : "No se pudo actualizar el orden de la zona.");
   }
 }
 
@@ -2435,7 +2491,7 @@ export async function saveEscaleraEntryAction(
 ): Promise<MutationState> {
   try {
     const profile = await requireProfile();
-    if (!["super-admin", "escaleras"].includes(profile.roleKey)) {
+    if (!["super-admin", "control", "escaleras"].includes(profile.roleKey)) {
       return failure("Tu rol no puede operar Escaleras.");
     }
 
@@ -2574,7 +2630,7 @@ export async function addEscaleraItemAction(
 ): Promise<MutationState> {
   try {
     const profile = await requireProfile();
-    if (!["super-admin", "escaleras"].includes(profile.roleKey)) {
+    if (!["super-admin", "control", "escaleras"].includes(profile.roleKey)) {
       return failure("Tu rol no puede agregar articulos en Escaleras.");
     }
 

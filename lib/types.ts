@@ -315,6 +315,7 @@ export interface ZoneRecord {
   id: string;
   name: string;
   active: boolean;
+  sortOrder: number;
 }
 
 export interface ModuleChargeRoute {
