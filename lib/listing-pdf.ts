@@ -262,6 +262,25 @@ function drawWrappedBlock(options: {
   return currentTop;
 }
 
+function measureWrappedBlockHeight(options: {
+  font: PDFFont;
+  text: string;
+  width: number;
+  size: number;
+  maxLines?: number;
+  lineGap?: number;
+}) {
+  const { font, text, width, size, maxLines = Number.MAX_SAFE_INTEGER } = options;
+  const lineGap = options.lineGap ?? size * 0.28;
+  const allLines = wrapText(text, font, size, width);
+  const lines = allLines.slice(0, maxLines);
+  if (lines.length === 0) {
+    return 0;
+  }
+
+  return lines.length * size + Math.max(0, lines.length - 1) * lineGap;
+}
+
 function drawFooter(page: PDFPage, regularFont: PDFFont) {
   const footerSize = 5.2;
   let top = PAGE_HEIGHT - MARGINS.bottom - 20;
@@ -314,12 +333,13 @@ function drawMainListingCard(options: {
   const { visibleVisitors, underTwelveCount } = getListingVisitors(pass);
   const { basic, special } = splitMentions(pass.menciones);
   const extraSpecials = splitMentions(pass.especiales);
+  const basicLines = basic.slice(0, 2);
   const specialLines = [
     ...extraSpecials.basic,
     ...extraSpecials.special,
     ...special,
     ...(!pass.especiales?.trim() && formatDeviceSummary(pass) ? [formatDeviceSummary(pass) as string] : [])
-  ];
+  ].slice(0, 2);
 
   const compactGap = 0.7;
   const titleText = "REGISTRO PASE PARA TERRAZA";
@@ -351,9 +371,45 @@ function drawMainListingCard(options: {
       ? [{ text: `+ ${underTwelveCount} ${underTwelveCount === 1 ? "menor" : "menores"}`, color: COLORS.danger }]
       : [])
   ];
-  const useTwoColumns = visitorLines.length > 6;
   const visitorFontSize = ptFromPx(LISTADO_TEXT_PX);
-  const visitorLineHeight = 10.45;
+  const visitorLineHeight = visitorFontSize + 0.2;
+  const sectionTitleSize = ptFromPx(LISTADO_TEXT_PX);
+  const sectionTopGap = 3;
+  const sectionAfterTitleGap = 10;
+  let reservedBottomHeight = 0;
+
+  if (basicLines.length > 0) {
+    reservedBottomHeight += sectionTopGap + sectionAfterTitleGap;
+    basicLines.forEach((item) => {
+      reservedBottomHeight += measureWrappedBlockHeight({
+        font: regularFont,
+        text: item,
+        width: innerWidth,
+        size: ptFromPx(LISTADO_TEXT_PX),
+        maxLines: 1,
+        lineGap: compactGap
+      });
+    });
+  }
+
+  if (specialLines.length > 0) {
+    reservedBottomHeight += sectionTopGap + sectionAfterTitleGap;
+    specialLines.forEach((item) => {
+      reservedBottomHeight += measureWrappedBlockHeight({
+        font: boldFont,
+        text: item,
+        width: innerWidth,
+        size: ptFromPx(LISTADO_TEXT_PX),
+        maxLines: 1,
+        lineGap: compactGap
+      });
+    });
+  }
+
+  const innerBottom = top + cardHeight - 8;
+  const availableVisitorHeight = Math.max(0, innerBottom - reservedBottomHeight - cursorTop);
+  const maxRowsSingleColumn = Math.max(1, Math.floor(availableVisitorHeight / visitorLineHeight));
+  const useTwoColumns = visitorLines.length > maxRowsSingleColumn;
   const columns = useTwoColumns ? 2 : 1;
   const columnGap = 10;
   const columnWidth = useTwoColumns ? (innerWidth - columnGap) / 2 : innerWidth;
@@ -373,15 +429,19 @@ function drawMainListingCard(options: {
       visitorFontSize,
       regularFont,
       line.color
-    );
-  });
-  cursorTop = startTop + rowsPerColumn * visitorLineHeight;
+      );
+    });
+  const visitorBlockBottom = startTop + rowsPerColumn * visitorLineHeight;
+  cursorTop =
+    reservedBottomHeight > 0
+      ? Math.max(visitorBlockBottom, innerBottom - reservedBottomHeight)
+      : visitorBlockBottom;
 
-  if (basic.length > 0) {
-    cursorTop += 3;
+  if (basicLines.length > 0) {
+    cursorTop += sectionTopGap;
     drawTextLine(page, "Peticion:", innerX, cursorTop, ptFromPx(LISTADO_TEXT_PX), boldFont);
-    cursorTop += 10;
-    basic.slice(0, 2).forEach((item) => {
+    cursorTop += sectionAfterTitleGap;
+    basicLines.forEach((item) => {
       cursorTop = drawWrappedBlock({
         page,
         font: regularFont,
@@ -398,10 +458,10 @@ function drawMainListingCard(options: {
   }
 
   if (specialLines.length > 0) {
-    cursorTop += 3;
+    cursorTop += sectionTopGap;
     drawTextLine(page, "Peticion especial:", innerX, cursorTop, ptFromPx(LISTADO_TEXT_PX), boldFont, COLORS.danger);
-    cursorTop += 10;
-    specialLines.slice(0, 2).forEach((item) => {
+    cursorTop += sectionAfterTitleGap;
+    specialLines.forEach((item) => {
       cursorTop = drawWrappedBlock({
         page,
         font: boldFont,
