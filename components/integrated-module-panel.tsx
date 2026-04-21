@@ -28,18 +28,42 @@ const mutationInitialState: MutationState = {
 
 type ModuleTab = "resumen" | "aparatos" | "cobranza";
 
-function getZonePrefix(zoneName?: string) {
-  const match = /m(\d+)/i.exec(zoneName ?? "");
-  return match?.[1] ?? null;
+function normalizeZoneKey(zoneName?: string) {
+  return String(zoneName ?? "")
+    .trim()
+    .toUpperCase()
+    .replace(/^M(?=[A-Z0-9]+)/, "");
+}
+
+function getLocationZoneKey(internalLocation: string) {
+  const prefix = String(internalLocation ?? "")
+    .split("-")[0]
+    ?.trim()
+    .toUpperCase();
+
+  return prefix || null;
+}
+
+function findZoneForLocation(zoneList: ModulePanelData["zones"], internalLocation: string) {
+  const locationKey = getLocationZoneKey(internalLocation);
+  if (!locationKey) {
+    return null;
+  }
+
+  return (
+    zoneList.find((zone) => normalizeZoneKey(zone.name) === locationKey) ??
+    null
+  );
 }
 
 function matchesZoneByLocation(zoneName: string | undefined, internalLocation: string) {
-  const prefix = getZonePrefix(zoneName);
-  if (!prefix) {
+  const locationKey = getLocationZoneKey(internalLocation);
+  const zoneKey = normalizeZoneKey(zoneName);
+  if (!locationKey || !zoneKey) {
     return true;
   }
 
-  return String(internalLocation).split("-")[0] === prefix;
+  return locationKey === zoneKey;
 }
 
 function getDeviceWeeklyCharge(
@@ -71,6 +95,8 @@ export function IntegratedModulePanel({
   const [selectedInternalId, setSelectedInternalId] = useState<string | null>(null);
   const [selectedPendingDeviceId, setSelectedPendingDeviceId] = useState<string | null>(null);
   const [selectedEntryInternal, setSelectedEntryInternal] = useState<InternalSearchOption | null>(null);
+  const [selectedEntryZoneId, setSelectedEntryZoneId] = useState("");
+  const [selectedPendingZoneId, setSelectedPendingZoneId] = useState("");
   const [selectedChargeDeviceId, setSelectedChargeDeviceId] = useState("");
   const [selectedZoneFilter, setSelectedZoneFilter] = useState("");
   const [selectedDeviceTypeId, setSelectedDeviceTypeId] = useState("");
@@ -238,15 +264,63 @@ export function IntegratedModulePanel({
     if (deviceState.success) {
       setSelectedDeviceTypeId("");
       setSelectedEntryInternal(null);
+      setSelectedEntryZoneId("");
     }
   }, [deviceState.success]);
 
   useEffect(() => {
     if (paymentState.success) {
       setSelectedPendingDeviceId(null);
+      setSelectedPendingZoneId("");
       setSelectedChargeDeviceId("");
     }
   }, [paymentState.success]);
+
+  useEffect(() => {
+    if (!selectedEntryInternal) {
+      setSelectedEntryZoneId("");
+      return;
+    }
+
+    const inferredZone = findZoneForLocation(data.zones, selectedEntryInternal.ubicacion);
+    setSelectedEntryZoneId(inferredZone?.id ?? "");
+  }, [data.zones, selectedEntryInternal]);
+
+  useEffect(() => {
+    if (!selectedPendingDevice) {
+      setSelectedPendingZoneId("");
+      return;
+    }
+
+    const inferredZone = selectedPendingDevice.zoneId
+      ? data.zones.find((zone) => zone.id === selectedPendingDevice.zoneId) ?? null
+      : findZoneForLocation(data.zones, selectedPendingDevice.internalLocation);
+    setSelectedPendingZoneId(inferredZone?.id ?? "");
+  }, [data.zones, selectedPendingDevice]);
+
+  useEffect(() => {
+    if (!selectedInternalId && !selectedPendingDeviceId) {
+      return;
+    }
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key !== "Escape") {
+        return;
+      }
+
+      if (selectedPendingDeviceId) {
+        setSelectedPendingDeviceId(null);
+        return;
+      }
+
+      if (selectedInternalId) {
+        setSelectedInternalId(null);
+      }
+    };
+
+    window.addEventListener("keydown", handleEscape);
+    return () => window.removeEventListener("keydown", handleEscape);
+  }, [selectedInternalId, selectedPendingDeviceId]);
 
   return (
     <>
@@ -456,7 +530,12 @@ export function IntegratedModulePanel({
                   </select>
                 </div>
                 <div className="field">
-                  <select name="zone_id" defaultValue="" disabled={!canManageEntries || data.weekClosed}>
+                  <select
+                    name="zone_id"
+                    value={selectedEntryZoneId}
+                    onChange={(event) => setSelectedEntryZoneId(event.target.value)}
+                    disabled={!canManageEntries || data.weekClosed}
+                  >
                     <option value="">Zona</option>
                     {data.zones.map((zone) => (
                       <option key={zone.id} value={zone.id}>
@@ -620,7 +699,7 @@ export function IntegratedModulePanel({
 
       {selectedInternal ? (
         <div className="modal-backdrop" onClick={() => setSelectedInternalId(null)}>
-          <div className="form-card compact" style={{ width: "min(100%, 980px)" }} onClick={(event) => event.stopPropagation()}>
+          <div className="modal-sheet" style={{ width: "min(100%, 980px)" }} onClick={(event) => event.stopPropagation()}>
             <div className="profile-top">
               <div className="record-title">
                 <strong className="section-title">{selectedInternal.internalName}</strong>
@@ -664,7 +743,7 @@ export function IntegratedModulePanel({
 
       {selectedPendingDevice ? (
         <div className="modal-backdrop" onClick={() => setSelectedPendingDeviceId(null)}>
-          <div className="form-card compact" style={{ width: "min(100%, 760px)" }} onClick={(event) => event.stopPropagation()}>
+          <div className="modal-sheet" style={{ width: "min(100%, 760px)" }} onClick={(event) => event.stopPropagation()}>
             <div className="profile-top">
               <div className="record-title">
                 <strong className="section-title">Dar de alta aparato</strong>
@@ -682,7 +761,12 @@ export function IntegratedModulePanel({
                 value={priceMap.get(selectedPendingDevice.deviceTypeId)?.activationPrice ?? 0}
               />
               <div className="field">
-                <select name="zone_id" defaultValue={selectedPendingDevice.zoneId ?? ""} disabled={!canManageCharges || data.weekClosed}>
+                <select
+                  name="zone_id"
+                  value={selectedPendingZoneId}
+                  onChange={(event) => setSelectedPendingZoneId(event.target.value)}
+                  disabled={!canManageCharges || data.weekClosed}
+                >
                   <option value="">Zona</option>
                   {data.zones.map((zone) => (
                     <option key={zone.id} value={zone.id}>

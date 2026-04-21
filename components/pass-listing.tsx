@@ -343,6 +343,21 @@ export function PassListing({
     }
   }, [router, updateState.error, updateState.success]);
 
+  useEffect(() => {
+    if (!editData) {
+      return;
+    }
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        closeEditModal();
+      }
+    };
+
+    window.addEventListener("keydown", handleEscape);
+    return () => window.removeEventListener("keydown", handleEscape);
+  }, [editData]);
+
   const filtered = useMemo(() => {
     const normalized = normalizeSearchText(query);
     const byDate = listings
