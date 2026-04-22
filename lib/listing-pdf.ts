@@ -580,8 +580,8 @@ function drawNumbersRow(options: {
   });
   drawWrappedBlock({
     page,
-    font: regularFont,
-    text: `${pass.internoNombre}    Pase ${pass.numeroPase ?? "-"}`,
+    font: boldFont,
+    text: `${pass.internoNombre}    [${pass.numeroPase ?? "-"}]`,
     x: x + leftWidth + 4,
     top: textTop,
     width: middleWidth,
