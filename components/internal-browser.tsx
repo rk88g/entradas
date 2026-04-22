@@ -19,7 +19,9 @@ import {
   formatLongDateWithWeekday,
   getDefaultDateStatusForRole,
   getInternalStatusMeta,
-  maskValue
+  maskPrivateText,
+  maskValue,
+  shouldMaskSensitiveInternal
 } from "@/lib/utils";
 
 const mutationInitialState: MutationState = {
@@ -86,6 +88,10 @@ function getPassBadge(passExists: boolean) {
   );
 }
 
+function getMaskedInternalLabel(roleKey: RoleKey, internalId: string, value: string) {
+  return maskPrivateText(value, shouldMaskSensitiveInternal(roleKey, internalId));
+}
+
 export function InternalBrowser({
   profiles,
   query,
@@ -147,6 +153,7 @@ export function InternalBrowser({
 
   const availableDates = useMemo(() => getDateOptions(openDate, nextDate), [openDate, nextDate]);
   const selected = profiles.find((item) => item.id === modalInternalId) ?? null;
+  const selectedIsSensitive = shouldMaskSensitiveInternal(roleKey, selected?.id);
   const selectedPass =
     selected && selectedDateValue
       ? getPassForDate(selected, selectedDateValue, openDate, nextDate)
@@ -405,8 +412,8 @@ export function InternalBrowser({
       module: "internos",
       entityType: "interno",
       entityId: selected.id,
-      label: selected.fullName,
-      subtitle: `Ubicacion ${selected.ubicacion}`
+      label: getMaskedInternalLabel(roleKey, selected.id, selected.fullName),
+      subtitle: `Ubicacion ${getMaskedInternalLabel(roleKey, selected.id, selected.ubicacion)}`
     });
 
     setModalInternalId(null);
@@ -476,7 +483,7 @@ export function InternalBrowser({
                     <tr key={profile.id} onClick={() => openInternalModal(profile)} style={{ cursor: "pointer" }}>
                       <td>
                         <div className="record-title inline">
-                          <strong>{profile.fullName}</strong>
+                          <strong>{getMaskedInternalLabel(roleKey, profile.id, profile.fullName)}</strong>
                           <span>
                             <StatusBadge variant={getInternalStatusMeta(profile.estatus).variant}>
                               {getInternalStatusMeta(profile.estatus).label}
@@ -484,8 +491,8 @@ export function InternalBrowser({
                           </span>
                         </div>
                       </td>
-                      <td>{profile.ubicacion}</td>
-                      <td>{maskValue(profile.edad, canViewSensitiveData)}</td>
+                      <td>{getMaskedInternalLabel(roleKey, profile.id, profile.ubicacion)}</td>
+                      <td>{maskValue(profile.edad, canViewSensitiveData && !shouldMaskSensitiveInternal(roleKey, profile.id))}</td>
                     </tr>
                   ))
                 )}
@@ -547,9 +554,9 @@ export function InternalBrowser({
           >
             <div className="profile-top">
               <div className="record-title">
-                <strong className="section-title">{selected.fullName}</strong>
+                <strong className="section-title">{getMaskedInternalLabel(roleKey, selected.id, selected.fullName)}</strong>
                 <span>
-                  Ubicacion {selected.ubicacion} · {maskValue(selected.edad, canViewSensitiveData)} años
+                  Ubicacion {getMaskedInternalLabel(roleKey, selected.id, selected.ubicacion)} · {maskValue(selected.edad, canViewSensitiveData && !selectedIsSensitive)} años
                 </span>
               </div>
               <div className="actions-row">
@@ -584,7 +591,7 @@ export function InternalBrowser({
                   </div>
                   <div className="mini-row"><span>Fecha</span><strong>{selectedDateValue ? formatLongDateWithWeekday(selectedDateValue) : "Sin fecha"}</strong></div>
                   <div className="mini-row"><span>Laborando</span><strong>{selected.laborando ? "Si" : "No"}</strong></div>
-                  <div className="mini-row"><span>Telefono</span><strong>{maskValue(selected.telefono || "No aplica", canViewSensitiveData)}</strong></div>
+                  <div className="mini-row"><span>Telefono</span><strong>{maskValue(selected.telefono || "No aplica", canViewSensitiveData && !selectedIsSensitive)}</strong></div>
                 </div>
               </article>
 
@@ -624,8 +631,8 @@ export function InternalBrowser({
                 <div className="visitor-choice-grid visitor-column-list">
                   {filteredAvailableVisitors.length === 0 ? <span className="muted visitor-column-empty">Sin registros.</span> : filteredAvailableVisitors.map((item) => (
                     <button key={item.id} type="button" className="visitor-choice-item available" onClick={() => toggleVisitor(item.visitaId)}>
-                      <strong>{item.visitor.fullName}</strong>
-                      <span className="muted">{maskValue(item.visitor.edad, canViewSensitiveData)} años</span>
+                      <strong>{maskPrivateText(item.visitor.fullName, selectedIsSensitive)}</strong>
+                      <span className="muted">{maskValue(item.visitor.edad, canViewSensitiveData && !selectedIsSensitive)} años</span>
                     </button>
                   ))}
                 </div>
@@ -636,8 +643,8 @@ export function InternalBrowser({
                 <div className="visitor-choice-grid visitor-column-list">
                   {filteredSelectedVisitors.length === 0 ? <span className="muted visitor-column-empty">Sin registros.</span> : filteredSelectedVisitors.map((item) => (
                     <button key={item.id} type="button" className="visitor-choice-item selected" onClick={() => toggleVisitor(item.visitaId)}>
-                      <strong>{item.visitor.fullName}</strong>
-                      <span className="muted">{maskValue(item.visitor.edad, canViewSensitiveData)} años</span>
+                      <strong>{maskPrivateText(item.visitor.fullName, selectedIsSensitive)}</strong>
+                      <span className="muted">{maskValue(item.visitor.edad, canViewSensitiveData && !selectedIsSensitive)} años</span>
                     </button>
                   ))}
                 </div>

@@ -9,7 +9,7 @@ import { MutationBanner } from "@/components/mutation-banner";
 import { RemoteInternalSearchField } from "@/components/remote-internal-search-field";
 import { StatusBadge } from "@/components/status-badge";
 import { InternalSearchOption, MutationState, RoleKey, VisitorRecord } from "@/lib/types";
-import { formatLongDate, getVisitorAvailabilityLabel, maskValue } from "@/lib/utils";
+import { formatLongDate, getVisitorAvailabilityLabel, maskPrivateText, maskValue, shouldMaskSensitiveInternal } from "@/lib/utils";
 
 const mutationInitialState: MutationState = {
   success: null,
@@ -70,6 +70,7 @@ export function VisitorManager({
   const canReassign = roleKey === "super-admin";
   const canManageAvailability = roleKey === "super-admin" || roleKey === "control";
   const canUseFallbackParentesco = canManageAvailability;
+  const selectedVisitorIsSensitive = shouldMaskSensitiveInternal(roleKey, selectedVisitor?.currentInternalId);
   const reassignedInternalCount = selectedVisitor
     ? new Set(
         [...selectedVisitor.historialInterno, selectedVisitor.currentInternalName ?? ""].filter(Boolean)
@@ -163,10 +164,10 @@ export function VisitorManager({
       module: "visitas",
       entityType: "visita",
       entityId: selectedVisitor.id,
-      label: selectedVisitor.fullName,
+      label: maskPrivateText(selectedVisitor.fullName, selectedVisitorIsSensitive),
       subtitle: selectedVisitor.currentInternalName
-        ? `${selectedVisitor.currentInternalName} · ${selectedVisitor.parentesco}`
-        : selectedVisitor.parentesco
+        ? `${maskPrivateText(selectedVisitor.currentInternalName, selectedVisitorIsSensitive)} · ${maskPrivateText(selectedVisitor.parentesco, selectedVisitorIsSensitive)}`
+        : maskPrivateText(selectedVisitor.parentesco, selectedVisitorIsSensitive)
     });
 
     router.push(`/sistema/tickets?${params.toString()}`);
@@ -232,19 +233,26 @@ export function VisitorManager({
               ) : (
                 visitors.map((visitor) => (
                   <tr key={visitor.id} onClick={() => setSelectedVisitorId(visitor.id)} style={{ cursor: "pointer" }}>
+                    {(() => {
+                      const isSensitiveVisitor = shouldMaskSensitiveInternal(roleKey, visitor.currentInternalId);
+                      return (
+                        <>
                     <td>
                       <div className="record-title inline">
-                        <strong>{visitor.fullName}</strong>
-                        <span>{visitor.parentesco}</span>
+                        <strong>{maskPrivateText(visitor.fullName, isSensitiveVisitor)}</strong>
+                        <span>{maskPrivateText(visitor.parentesco, isSensitiveVisitor)}</span>
                       </div>
                     </td>
-                    <td>{visitor.currentInternalName ?? "-"}</td>
-                    <td>{maskValue(visitor.edad, canViewSensitiveData)}</td>
+                    <td>{maskPrivateText(visitor.currentInternalName ?? "-", isSensitiveVisitor)}</td>
+                    <td>{maskValue(visitor.edad, canViewSensitiveData && !isSensitiveVisitor)}</td>
                     <td>
                       <StatusBadge variant={visitor.betada ? "danger" : "ok"}>
                         {getVisitorAvailabilityLabel(visitor.betada)}
                       </StatusBadge>
                     </td>
+                        </>
+                      );
+                    })()}
                   </tr>
                 ))
               )}
@@ -287,11 +295,11 @@ export function VisitorManager({
               {sectionsOpen.perfil ? (
                 <div className="section-collapse-body">
                   <div className="mini-list">
-                    <div className="mini-row"><span>Interno actual</span><strong>{selectedVisitor.currentInternalName ?? "Sin interno"}</strong></div>
-                    <div className="mini-row"><span>Parentesco</span><strong>{selectedVisitor.parentesco}</strong></div>
-                    <div className="mini-row"><span>Telefono</span><strong>{maskValue(selectedVisitor.telefono ?? "No aplica", canViewSensitiveData)}</strong></div>
+                    <div className="mini-row"><span>Interno actual</span><strong>{maskPrivateText(selectedVisitor.currentInternalName ?? "Sin interno", selectedVisitorIsSensitive)}</strong></div>
+                    <div className="mini-row"><span>Parentesco</span><strong>{maskPrivateText(selectedVisitor.parentesco, selectedVisitorIsSensitive)}</strong></div>
+                    <div className="mini-row"><span>Telefono</span><strong>{maskValue(selectedVisitor.telefono ?? "No aplica", canViewSensitiveData && !selectedVisitorIsSensitive)}</strong></div>
                     <div className="mini-row"><span>Nacimiento</span><strong>{formatHistoryDate(selectedVisitor.fechaNacimiento)}</strong></div>
-                    <div className="mini-row"><span>Edad</span><strong>{maskValue(selectedVisitor.edad, canViewSensitiveData)}</strong></div>
+                    <div className="mini-row"><span>Edad</span><strong>{maskValue(selectedVisitor.edad, canViewSensitiveData && !selectedVisitorIsSensitive)}</strong></div>
                     <div className="mini-row">
                       <span>Estatus</span>
                       <StatusBadge variant={selectedVisitor.betada ? "danger" : "ok"}>
@@ -316,7 +324,7 @@ export function VisitorManager({
                     ) : (
                       selectedVisitor.historial.map((entry) => (
                         <div key={entry.id} className="record-pill">
-                          <strong>{entry.internalName}</strong>
+                          <strong>{maskPrivateText(entry.internalName, selectedVisitorIsSensitive)}</strong>
                           <span>{entry.type === "reasignacion" ? "Reasignacion" : "Visita"} · {formatHistoryDate(entry.date)}</span>
                         </div>
                       ))

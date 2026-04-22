@@ -1550,6 +1550,34 @@ html[data-theme="dark"] .danger-zone-panel .section-collapse summary {
   color: #fecaca;
 }
 
+.danger-zone-panel .data-card,
+.danger-zone-panel .section-collapse-body,
+.danger-zone-panel .field,
+.danger-zone-panel .table-wrap {
+  min-width: 0;
+}
+
+.danger-zone-panel .section-collapse-body {
+  overflow-x: auto;
+}
+
+.danger-zone-panel .field-grid {
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  align-items: start;
+}
+
+.danger-zone-panel .field-grid > .actions-row {
+  grid-column: 1 / -1;
+}
+
+.danger-zone-panel .actions-row {
+  flex-wrap: wrap;
+}
+
+.danger-zone-panel .admin-table-row-form {
+  min-width: 720px;
+}
+
 .admin-tabstrip {
   display: flex;
   align-items: flex-end;
@@ -1742,6 +1770,18 @@ html[data-theme="dark"] .admin-tab.active {
   .admin-tabstrip {
     padding: 0;
     margin-inline: -0.15rem;
+  }
+
+  .danger-zone-panel .field-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .danger-zone-panel .actions-row {
+    width: 100%;
+  }
+
+  .danger-zone-panel .actions-row > * {
+    width: 100%;
   }
 
   .admin-tab {

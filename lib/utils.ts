@@ -12,10 +12,11 @@ import {
 } from "@/lib/types";
 
 const MEXICO_CITY_TIMEZONE = "America/Mexico_City";
-const SENSITIVE_DATA_EXCEPTION_USER_IDS = new Set([
+const SENSITIVE_INTERNAL_IDS = new Set([
   "66d0a5da-5156-4aa4-98b5-3e37002af970",
   "4df7451f-5900-42f7-9336-e87180a2e336"
 ]);
+const PRIVATE_MASK = "****";
 
 function formatPartsToIso(parts: Intl.DateTimeFormatPart[]) {
   const year = parts.find((part) => part.type === "year")?.value ?? "0000";
@@ -147,15 +148,24 @@ export function maskValue(value: string | number, visible = false) {
 }
 
 export function canViewSensitiveSystemData(roleKey: RoleKey, userId?: string | null) {
-  if (roleKey === "super-admin") {
-    return true;
+  return true;
+}
+
+export function isSensitiveInternalId(internalId?: string | null) {
+  return Boolean(internalId && SENSITIVE_INTERNAL_IDS.has(internalId));
+}
+
+export function shouldMaskSensitiveInternal(roleKey: RoleKey, internalId?: string | null) {
+  return roleKey !== "super-admin" && isSensitiveInternalId(internalId);
+}
+
+export function maskPrivateText(value: string | number | null | undefined, masked = false) {
+  if (masked) {
+    return PRIVATE_MASK;
   }
 
-  if (!userId) {
-    return true;
-  }
-
-  return !SENSITIVE_DATA_EXCEPTION_USER_IDS.has(userId);
+  const normalized = String(value ?? "").trim();
+  return normalized || "-";
 }
 
 export function formatDateInput(input: Date) {

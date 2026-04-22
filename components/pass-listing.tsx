@@ -7,7 +7,7 @@ import { FullscreenLoading } from "@/components/fullscreen-loading";
 import { LoadingButton } from "@/components/loading-button";
 import { MutationBanner } from "@/components/mutation-banner";
 import { DateRecord, ListingRecord, MutationState, PassEditData, RoleKey } from "@/lib/types";
-import { formatLongDate, sortListingsForPrint } from "@/lib/utils";
+import { formatLongDate, maskPrivateText, shouldMaskSensitiveInternal, sortListingsForPrint } from "@/lib/utils";
 
 type PrintMode = "listado" | "sexos" | "numeros" | "menciones";
 const mutationInitialState: MutationState = { success: null, error: null };
@@ -78,7 +78,8 @@ function formatDeviceSummary(pass: ListingRecord) {
     .join(", ");
 }
 
-function renderMainPass(pass: ListingRecord) {
+function renderMainPass(pass: ListingRecord, roleKey: RoleKey) {
+  const isSensitivePass = shouldMaskSensitiveInternal(roleKey, pass.internoId);
   const { listedVisitors, hiddenVisitorsCount, underTwelveCount } = getCompactVisibleVisitors(pass);
   const { basic, special } = splitMentions(pass.menciones);
   const extraSpecials = splitMentions(pass.especiales);
@@ -96,22 +97,24 @@ function renderMainPass(pass: ListingRecord) {
           <div className="apoyo-pass-kicker">Registro pase para terraza</div>
           <div className="apoyo-pass-date">{formatLongDate(pass.fechaVisita)}</div>
         </div>
-        <div className="apoyo-pass-number">{pass.numeroPase ?? "-"}</div>
+        <div className="apoyo-pass-number">{maskPrivateText(pass.numeroPase ?? "-", isSensitivePass)}</div>
       </div>
 
       <div className="apoyo-pass-meta">
         <div>
-          <strong>PPL:</strong> {pass.internoNombre}
+          <strong>PPL:</strong> {maskPrivateText(pass.internoNombre, isSensitivePass)}
         </div>
         <div>
-          <strong>Ubicacion:</strong> {pass.internoUbicacion}
+          <strong>Ubicacion:</strong> {maskPrivateText(pass.internoUbicacion, isSensitivePass)}
         </div>
       </div>
 
       <div className="apoyo-pass-section visits-section">
         <strong>Visitas:</strong>
         <div className="apoyo-pass-list">
-          {listedVisitors.map((visitor) => (
+          {isSensitivePass ? (
+            <div className="apoyo-pass-line">{maskPrivateText("Privado", true)}</div>
+          ) : listedVisitors.map((visitor) => (
             <div
               key={`${pass.id}-${visitor.visitorId}`}
               className={`apoyo-pass-line ${visitor.edad < 18 ? "minor" : ""}`}
@@ -119,12 +122,12 @@ function renderMainPass(pass: ListingRecord) {
               {formatVisitorLine(visitor)}
             </div>
           ))}
-          {underTwelveCount > 0 ? (
+          {!isSensitivePass && underTwelveCount > 0 ? (
             <div className="apoyo-pass-line minor">
               + {underTwelveCount} {underTwelveCount === 1 ? "menor" : "menores"}
             </div>
           ) : null}
-          {hiddenVisitorsCount > 0 ? (
+          {!isSensitivePass && hiddenVisitorsCount > 0 ? (
             <div className="apoyo-pass-line warning">
               + {hiddenVisitorsCount} visitas en Hombres / Mujeres
             </div>
@@ -132,11 +135,11 @@ function renderMainPass(pass: ListingRecord) {
         </div>
       </div>
 
-      {basic.length > 0 ? (
+      {(basic.length > 0 || isSensitivePass) ? (
         <div className="apoyo-pass-section basic-section">
           <strong>Peticion:</strong>
           <div className="apoyo-pass-list">
-            {basic.map((item, index) => (
+            {(isSensitivePass ? ["****"] : basic).map((item, index) => (
               <div key={`${pass.id}-basic-${index}`} className="apoyo-pass-line warning ellipsis-block">
                 {item}
               </div>
@@ -145,11 +148,11 @@ function renderMainPass(pass: ListingRecord) {
         </div>
       ) : null}
 
-      {specialLines.length > 0 ? (
+      {(specialLines.length > 0 || isSensitivePass) ? (
         <div className="apoyo-pass-section special-section">
           <strong>Peticion especial:</strong>
           <div className="apoyo-pass-list">
-            {specialLines.map((item, index) => (
+            {(isSensitivePass ? ["****"] : specialLines).map((item, index) => (
               <div key={`${pass.id}-special-${index}`} className="apoyo-pass-line minor ellipsis-block">
                 {item}
               </div>
@@ -170,7 +173,8 @@ function chunkListingPages<T>(items: T[], size: number) {
   return pages;
 }
 
-function renderSeparatedPasses(pass: ListingRecord) {
+function renderSeparatedPasses(pass: ListingRecord, roleKey: RoleKey) {
+  const isSensitivePass = shouldMaskSensitiveInternal(roleKey, pass.internoId);
   const { visibleVisitors, underTwelveCount } = getVisibleVisitors(pass);
   const hasMen = visibleVisitors.some((visitor) => visitor.sexo === "hombre");
   const hasWomen = visibleVisitors.some((visitor) => visitor.sexo !== "hombre");
@@ -204,16 +208,18 @@ function renderSeparatedPasses(pass: ListingRecord) {
 
       <div className="apoyo-pass-meta">
         <div>
-          <strong>PPL:</strong> {pass.internoNombre}
+          <strong>PPL:</strong> {maskPrivateText(pass.internoNombre, isSensitivePass)}
         </div>
         <div>
-          <strong>Ubicacion:</strong> {pass.internoUbicacion}
+          <strong>Ubicacion:</strong> {maskPrivateText(pass.internoUbicacion, isSensitivePass)}
         </div>
       </div>
 
       <div className="apoyo-pass-section">
         <div className="apoyo-pass-list">
-          {section.visitors.map((visitor) => (
+          {isSensitivePass ? (
+            <div className="apoyo-pass-line">{maskPrivateText("Privado", true)}</div>
+          ) : section.visitors.map((visitor) => (
             <div
               key={`${pass.id}-${section.key}-${visitor.visitorId}`}
               className={`apoyo-pass-line ${visitor.edad < 18 ? "minor" : ""}`}
@@ -221,7 +227,7 @@ function renderSeparatedPasses(pass: ListingRecord) {
               {formatVisitorLine(visitor)}
             </div>
           ))}
-          {section.childrenCount > 0 ? (
+          {!isSensitivePass && section.childrenCount > 0 ? (
             <div className="apoyo-pass-line minor">
               + {section.childrenCount} {section.childrenCount === 1 ? "menor" : "menores"}
             </div>
@@ -232,7 +238,8 @@ function renderSeparatedPasses(pass: ListingRecord) {
   ));
 }
 
-function renderMentionPass(pass: ListingRecord) {
+function renderMentionPass(pass: ListingRecord, roleKey: RoleKey) {
+  const isSensitivePass = shouldMaskSensitiveInternal(roleKey, pass.internoId);
   const { basic, special } = splitMentions(pass.menciones);
   const extraSpecials = splitMentions(pass.especiales);
   const mergedSpecialLines = [
@@ -253,26 +260,26 @@ function renderMentionPass(pass: ListingRecord) {
 
       <div className="apoyo-pass-meta">
         <div>
-          <strong>PPL:</strong> {pass.internoNombre}
+          <strong>PPL:</strong> {maskPrivateText(pass.internoNombre, isSensitivePass)}
         </div>
         <div>
-          <strong>Ubicacion:</strong> {pass.internoUbicacion}
+          <strong>Ubicacion:</strong> {maskPrivateText(pass.internoUbicacion, isSensitivePass)}
         </div>
       </div>
 
-      {basic.length > 0 || mergedSpecialLines.length > 0 ? (
+      {basic.length > 0 || mergedSpecialLines.length > 0 || isSensitivePass ? (
         <div className="apoyo-pass-section">
           <strong className="mention-title">Mencion</strong>
           <div className="apoyo-pass-list support-note-list">
-            {basic.map((item, index) => (
+            {(isSensitivePass ? ["****"] : basic).map((item, index) => (
               <div key={`${pass.id}-mention-basic-${index}`} className="apoyo-pass-line warning">
                 {item}
               </div>
             ))}
-            {mergedSpecialLines.length > 0 ? (
+            {mergedSpecialLines.length > 0 || isSensitivePass ? (
               <div className="support-note-block">
                 <strong className="mention-title">Mencion especial</strong>
-                {mergedSpecialLines.map((item, index) => (
+                {(isSensitivePass ? ["****"] : mergedSpecialLines).map((item, index) => (
                   <div key={`${pass.id}-mention-special-${index}`} className="apoyo-pass-line minor">
                     {item}
                   </div>
@@ -603,7 +610,7 @@ export function PassListing({
                         </button>
                       </div>
                     ) : null}
-                    {renderMainPass(pass)}
+                    {renderMainPass(pass, roleKey)}
                   </div>
                 ))}
               </div>
@@ -614,18 +621,23 @@ export function PassListing({
             </section>
           ))
         ) : printMode === "sexos" ? (
-          filtered.flatMap((pass) => renderSeparatedPasses(pass))
+          filtered.flatMap((pass) => renderSeparatedPasses(pass, roleKey))
         ) : printMode === "menciones" ? (
-          filtered.map((pass) => renderMentionPass(pass))
+          filtered.map((pass) => renderMentionPass(pass, roleKey))
         ) : (
           <article className="pass-card delivery-print">
             <div className="numbers-print-list">
               {filtered.map((pass) => (
+                (() => {
+                  const isSensitivePass = shouldMaskSensitiveInternal(roleKey, pass.internoId);
+                  return (
                 <div key={pass.id} className="numbers-print-row">
-                  <span>{pass.internoUbicacion}</span>
-                  <span>{pass.internoNombre}</span>
-                  <span className="numbers-print-value">{pass.numeroPase ?? "-"}</span>
+                  <span>{maskPrivateText(pass.internoUbicacion, isSensitivePass)}</span>
+                  <span>{maskPrivateText(pass.internoNombre, isSensitivePass)}</span>
+                  <span className="numbers-print-value">{maskPrivateText(pass.numeroPase ?? "-", isSensitivePass)}</span>
                 </div>
+                  );
+                })()
               ))}
             </div>
           </article>
