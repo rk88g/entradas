@@ -48,17 +48,14 @@ export default async function ListadoPage({
     redirect("/sistema/escaleras");
   }
 
-  const orderedDates = [...fechas].sort((left, right) => left.fechaCompleta.localeCompare(right.fechaCompleta));
-  const referenceDateValue = requestedDate || openDate?.fechaCompleta || nextDate?.fechaCompleta || orderedDates[orderedDates.length - 1]?.fechaCompleta || "";
-  const referenceIndex = Math.max(
-    0,
-    orderedDates.findIndex((item) => item.fechaCompleta === referenceDateValue)
-  );
-  const availableDates =
-    profile?.roleKey === "super-admin"
-      ? orderedDates.slice(Math.max(0, referenceIndex - 3), Math.min(orderedDates.length, referenceIndex + 3))
-      : [];
-  const selectedPrintDate = requestedDate || openDate?.fechaCompleta || availableDates[availableDates.length - 1]?.fechaCompleta || "";
+  const orderedDates = [...fechas].sort((left, right) => right.fechaCompleta.localeCompare(left.fechaCompleta));
+  const availableDates = orderedDates;
+  const selectedPrintDate =
+    requestedDate ||
+    openDate?.fechaCompleta ||
+    nextDate?.fechaCompleta ||
+    availableDates[0]?.fechaCompleta ||
+    "";
 
   const [currentPrintListings, waitingListings] = await Promise.all([
     selectedPrintDate ? getListado({ fechaVisita: selectedPrintDate }) : Promise.resolve([]),
@@ -81,10 +78,10 @@ export default async function ListadoPage({
           </div>
         </article>
         <article className="quick-card">
-          <h3>Manana</h3>
+          <h3>Listado seleccionado</h3>
           <div className="mini-list">
             <div className="mini-row">
-              <strong>{openDate ? formatLongDate(openDate.fechaCompleta) : "Sin fecha"}</strong>
+              <strong>{selectedPrintDate ? formatLongDate(selectedPrintDate) : "Sin fecha"}</strong>
             </div>
             <div className="mini-row">
               <span>Pases</span>

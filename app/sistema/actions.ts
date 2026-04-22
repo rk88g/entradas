@@ -499,7 +499,7 @@ export async function closeDateAction(
     const openDate = await getOpenDate();
     const dateValue = String(formData.get("fecha_completa") ?? "").trim() || openDate?.fechaCompleta || "";
     if (!dateValue) {
-      return failure("No se encontro la fecha activa de MAÑANA.");
+      return failure("No se encontro la fecha a cerrar.");
     }
 
     const supabase = await createServerSupabaseClient();
@@ -511,11 +511,11 @@ export async function closeDateAction(
       .maybeSingle();
 
     if (!setting?.value) {
-      return failure("No hay contraseña de cierre configurada.");
+      return failure("No hay contrasena de cierre configurada.");
     }
 
     if (setting.value !== closePassword) {
-      return failure("Contraseña incorrecta.");
+      return failure("Contrasena incorrecta.");
     }
 
     const selectedDate = await getDateByValue(dateValue);
@@ -523,8 +523,8 @@ export async function closeDateAction(
       return failure("La fecha ya no existe.");
     }
 
-    if (selectedDate.estado !== "abierto") {
-      return failure("Solo se puede cerrar la fecha de MAÑANA.");
+    if (selectedDate.cierre) {
+      return failure("Esa fecha ya esta cerrada.");
     }
 
     const passes = await getListado({ fechaVisita: dateValue });
@@ -539,7 +539,9 @@ export async function closeDateAction(
 
     const orderedPendingPasses =
       numberedPasses.length > 0
-        ? pendingPasses.sort((a, b) => a.createdAt.localeCompare(b.createdAt))
+        ? pendingPasses.sort(
+            (a, b) => compareInternalLocations(a.internoUbicacion, b.internoUbicacion) || a.createdAt.localeCompare(b.createdAt)
+          )
         : pendingPasses.sort(
             (a, b) => compareInternalLocations(a.internoUbicacion, b.internoUbicacion) || a.createdAt.localeCompare(b.createdAt)
           );
@@ -592,7 +594,6 @@ export async function closeDateAction(
     return failure(error instanceof Error ? error.message : "No se pudo cerrar la fecha.");
   }
 }
-
 export async function createInternalAction(
   _prevState: MutationState,
   formData: FormData
@@ -3182,3 +3183,5 @@ export async function assignModuleStaffAction(
     return failure(error instanceof Error ? error.message : "No se pudo asignar el puesto.");
   }
 }
+
+

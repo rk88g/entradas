@@ -506,7 +506,7 @@ export function PassListing({
       <FullscreenLoading active={editScreenLoading || editLoading} label="Loading..." />
       <div className="pass-controls hide-print">
         <div className="toolbar">
-          {roleKey === "super-admin" && availableDates.length > 0 ? (
+          {availableDates.length > 0 ? (
             <div className="field" style={{ width: "100%", flexBasis: "100%" }}>
               <select
                 value={printDate}

@@ -489,7 +489,7 @@ export function nextPassNumber(seed: number) {
 
 export function isValidInternalLocation(value: string) {
   const normalized = value.trim().toUpperCase();
-  return /^(?:(?:[1-9]|1[0-5])-\d+|[A-Z]+-\d+)$/.test(normalized);
+  return /^(?:(?:0|[1-9]|1[0-5])-\d+|[A-Z]+-\d+)$/.test(normalized);
 }
 
 export function parseInternalLocation(value: string) {
@@ -529,21 +529,24 @@ export function compareInternalLocations(a: string, b: string) {
   const locationA = parseInternalLocation(a);
   const locationB = parseInternalLocation(b);
 
-  if (locationA.type !== locationB.type) {
-    if (locationA.type === "numeric") {
-      return -1;
-    }
+  const rankA =
+    locationA.type === "alpha"
+      ? locationA.primaryText === "I"
+        ? -1
+        : Number.MAX_SAFE_INTEGER - 1
+      : locationA.primaryNumber;
+  const rankB =
+    locationB.type === "alpha"
+      ? locationB.primaryText === "I"
+        ? -1
+        : Number.MAX_SAFE_INTEGER - 1
+      : locationB.primaryNumber;
 
-    if (locationB.type === "numeric") {
-      return 1;
-    }
+  if (rankA !== rankB) {
+    return rankA - rankB;
   }
 
   if (locationA.type === "numeric" && locationB.type === "numeric") {
-    if (locationA.primaryNumber !== locationB.primaryNumber) {
-      return locationA.primaryNumber - locationB.primaryNumber;
-    }
-
     if (locationA.secondary !== locationB.secondary) {
       return locationA.secondary - locationB.secondary;
     }

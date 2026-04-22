@@ -33,6 +33,7 @@ export function DateOperations({
   const tomorrowValue = getDateOffset(1);
   const waitingValue = getDateOffset(2);
   const registeredDates = useMemo(() => [...dates].sort((a, b) => b.fechaCompleta.localeCompare(a.fechaCompleta)), [dates]);
+  const closableDates = useMemo(() => registeredDates.filter((item) => !item.cierre), [registeredDates]);
   const tomorrowDate = registeredDates.find((item) => item.fechaCompleta === tomorrowValue) ?? null;
   const waitingDate = registeredDates.find((item) => item.fechaCompleta === waitingValue) ?? null;
 
@@ -51,7 +52,7 @@ export function DateOperations({
         <div className="calendar-grid" style={{ marginTop: "1rem" }}>
           {[
             { label: "EN ESPERA", dateValue: waitingValue, record: waitingDate },
-            { label: "MAÑANA", dateValue: tomorrowValue, record: tomorrowDate }
+            { label: "MANANA", dateValue: tomorrowValue, record: tomorrowDate }
           ].map((slot) => (
             <article key={slot.dateValue} className="calendar-card date-slot-card">
               <span className="eyebrow">{slot.label}</span>
@@ -89,7 +90,7 @@ export function DateOperations({
                       const type = concluded
                         ? "CONCLUIDA"
                         : date.fechaCompleta === tomorrowValue
-                          ? "MAÑANA"
+                          ? "MANANA"
                           : date.fechaCompleta === waitingValue
                             ? "EN ESPERA"
                             : "Registrada";
@@ -135,21 +136,33 @@ export function DateOperations({
           <details className="data-card section-collapse date-section-card">
             <summary>
               <span>Cerrar</span>
-              <span>{openDate ? formatLongDate(openDate.fechaCompleta) : "Sin fecha"}</span>
+              <span>{closableDates[0] ? formatLongDate(closableDates[0].fechaCompleta) : "Sin fecha"}</span>
             </summary>
             <div className="section-collapse-body">
               <p className="muted">
-                {openDate ? `Vas a cerrar la fecha ${formatLongDate(openDate.fechaCompleta)}.` : "No hay fecha registrada para MAÑANA."}
+                {closableDates[0]
+                  ? "Elige cualquier fecha disponible para cerrarla y enumerar sus pases."
+                  : "No hay fechas disponibles para cerrar."}
               </p>
               <MutationBanner state={closeState} />
               <form action={closeAction} className="field-grid" style={{ marginTop: "0.8rem" }} autoComplete="off" onSubmitCapture={() => setScreenLoading(true)}>
-                <input type="hidden" name="fecha_completa" value={openDate?.fechaCompleta ?? ""} />
                 <div className="field">
-                  <label htmlFor="close_password">Contraseña de cierre</label>
-                  <input id="close_password" name="close_password" type="password" placeholder="Contraseña" autoComplete="off" />
+                  <label htmlFor="close_date_value">Fecha a cerrar</label>
+                  <select id="close_date_value" name="fecha_completa" defaultValue={closableDates[0]?.fechaCompleta ?? ""}>
+                    {closableDates.length === 0 ? <option value="">Sin fechas disponibles</option> : null}
+                    {closableDates.map((date) => (
+                      <option key={date.id} value={date.fechaCompleta}>
+                        {formatLongDate(date.fechaCompleta)}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+                <div className="field">
+                  <label htmlFor="close_password">Contrasena de cierre</label>
+                  <input id="close_password" name="close_password" type="password" placeholder="Contrasena" autoComplete="off" />
                 </div>
                 <div className="actions-row">
-                  <LoadingButton pending={closePending} label="Cerrar fecha" loadingLabel="Loading..." className="button-secondary" disabled={!openDate} />
+                  <LoadingButton pending={closePending} label="Cerrar fecha" loadingLabel="Loading..." className="button-secondary" disabled={closableDates.length === 0} />
                 </div>
               </form>
             </div>
@@ -157,7 +170,7 @@ export function DateOperations({
 
           <details className="data-card section-collapse date-section-card">
             <summary>
-              <span>Contraseña</span>
+              <span>Contrasena</span>
               <span>{closePasswordConfigured ? "Actualizable" : "Sin definir"}</span>
             </summary>
             <div className="section-collapse-body">
@@ -165,12 +178,12 @@ export function DateOperations({
               <form action={passwordAction} className="field-grid" autoComplete="off" onSubmitCapture={() => setScreenLoading(true)}>
                 <div className="field">
                   <label htmlFor="new_close_password">
-                    {closePasswordConfigured ? "Nueva contraseña de cierre" : "Crear contraseña de cierre"}
+                    {closePasswordConfigured ? "Nueva contrasena de cierre" : "Crear contrasena de cierre"}
                   </label>
-                  <input id="new_close_password" name="close_password" type="password" placeholder="Contraseña" autoComplete="off" />
+                  <input id="new_close_password" name="close_password" type="password" placeholder="Contrasena" autoComplete="off" />
                 </div>
                 <div className="actions-row">
-                  <LoadingButton pending={passwordPending} label="Guardar contraseña" loadingLabel="Loading..." className="button" />
+                  <LoadingButton pending={passwordPending} label="Guardar contrasena" loadingLabel="Loading..." className="button" />
                 </div>
               </form>
             </div>
