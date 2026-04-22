@@ -490,6 +490,7 @@ function drawSecondaryCard(options: {
   top: number;
   cardHeight: number;
   title: string;
+  titleColor?: ReturnType<typeof rgb>;
   date: string;
   internalName: string;
   location: string;
@@ -503,6 +504,7 @@ function drawSecondaryCard(options: {
   const y = PAGE_HEIGHT - top - cardHeight;
   const innerX = x + 10;
   const innerWidth = width - 20;
+  const titleColor = options.titleColor ?? COLORS.text;
 
   page.drawLine({
     start: { x, y },
@@ -514,7 +516,7 @@ function drawSecondaryCard(options: {
   const titleWidth = boldFont.widthOfTextAtSize(title, SECONDARY_LISTING_TEXT_SIZE);
   const dateX = innerX + titleWidth + 10;
   let cursorTop = top + 6;
-  drawTextLine(page, title, innerX, cursorTop, SECONDARY_LISTING_TEXT_SIZE, boldFont);
+  drawTextLine(page, title, innerX, cursorTop, SECONDARY_LISTING_TEXT_SIZE, boldFont, titleColor);
   drawTextLine(page, date, dateX, cursorTop, SECONDARY_LISTING_TEXT_SIZE, regularFont, COLORS.muted);
   cursorTop += 15;
   drawTextLine(page, "PPL:", innerX, cursorTop, SECONDARY_LISTING_TEXT_SIZE, boldFont);
@@ -579,7 +581,7 @@ function drawNumbersRow(options: {
   drawWrappedBlock({
     page,
     font: regularFont,
-    text: pass.internoNombre,
+    text: `${pass.internoNombre}    Pase ${pass.numeroPase ?? "-"}`,
     x: x + leftWidth + 4,
     top: textTop,
     width: middleWidth,
@@ -687,6 +689,7 @@ function drawMentionsMode(pdf: PDFDocument, listings: ListingRecord[], regularFo
         top,
         cardHeight,
         title: "MENCIONES",
+        titleColor: COLORS.danger,
         date: formatLongDate(card.pass.fechaVisita),
         internalName: card.pass.internoNombre,
         location: card.pass.internoUbicacion,
