@@ -123,6 +123,7 @@ export interface VisitorRecord {
   historial: VisitorHistoryEntry[];
   currentInternalId?: string;
   currentInternalName?: string;
+  currentInternalLocation?: string;
   telefono?: string;
   notas?: string | null;
   createdAt: string;

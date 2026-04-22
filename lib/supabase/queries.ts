@@ -1064,7 +1064,7 @@ export async function getVisitas(): Promise<VisitorRecord[]> {
 
   const relationInternalIds = [...new Set((currentRelations ?? []).map((item) => item.interno_id))];
   const relationInternalsMap = await getInternosMap(supabase, relationInternalIds);
-  const currentRelationMap = new Map<string, { internoId: string; internoName: string }>();
+  const currentRelationMap = new Map<string, { internoId: string; internoName: string; internoLocation: string }>();
   if (!relationError) {
     (currentRelations ?? []).forEach((item) => {
       const interno = relationInternalsMap.get(item.interno_id);
@@ -1074,7 +1074,8 @@ export async function getVisitas(): Promise<VisitorRecord[]> {
 
       currentRelationMap.set(item.visita_id, {
         internoId: item.interno_id,
-        internoName: interno.fullName
+        internoName: interno.fullName,
+        internoLocation: interno.ubicacion
       });
     });
   }
@@ -1089,7 +1090,8 @@ export async function getVisitas(): Promise<VisitorRecord[]> {
           detailedHistoryMap.get(item.id) ?? []
         ),
         currentInternalId: currentRelation?.internoId,
-        currentInternalName: currentRelation?.internoName
+        currentInternalName: currentRelation?.internoName,
+        currentInternalLocation: currentRelation?.internoLocation
       };
     })
     .filter((item) => Boolean(item.currentInternalId && item.currentInternalName))
@@ -1191,7 +1193,7 @@ export async function getVisitasPage(options?: {
 
   const relationInternalIds = [...new Set(relationRows.map((item) => item.interno_id))];
   const relationInternalsMap = await getInternosMap(supabase, relationInternalIds);
-  const currentRelationMap = new Map<string, { internoId: string; internoName: string }>();
+  const currentRelationMap = new Map<string, { internoId: string; internoName: string; internoLocation: string }>();
 
   relationRows.forEach((item) => {
     const interno = relationInternalsMap.get(item.interno_id);
@@ -1201,7 +1203,8 @@ export async function getVisitasPage(options?: {
 
     currentRelationMap.set(item.visita_id, {
       internoId: item.interno_id,
-      internoName: interno.fullName
+      internoName: interno.fullName,
+      internoLocation: interno.ubicacion
     });
   });
 
@@ -1215,7 +1218,8 @@ export async function getVisitasPage(options?: {
           detailedHistoryMap.get(item.id) ?? []
         ),
         currentInternalId: currentRelation?.internoId,
-        currentInternalName: currentRelation?.internoName
+        currentInternalName: currentRelation?.internoName,
+        currentInternalLocation: currentRelation?.internoLocation
       };
     })
     .filter((item) => {
@@ -1229,7 +1233,8 @@ export async function getVisitasPage(options?: {
 
       return (
         item.fullName.toLowerCase().includes(normalized) ||
-        (item.currentInternalName ?? "").toLowerCase().includes(normalized)
+        (item.currentInternalName ?? "").toLowerCase().includes(normalized) ||
+        (item.currentInternalLocation ?? "").toLowerCase().includes(normalized)
       );
     });
 

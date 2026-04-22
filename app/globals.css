@@ -1586,11 +1586,35 @@ html[data-theme="dark"] .danger-zone-panel .section-collapse summary {
 .danger-zone-panel .responsive-mobile-table {
   overflow-x: auto;
   overflow-y: hidden;
+  scrollbar-gutter: stable both-edges;
+  border: 1px solid var(--line);
+  border-radius: 18px;
+  background: var(--surface-strong);
 }
 
 .danger-zone-panel .responsive-mobile-table table {
   width: max-content;
   min-width: 100%;
+  table-layout: auto;
+}
+
+.danger-zone-panel .responsive-mobile-table th,
+.danger-zone-panel .responsive-mobile-table td {
+  vertical-align: top;
+  max-width: 18rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.danger-zone-panel .responsive-mobile-table td[data-label="Elemento"],
+.danger-zone-panel .responsive-mobile-table td[data-label="Correo"],
+.danger-zone-panel .responsive-mobile-table td[data-label="Ubicacion"],
+.danger-zone-panel .responsive-mobile-table td[data-label="Alcance"] {
+  max-width: 28rem;
+}
+
+.danger-zone-panel .responsive-mobile-table td form {
+  min-width: max-content;
 }
 
 .admin-tabstrip {
@@ -2184,11 +2208,12 @@ html[data-theme="dark"] .admin-tab.active {
     border: 1px solid var(--line);
     border-radius: 18px;
     background: transparent;
+    scrollbar-gutter: stable both-edges;
   }
 
   .danger-zone-panel .responsive-mobile-table table {
     display: table;
-    width: 100%;
+    width: max-content;
     min-width: 720px;
   }
 
@@ -2213,6 +2238,9 @@ html[data-theme="dark"] .admin-tab.active {
     width: auto;
     padding: 0.85rem 0.75rem;
     white-space: nowrap;
+    max-width: 18rem;
+    overflow: hidden;
+    text-overflow: ellipsis;
     border-bottom: 1px solid #e8edf5;
   }
 

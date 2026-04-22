@@ -21,6 +21,17 @@ function formatHistoryDate(value: string) {
   return formatLongDate(normalized);
 }
 
+function formatCurrentInternalLabel(name?: string | null, location?: string | null) {
+  const normalizedName = String(name ?? "").trim();
+  const normalizedLocation = String(location ?? "").trim();
+
+  if (!normalizedName) {
+    return "-";
+  }
+
+  return normalizedLocation ? `${normalizedName} [${normalizedLocation}]` : normalizedName;
+}
+
 function getEstimatedBirthDateFromAge(ageValue: string) {
   const age = Number(ageValue);
   if (!Number.isFinite(age) || age < 0 || age > 120) {
@@ -243,7 +254,12 @@ export function VisitorManager({
                         <span>{maskPrivateText(visitor.parentesco, isSensitiveVisitor)}</span>
                       </div>
                     </td>
-                    <td>{maskPrivateText(visitor.currentInternalName ?? "-", isSensitiveVisitor)}</td>
+                    <td>
+                      {maskPrivateText(
+                        formatCurrentInternalLabel(visitor.currentInternalName, visitor.currentInternalLocation),
+                        isSensitiveVisitor
+                      )}
+                    </td>
                     <td>{maskValue(visitor.edad, canViewSensitiveData && !isSensitiveVisitor)}</td>
                     <td>
                       <StatusBadge variant={visitor.betada ? "danger" : "ok"}>
