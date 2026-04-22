@@ -29,8 +29,16 @@ const mutationInitialState: MutationState = {
   error: null
 };
 
-function getDateOptions(openDate?: DateRecord | null, nextDate?: DateRecord | null) {
-  return [openDate, nextDate].filter((item): item is DateRecord => Boolean(item));
+function getDateOptions(previousDate?: DateRecord | null, openDate?: DateRecord | null, nextDate?: DateRecord | null) {
+  const unique = new Map<string, DateRecord>();
+
+  [previousDate, openDate, nextDate].forEach((item) => {
+    if (item) {
+      unique.set(item.fechaCompleta, item);
+    }
+  });
+
+  return [...unique.values()].sort((left, right) => left.fechaCompleta.localeCompare(right.fechaCompleta));
 }
 
 function getDefaultDateValue(roleKey: RoleKey, openDate?: DateRecord | null, nextDate?: DateRecord | null) {
@@ -97,6 +105,7 @@ export function InternalBrowser({
   query,
   page,
   totalPages,
+  previousDate,
   nextDate,
   openDate,
   passArticles,
@@ -107,6 +116,7 @@ export function InternalBrowser({
   query: string;
   page: number;
   totalPages: number;
+  previousDate?: DateRecord | null;
   nextDate?: DateRecord | null;
   openDate?: DateRecord | null;
   passArticles: ModuleDeviceType[];
@@ -151,7 +161,10 @@ export function InternalBrowser({
   const canManageVisitorAvailability = roleKey === "super-admin" || roleKey === "control";
   const canUseFallbackParentesco = canManageVisitorAvailability;
 
-  const availableDates = useMemo(() => getDateOptions(openDate, nextDate), [openDate, nextDate]);
+  const availableDates = useMemo(
+    () => getDateOptions(previousDate, openDate, nextDate),
+    [previousDate, openDate, nextDate]
+  );
   const selected = profiles.find((item) => item.id === modalInternalId) ?? null;
   const selectedIsSensitive = shouldMaskSensitiveInternal(roleKey, selected?.id);
   const selectedPass =

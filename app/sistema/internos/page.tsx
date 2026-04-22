@@ -2,6 +2,7 @@ import { redirect } from "next/navigation";
 import { InternalBrowser } from "@/components/internal-browser";
 import {
   getCurrentUserProfile,
+  getFechas,
   getInternalProfilesPage,
   getNextDate,
   getOpenDate,
@@ -17,11 +18,12 @@ export default async function InternosPage({
   const resolvedSearchParams = (await searchParams) ?? {};
   const query = String(resolvedSearchParams.q ?? "").trim();
   const page = Math.max(1, Number(resolvedSearchParams.page ?? "1") || 1);
-  const [profile, openDate, nextDate, passArticles] = await Promise.all([
+  const [profile, openDate, nextDate, passArticles, fechas] = await Promise.all([
     getCurrentUserProfile(),
     getOpenDate(),
     getNextDate(),
-    getPassDeviceTypes()
+    getPassDeviceTypes(),
+    getFechas()
   ]);
 
   if (profile?.moduleOnly && profile.accessibleModules.length > 0) {
@@ -48,6 +50,10 @@ export default async function InternosPage({
     openDateValue: openDate?.fechaCompleta,
     nextDateValue: nextDate?.fechaCompleta
   });
+  const previousAvailableDate =
+    [...fechas]
+      .filter((item) => !item.cierre && item.fechaCompleta < (openDate?.fechaCompleta ?? nextDate?.fechaCompleta ?? "9999-12-31"))
+      .sort((left, right) => right.fechaCompleta.localeCompare(left.fechaCompleta))[0] ?? null;
 
   return (
     <InternalBrowser
@@ -57,6 +63,7 @@ export default async function InternosPage({
       totalPages={Math.max(1, Math.ceil(paged.total / paged.pageSize))}
       nextDate={nextDate}
       openDate={openDate}
+      previousDate={previousAvailableDate}
       passArticles={passArticles}
       roleKey={profile?.roleKey ?? "capturador"}
       canViewSensitiveData={canViewSensitiveSystemData(profile?.roleKey ?? "capturador", profile?.id)}
