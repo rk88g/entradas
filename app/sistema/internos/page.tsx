@@ -50,10 +50,9 @@ export default async function InternosPage({
     openDateValue: openDate?.fechaCompleta,
     nextDateValue: nextDate?.fechaCompleta
   });
-  const previousAvailableDate =
-    [...fechas]
-      .filter((item) => !item.cierre && item.fechaCompleta < (openDate?.fechaCompleta ?? nextDate?.fechaCompleta ?? "9999-12-31"))
-      .sort((left, right) => right.fechaCompleta.localeCompare(left.fechaCompleta))[0] ?? null;
+  const extraPassDates = [...fechas]
+    .sort((left, right) => right.fechaCompleta.localeCompare(left.fechaCompleta))
+    .slice(0, 6);
 
   return (
     <InternalBrowser
@@ -63,7 +62,7 @@ export default async function InternosPage({
       totalPages={Math.max(1, Math.ceil(paged.total / paged.pageSize))}
       nextDate={nextDate}
       openDate={openDate}
-      previousDate={previousAvailableDate}
+      extraDates={extraPassDates}
       passArticles={passArticles}
       roleKey={profile?.roleKey ?? "capturador"}
       canViewSensitiveData={canViewSensitiveSystemData(profile?.roleKey ?? "capturador", profile?.id)}
