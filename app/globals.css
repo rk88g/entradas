@@ -1557,6 +1557,11 @@ html[data-theme="dark"] .danger-zone-panel .section-collapse summary {
   min-width: 0;
 }
 
+.danger-zone-panel .table-wrap {
+  width: 100%;
+  max-width: 100%;
+}
+
 .danger-zone-panel .section-collapse-body {
   overflow-x: auto;
 }
@@ -1576,6 +1581,16 @@ html[data-theme="dark"] .danger-zone-panel .section-collapse summary {
 
 .danger-zone-panel .admin-table-row-form {
   min-width: 720px;
+}
+
+.danger-zone-panel .responsive-mobile-table {
+  overflow-x: auto;
+  overflow-y: hidden;
+}
+
+.danger-zone-panel .responsive-mobile-table table {
+  width: max-content;
+  min-width: 100%;
 }
 
 .admin-tabstrip {
