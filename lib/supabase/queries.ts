@@ -1300,15 +1300,26 @@ function resolveOperationalDates(fechas: DateRecord[]) {
   const waitingValue = getDateOffset(2);
   const openCandidate = availableDates.find((item) => item.fechaCompleta === tomorrowValue) ?? null;
   const nextCandidate = availableDates.find((item) => item.fechaCompleta === waitingValue) ?? null;
+  const futureDates = availableDates.filter((item) => item.fechaCompleta >= tomorrowValue);
 
-  if (openCandidate && nextCandidate) {
+  if (openCandidate) {
     return {
       openDate: openCandidate,
-      nextDate: nextCandidate
+      nextDate:
+        nextCandidate ??
+        futureDates.find((item) => item.fechaCompleta > openCandidate.fechaCompleta) ??
+        null
     };
   }
 
-  const latestTwo = availableDates.slice(-2);
+  if (nextCandidate) {
+    return {
+      openDate: nextCandidate,
+      nextDate: futureDates.find((item) => item.fechaCompleta > nextCandidate.fechaCompleta) ?? null
+    };
+  }
+
+  const latestTwo = futureDates.length > 0 ? futureDates.slice(0, 2) : availableDates.slice(-2);
   return {
     openDate: latestTwo[0] ?? null,
     nextDate: latestTwo[1] ?? null

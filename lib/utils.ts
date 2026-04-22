@@ -195,20 +195,20 @@ export function getTodayDate() {
 }
 
 export function getTomorrowDate() {
-  const date = new Date();
+  const date = parseLocalDate(getTodayDate());
   date.setDate(date.getDate() + 1);
   return formatDateInput(date);
 }
 
 export function getDateOffset(offset: number) {
-  const date = new Date();
+  const date = parseLocalDate(getTodayDate());
   date.setDate(date.getDate() + offset);
   return formatDateInput(date);
 }
 
 export function getNextTwoDays() {
   return [0, 1, 2].map((offset) => {
-    const date = new Date();
+    const date = parseLocalDate(getTodayDate());
     date.setDate(date.getDate() + offset);
     return formatDateInput(date);
   });
