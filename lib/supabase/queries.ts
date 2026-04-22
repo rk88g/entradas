@@ -1292,16 +1292,37 @@ export async function getFechas(): Promise<DateRecord[]> {
   }));
 }
 
+function resolveOperationalDates(fechas: DateRecord[]) {
+  const availableDates = [...fechas]
+    .filter((item) => !item.cierre)
+    .sort((left, right) => left.fechaCompleta.localeCompare(right.fechaCompleta));
+  const tomorrowValue = getDateOffset(1);
+  const waitingValue = getDateOffset(2);
+  const openCandidate = availableDates.find((item) => item.fechaCompleta === tomorrowValue) ?? null;
+  const nextCandidate = availableDates.find((item) => item.fechaCompleta === waitingValue) ?? null;
+
+  if (openCandidate && nextCandidate) {
+    return {
+      openDate: openCandidate,
+      nextDate: nextCandidate
+    };
+  }
+
+  const latestTwo = availableDates.slice(-2);
+  return {
+    openDate: latestTwo[0] ?? null,
+    nextDate: latestTwo[1] ?? null
+  };
+}
+
 export async function getOpenDate(): Promise<DateRecord | null> {
   const fechas = await getFechas();
-  const tomorrowValue = getDateOffset(1);
-  return fechas.find((item) => item.estado === "abierto" && !item.cierre && item.fechaCompleta === tomorrowValue) ?? null;
+  return resolveOperationalDates(fechas).openDate;
 }
 
 export async function getNextDate(): Promise<DateRecord | null> {
   const fechas = await getFechas();
-  const waitingValue = getDateOffset(2);
-  return fechas.find((item) => item.estado === "proximo" && !item.cierre && item.fechaCompleta === waitingValue) ?? null;
+  return resolveOperationalDates(fechas).nextDate;
 }
 
 export async function getOperatingDate(): Promise<DateRecord | null> {
