@@ -308,7 +308,6 @@ function drawMainListingCard(options: {
   const y = PAGE_HEIGHT - top - cardHeight;
   const innerX = x + 8;
   const innerWidth = width - 16;
-  const rightX = x + width - 34;
 
   page.drawRectangle({
     x,
@@ -334,10 +333,13 @@ function drawMainListingCard(options: {
   const titleText = "REGISTRO PASE PARA TERRAZA";
   const titleWidth = boldFont.widthOfTextAtSize(titleText, LISTADO_TEXT_SIZE);
   const dateX = innerX + titleWidth + 10;
+  const passNumberText = String(pass.numeroPase ?? "-");
+  const passNumberWidth = boldFont.widthOfTextAtSize(passNumberText, PASS_NUMBER_SIZE);
+  const passNumberX = x + width - 8 - passNumberWidth;
   let cursorTop = top + 6;
   drawTextLine(page, titleText, innerX, cursorTop, LISTADO_TEXT_SIZE, boldFont);
   drawTextLine(page, formatLongDate(pass.fechaVisita), dateX, cursorTop, LISTADO_TEXT_SIZE, regularFont, COLORS.muted);
-  drawTextLine(page, String(pass.numeroPase ?? "-"), rightX, top + 6, PASS_NUMBER_SIZE, boldFont);
+  drawTextLine(page, passNumberText, passNumberX, top + 6, PASS_NUMBER_SIZE, boldFont);
 
   cursorTop += 17;
   drawTextLine(page, "PPL:", innerX, cursorTop, LISTADO_TEXT_SIZE, boldFont);
