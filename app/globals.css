@@ -1117,6 +1117,45 @@ tr:last-child td {
   text-transform: uppercase;
 }
 
+.scroll-top-fab {
+  position: fixed;
+  right: 1.25rem;
+  bottom: 1.25rem;
+  z-index: 9998;
+  width: 3.2rem;
+  height: 3.2rem;
+  border: 1px solid rgba(15, 23, 42, 0.1);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.88);
+  color: #122033;
+  backdrop-filter: blur(12px);
+  box-shadow: 0 18px 38px rgba(15, 23, 42, 0.16);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 1.35rem;
+  line-height: 1;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(10px);
+  transition: opacity 180ms ease, transform 180ms ease, background 180ms ease, box-shadow 180ms ease;
+}
+
+.scroll-top-fab.visible {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+
+.scroll-top-fab:hover {
+  background: rgba(255, 255, 255, 0.98);
+  box-shadow: 0 20px 44px rgba(15, 23, 42, 0.2);
+}
+
+.scroll-top-fab:active {
+  transform: translateY(1px);
+}
+
 .fullscreen-loading {
   position: fixed;
   inset: 0;
@@ -1154,6 +1193,13 @@ html[data-theme="dark"] .floating-alert.is-error {
 html[data-theme="dark"] .floating-alert.is-success {
   background: rgba(8, 47, 73, 0.94);
   color: #ecfeff;
+}
+
+html[data-theme="dark"] .scroll-top-fab {
+  background: rgba(18, 32, 51, 0.88);
+  border-color: rgba(148, 163, 184, 0.18);
+  color: #f8fafc;
+  box-shadow: 0 18px 38px rgba(2, 6, 23, 0.45);
 }
 
 .alert-box {
@@ -2575,6 +2621,13 @@ html[data-theme="dark"] .admin-tab.active {
 }
 
 @media (max-width: 640px) {
+  .scroll-top-fab {
+    right: 0.85rem;
+    bottom: 0.85rem;
+    width: 3rem;
+    height: 3rem;
+  }
+
   .modal-backdrop {
     padding: 0.5rem;
     place-items: end center;

@@ -44,6 +44,7 @@ export function AppShell({
   const [loadingHref, setLoadingHref] = useState<string | null>(null);
   const [supportCount, setSupportCount] = useState(supportUnreadCount);
   const [supportToast, setSupportToast] = useState<string | null>(null);
+  const [showScrollTop, setShowScrollTop] = useState(false);
   const idleLogoutFormRef = useRef<HTMLFormElement | null>(null);
   const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const visibleNavItems = [
@@ -145,6 +146,19 @@ export function AppShell({
   }, [supportToast]);
 
   useEffect(() => {
+    const updateScrollTopVisibility = () => {
+      setShowScrollTop(window.scrollY > 360);
+    };
+
+    updateScrollTopVisibility();
+    window.addEventListener("scroll", updateScrollTopVisibility, { passive: true });
+
+    return () => {
+      window.removeEventListener("scroll", updateScrollTopVisibility);
+    };
+  }, [pathname]);
+
+  useEffect(() => {
     if (user.roleKey === "super-admin") {
       return;
     }
@@ -180,6 +194,10 @@ export function AppShell({
     setLoadingHref(href);
     setOpen(false);
     router.push(href);
+  }
+
+  function handleScrollToTop() {
+    window.scrollTo({ top: 0, behavior: "smooth" });
   }
 
   return (
@@ -250,6 +268,15 @@ export function AppShell({
               <span>{supportToast}</span>
             </div>
           ) : null}
+          <button
+            type="button"
+            className={`scroll-top-fab hide-print ${showScrollTop ? "visible" : ""}`}
+            onClick={handleScrollToTop}
+            aria-label="Subir al inicio"
+            title="Subir al inicio"
+          >
+            <span aria-hidden="true">↑</span>
+          </button>
           {children}
         </main>
       </div>
