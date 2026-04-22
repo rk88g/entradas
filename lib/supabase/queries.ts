@@ -61,6 +61,7 @@ import {
   fullNameFromParts,
   getAgeFromDate,
   getAllowedModuleDeviceNames,
+  getDateOffset,
   getModuleDisplayName,
   normalizeDeviceTypeName,
   getStatsFromListings,
@@ -1293,12 +1294,14 @@ export async function getFechas(): Promise<DateRecord[]> {
 
 export async function getOpenDate(): Promise<DateRecord | null> {
   const fechas = await getFechas();
-  return fechas.find((item) => item.estado === "abierto") ?? null;
+  const tomorrowValue = getDateOffset(1);
+  return fechas.find((item) => item.estado === "abierto" && !item.cierre && item.fechaCompleta === tomorrowValue) ?? null;
 }
 
 export async function getNextDate(): Promise<DateRecord | null> {
   const fechas = await getFechas();
-  return fechas.find((item) => item.estado === "proximo") ?? null;
+  const waitingValue = getDateOffset(2);
+  return fechas.find((item) => item.estado === "proximo" && !item.cierre && item.fechaCompleta === waitingValue) ?? null;
 }
 
 export async function getOperatingDate(): Promise<DateRecord | null> {

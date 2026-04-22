@@ -48,10 +48,20 @@ export default async function ListadoPage({
     redirect("/sistema/escaleras");
   }
 
+  const canViewHistoricalListingDates = Boolean(
+    profile &&
+      canAccessScope(profile.roleKey, profile.permissionGrants, "listado.fechas-historicas", false)
+  );
   const orderedDates = [...fechas].sort((left, right) => right.fechaCompleta.localeCompare(left.fechaCompleta));
-  const availableDates = orderedDates;
+  const operationalDates = orderedDates.filter(
+    (date) => date.fechaCompleta === openDate?.fechaCompleta || date.fechaCompleta === nextDate?.fechaCompleta
+  );
+  const availableDates = canViewHistoricalListingDates ? orderedDates : operationalDates;
+  const requestedDateAllowed = canViewHistoricalListingDates
+    ? availableDates.some((date) => date.fechaCompleta === requestedDate)
+    : operationalDates.some((date) => date.fechaCompleta === requestedDate);
   const selectedPrintDate =
-    requestedDate ||
+    (requestedDateAllowed ? requestedDate : "") ||
     openDate?.fechaCompleta ||
     nextDate?.fechaCompleta ||
     availableDates[0]?.fechaCompleta ||
@@ -95,6 +105,7 @@ export default async function ListadoPage({
         listings={currentPrintListings}
         printDate={selectedPrintDate}
         availableDates={availableDates}
+        showDateSelector={canViewHistoricalListingDates}
         initialMode={initialMode}
         autoPrint={autoPrint}
         roleKey={profile?.roleKey ?? "capturador"}

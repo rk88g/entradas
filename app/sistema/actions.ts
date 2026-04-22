@@ -431,8 +431,12 @@ export async function createDateAction(
         : dateValue === allowedNextDate
           ? "proximo"
           : "";
-    const activeOpenDate = dates.find((item) => item.estado === "abierto" && !item.cierre);
-    const waitingDate = dates.find((item) => item.estado === "proximo" && !item.cierre);
+    const activeOpenDate = dates.find(
+      (item) => item.estado === "abierto" && !item.cierre && item.fechaCompleta === allowedOpenDate
+    );
+    const waitingDate = dates.find(
+      (item) => item.estado === "proximo" && !item.cierre && item.fechaCompleta === allowedNextDate
+    );
 
     if (!status) {
       return failure("Solo puedes registrar fechas para MAÑANA o EN ESPERA.");

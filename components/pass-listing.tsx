@@ -297,6 +297,7 @@ export function PassListing({
   listings,
   printDate,
   availableDates,
+  showDateSelector = false,
   initialMode = "listado",
   autoPrint = false,
   roleKey
@@ -304,6 +305,7 @@ export function PassListing({
   listings: ListingRecord[];
   printDate: string;
   availableDates: DateRecord[];
+  showDateSelector?: boolean;
   initialMode?: PrintMode;
   autoPrint?: boolean;
   roleKey: RoleKey;
@@ -513,7 +515,7 @@ export function PassListing({
       <FullscreenLoading active={editScreenLoading || editLoading} label="Loading..." />
       <div className="pass-controls hide-print">
         <div className="toolbar">
-          {availableDates.length > 0 ? (
+          {showDateSelector && availableDates.length > 0 ? (
             <div className="field" style={{ width: "100%", flexBasis: "100%" }}>
               <select
                 value={printDate}
