@@ -51,6 +51,7 @@ export default async function InternosPage({
     nextDateValue: nextDate?.fechaCompleta
   });
   const extraPassDates = [...fechas]
+    .filter((date) => profile?.roleKey === "super-admin" || !date.cierre)
     .sort((left, right) => right.fechaCompleta.localeCompare(left.fechaCompleta))
     .slice(0, 6);
 
