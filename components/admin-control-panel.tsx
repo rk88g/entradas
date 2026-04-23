@@ -68,7 +68,15 @@ function formatDateTime(value: string) {
 }
 
 function formatEstimatedLocation(log: ConnectionLogRecord) {
-  const parts = [log.city, log.region, log.country].filter(Boolean);
+  const parts = [log.city, log.region, log.country]
+    .filter(Boolean)
+    .map((part) => {
+      try {
+        return decodeURIComponent(String(part));
+      } catch {
+        return String(part);
+      }
+    });
   return parts.length > 0 ? parts.join(", ") : "Sin dato";
 }
 
@@ -99,7 +107,8 @@ export function AdminControlPanel({
     ubicacion: ""
   });
   const [visitorNameForm, setVisitorNameForm] = useState({
-    nombreCompleto: ""
+    nombreCompleto: "",
+    edad: ""
   });
   const [visitorAvailabilityForm, setVisitorAvailabilityForm] = useState({
     betada: false,
@@ -157,7 +166,8 @@ export function AdminControlPanel({
 
   useEffect(() => {
     setVisitorNameForm({
-      nombreCompleto: selectedCorrectionVisitor?.fullName ?? ""
+      nombreCompleto: selectedCorrectionVisitor?.fullName ?? "",
+      edad: selectedCorrectionVisitor ? String(selectedCorrectionVisitor.edad ?? "") : ""
     });
   }, [selectedCorrectionVisitor]);
 
@@ -843,7 +853,7 @@ export function AdminControlPanel({
           <details className="data-card section-collapse">
             <summary>
               <span>Corregir visita</span>
-              <span>Nombre completo</span>
+              <span>Nombre completo y edad</span>
             </summary>
             <div className="section-collapse-body">
                 <MutationBanner state={visitorIdentityState} />
@@ -861,7 +871,21 @@ export function AdminControlPanel({
                     autoComplete="off"
                     value={visitorNameForm.nombreCompleto}
                     onChange={(event) =>
-                      setVisitorNameForm({ nombreCompleto: event.target.value })
+                      setVisitorNameForm((current) => ({ ...current, nombreCompleto: event.target.value }))
+                    }
+                  />
+                </div>
+                <div className="field">
+                  <input
+                    name="edad"
+                    type="number"
+                    min={0}
+                    max={120}
+                    placeholder="Edad"
+                    autoComplete="off"
+                    value={visitorNameForm.edad}
+                    onChange={(event) =>
+                      setVisitorNameForm((current) => ({ ...current, edad: event.target.value }))
                     }
                   />
                 </div>
@@ -929,7 +953,7 @@ export function AdminControlPanel({
             <span>{connectionLogs.length} registros</span>
           </summary>
           <div className="section-collapse-body">
-            <div className="table-wrap compact-table responsive-mobile-table">
+            <div className="table-wrap compact-table responsive-mobile-table danger-zone-log-table">
             <table>
               <thead>
                 <tr>
@@ -972,7 +996,7 @@ export function AdminControlPanel({
             <span>{actionLogs.length} registros</span>
           </summary>
           <div className="section-collapse-body">
-            <div className="table-wrap compact-table responsive-mobile-table">
+            <div className="table-wrap compact-table responsive-mobile-table danger-zone-action-table">
             <table>
               <thead>
                 <tr>

@@ -1563,11 +1563,11 @@ html[data-theme="dark"] .danger-zone-panel .section-collapse summary {
 }
 
 .danger-zone-panel .section-collapse-body {
-  overflow-x: auto;
+  overflow: visible;
 }
 
 .danger-zone-panel .field-grid {
-  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  grid-template-columns: minmax(0, 1fr);
   align-items: start;
 }
 
@@ -1580,7 +1580,7 @@ html[data-theme="dark"] .danger-zone-panel .section-collapse summary {
 }
 
 .danger-zone-panel .admin-table-row-form {
-  min-width: 720px;
+  min-width: 980px;
 }
 
 .danger-zone-panel .responsive-mobile-table {
@@ -1601,20 +1601,62 @@ html[data-theme="dark"] .danger-zone-panel .section-collapse summary {
 .danger-zone-panel .responsive-mobile-table th,
 .danger-zone-panel .responsive-mobile-table td {
   vertical-align: top;
-  max-width: 18rem;
-  overflow: hidden;
-  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .danger-zone-panel .responsive-mobile-table td[data-label="Elemento"],
 .danger-zone-panel .responsive-mobile-table td[data-label="Correo"],
 .danger-zone-panel .responsive-mobile-table td[data-label="Ubicacion"],
 .danger-zone-panel .responsive-mobile-table td[data-label="Alcance"] {
-  max-width: 28rem;
+  min-width: 18rem;
 }
 
 .danger-zone-panel .responsive-mobile-table td form {
   min-width: max-content;
+}
+
+.danger-zone-panel .danger-zone-log-table table,
+.danger-zone-panel .danger-zone-action-table table {
+  min-width: 900px;
+}
+
+.danger-zone-panel .danger-zone-log-table td[data-label="Correo"],
+.danger-zone-panel .danger-zone-log-table td[data-label="Resultado"],
+.danger-zone-panel .danger-zone-log-table td[data-label="Ubicacion"],
+.danger-zone-panel .danger-zone-action-table td[data-label="Seccion"],
+.danger-zone-panel .danger-zone-action-table td[data-label="Elemento"] {
+  white-space: normal;
+  min-width: 15rem;
+  max-width: 24rem;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.danger-zone-panel .danger-zone-log-table td[data-label="Correo"] {
+  min-width: 16rem;
+}
+
+.danger-zone-panel .danger-zone-log-table td[data-label="Ubicacion"] {
+  min-width: 14rem;
+}
+
+.danger-zone-panel .danger-zone-action-table td[data-label="Elemento"] {
+  min-width: 20rem;
+}
+
+.danger-zone-panel .field,
+.danger-zone-panel .remote-search-field,
+.danger-zone-panel .inline-search-list,
+.danger-zone-panel .record-pill-inline,
+.danger-zone-panel .password-field-row {
+  width: 100%;
+  max-width: 100%;
+}
+
+.danger-zone-panel .section-collapse,
+.danger-zone-panel .data-card,
+.danger-zone-panel .collapse-stack {
+  min-width: 0;
 }
 
 .admin-tabstrip {
@@ -2223,7 +2265,12 @@ html[data-theme="dark"] .admin-tab.active {
   .danger-zone-panel .responsive-mobile-table table {
     display: table;
     width: max-content;
-    min-width: 720px;
+    min-width: 980px;
+  }
+
+  .danger-zone-panel .danger-zone-log-table table,
+  .danger-zone-panel .danger-zone-action-table table {
+    min-width: 900px;
   }
 
   .danger-zone-panel .responsive-mobile-table thead {

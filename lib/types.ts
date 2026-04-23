@@ -76,6 +76,7 @@ export interface VisitorSearchOption {
   id: string;
   fullName: string;
   parentesco: string;
+  edad: number;
   currentInternalName?: string;
   currentInternalLocation?: string;
   betada: boolean;
