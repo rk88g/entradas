@@ -97,6 +97,43 @@ async function reserveGlobalPassNumbers(
     .map((item) => item.numero_pase);
 }
 
+async function normalizeDateStatuses(
+  supabase: Awaited<ReturnType<typeof createServerSupabaseClient>>,
+  presetDates?: Awaited<ReturnType<typeof getFechas>>
+) {
+  const dates = presetDates ?? (await getFechas());
+  const tomorrowValue = getDateOffset(1);
+  const futureOpenDates = [...dates]
+    .filter((item) => !item.cierre && item.fechaCompleta >= tomorrowValue)
+    .sort((left, right) => left.fechaCompleta.localeCompare(right.fechaCompleta));
+
+  for (const date of dates) {
+    let nextStatus = date.estado;
+
+    if (date.cierre) {
+      nextStatus = "cerrado";
+    } else {
+      const futureIndex = futureOpenDates.findIndex((item) => item.id === date.id);
+      if (futureIndex === 0) {
+        nextStatus = "abierto";
+      } else if (futureIndex > 0) {
+        nextStatus = "proximo";
+      }
+    }
+
+    if (nextStatus !== date.estado) {
+      const { error } = await supabase
+        .from("fechas")
+        .update({ estado: nextStatus })
+        .eq("id", date.id);
+
+      if (error) {
+        throw new Error(error.message || "No se pudo normalizar el estatus de las fechas.");
+      }
+    }
+  }
+}
+
 function splitVisitorLegacyName(nombreCompleto: string) {
   const tokens = normalizeFullName(nombreCompleto).split(" ").filter(Boolean);
   if (tokens.length === 0) {
@@ -443,6 +480,47 @@ export async function createDateAction(
     }
 
     const dates = await getFechas();
+    const tomorrowValue = getDateOffset(1);
+
+    if (dateValue < tomorrowValue) {
+      return failure("Solo puedes registrar fechas a partir de manana.");
+    }
+
+    const futureOpenDates = [...dates]
+      .filter((item) => !item.cierre && item.fechaCompleta >= tomorrowValue)
+      .sort((left, right) => left.fechaCompleta.localeCompare(right.fechaCompleta));
+    const earliestFutureDate = futureOpenDates[0]?.fechaCompleta ?? null;
+    const nextStatus = !earliestFutureDate || dateValue < earliestFutureDate ? "abierto" : "proximo";
+
+    const { error: createDateError } = await supabase.from("fechas").insert({
+      dia: parsedDate!.day,
+      mes: parsedDate!.month,
+      anio: parsedDate!.year,
+      fecha_completa: dateValue,
+      cierre: false,
+      estado: nextStatus,
+      created_by: profile.id
+    });
+
+    if (createDateError) {
+      return failure(createDateError.message || "No se pudo registrar la fecha.");
+    }
+
+    await normalizeDateStatuses(supabase);
+
+    await auditAction({
+      userId: profile.id,
+      moduleKey: "fechas",
+      sectionKey: "crear-fecha",
+      actionKey: "create",
+      entityType: "fecha",
+      entityId: dateValue,
+      afterData: { fechaCompleta: dateValue, estado: nextStatus }
+    });
+
+    revalidatePath("/sistema/fechas");
+    revalidatePath("/sistema/listado");
+    return success("Fecha registrada.");
     const allowedOpenDate = getDateOffset(1);
     const allowedNextDate = getDateOffset(2);
     const status =
@@ -595,13 +673,16 @@ export async function closeDateAction(
     const { error: closeError } = await supabase
       .from("fechas")
       .update({
-        cierre: true
+        cierre: true,
+        estado: "cerrado"
       })
       .eq("id", selectedDate.id);
 
     if (closeError) {
       return failure(closeError.message || "No se pudo cerrar la fecha.");
     }
+
+    await normalizeDateStatuses(supabase);
 
     await auditAction({
       userId: profile.id,

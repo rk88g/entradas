@@ -124,7 +124,7 @@ export function DateOperations({
               <form action={createAction} className="field-grid" autoComplete="off" onSubmitCapture={() => setScreenLoading(true)}>
                 <div className="field">
                   <label htmlFor="fecha_completa">Fecha de visita</label>
-                  <input id="fecha_completa" name="fecha_completa" type="date" min={tomorrowValue} max={waitingValue} autoComplete="off" />
+                  <input id="fecha_completa" name="fecha_completa" type="date" min={tomorrowValue} autoComplete="off" />
                 </div>
                 <div className="actions-row">
                   <LoadingButton pending={createPending} label="Guardar" loadingLabel="Loading..." className="button" />
