@@ -1562,7 +1562,10 @@ export async function createPassAction(
 
     const canOperateClosedDate = ["super-admin", "control"].includes(profile.roleKey);
 
-    if (!["abierto", "proximo"].includes(targetDate.estado)) {
+    const canCaptureOnSelectedDate =
+      ["abierto", "proximo"].includes(targetDate.estado) || (targetDate.cierre && canOperateClosedDate);
+
+    if (!canCaptureOnSelectedDate) {
       return failure("La fecha seleccionada no esta disponible para captura.");
     }
 
