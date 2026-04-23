@@ -41,6 +41,10 @@ function getDateOptions(extraDates: DateRecord[] = [], openDate?: DateRecord | n
   return [...unique.values()].sort((left, right) => right.fechaCompleta.localeCompare(left.fechaCompleta));
 }
 
+function canUseClosedPassDates(roleKey: RoleKey) {
+  return roleKey === "super-admin";
+}
+
 function getDefaultDateValue(
   roleKey: RoleKey,
   openDate?: DateRecord | null,
@@ -107,9 +111,15 @@ function getPassSubmitIssue(options: {
   selectedAdultCount: number;
   duplicateRequiresAuthorization: boolean;
   allowDuplicatePass: boolean;
+  selectedDateClosed: boolean;
+  canUseClosedDate: boolean;
 }) {
   if (!options.selectedDateValue) {
     return "Debes elegir la fecha del pase.";
+  }
+
+  if (options.selectedDateClosed && !options.canUseClosedDate) {
+    return "Solo super-admin puede capturar pases en fechas cerradas.";
   }
 
   if (options.selectedVisitorCount === 0) {
@@ -192,13 +202,15 @@ export function InternalBrowser({
   const pendingPassContextRef = useRef<{ internoId: string; fechaVisita: string } | null>(null);
   const canManageVisitorAvailability = roleKey === "super-admin" || roleKey === "control";
   const canUseFallbackParentesco = canManageVisitorAvailability;
+  const canUseClosedDate = canUseClosedPassDates(roleKey);
 
   const availableDates = useMemo(
-    () => getDateOptions(extraDates, openDate, nextDate),
-    [extraDates, openDate, nextDate]
+    () => getDateOptions(extraDates, openDate, nextDate).filter((date) => !date.cierre || canUseClosedDate),
+    [extraDates, openDate, nextDate, canUseClosedDate]
   );
   const selected = profiles.find((item) => item.id === modalInternalId) ?? null;
   const selectedIsSensitive = shouldMaskSensitiveInternal(roleKey, selected?.id);
+  const selectedDateRecord = availableDates.find((item) => item.fechaCompleta === selectedDateValue) ?? null;
   const selectedPass =
     selected && selectedDateValue
       ? getPassForDate(selected, selectedDateValue, openDate, nextDate)
@@ -228,14 +240,20 @@ export function InternalBrowser({
     ).includes(normalizedVisitorQuery);
   });
   const selectedAdults = selectedVisitors.filter((item) => item.visitor.edad >= 18);
-  const canRenderPassButton = !selectedPass || roleKey === "super-admin";
+  const selectedDateClosed = Boolean(selectedDateRecord?.cierre);
+  const canRenderPassButton =
+    Boolean(selectedDateRecord) &&
+    (!selectedPass || roleKey === "super-admin") &&
+    (!selectedDateClosed || canUseClosedDate);
   const duplicateRequiresAuthorization = roleKey === "super-admin" && Boolean(selectedPass);
   const passSubmitIssue = getPassSubmitIssue({
     selectedDateValue,
     selectedVisitorCount: selectedVisitors.length,
     selectedAdultCount: selectedAdults.length,
     duplicateRequiresAuthorization,
-    allowDuplicatePass
+    allowDuplicatePass,
+    selectedDateClosed,
+    canUseClosedDate
   });
   const canSubmitPass =
     Boolean(selected) &&

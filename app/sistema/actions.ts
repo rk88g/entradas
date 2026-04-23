@@ -76,6 +76,24 @@ function normalizeParentesco(value: string) {
   return normalized.toUpperCase() === "SN" ? "SN" : normalized;
 }
 
+function capitalizeFirstLetterPerLine(value: string) {
+  return value
+    .replace(/\r\n/g, "\n")
+    .split("\n")
+    .map((line) => {
+      const normalized = line.trim();
+      if (!normalized) {
+        return "";
+      }
+
+      return normalized.replace(/^([^\p{L}\p{N}]*)([\p{L}])/u, (_match, prefix: string, letter: string) => {
+        return `${prefix}${letter.toLocaleUpperCase("es-MX")}`;
+      });
+    })
+    .join("\n")
+    .trim();
+}
+
 async function reserveGlobalPassNumbers(
   supabase: Awaited<ReturnType<typeof createServerSupabaseClient>>,
   count: number
@@ -1710,8 +1728,8 @@ export async function createPassAction(
     const visitorIds = [...new Set(formData.getAll("visitor_ids").map((item) => String(item).trim()).filter(Boolean))];
     const targetDateValue = String(formData.get("fecha_visita") ?? "").trim();
     const allowDuplicatePass = String(formData.get("allow_duplicate_pass") ?? "").trim() === "true";
-    const mentions = String(formData.get("menciones") ?? "").trim();
-    const specials = String(formData.get("especiales") ?? "").trim();
+    const mentions = capitalizeFirstLetterPerLine(String(formData.get("menciones") ?? ""));
+    const specials = capitalizeFirstLetterPerLine(String(formData.get("especiales") ?? ""));
     const typedArticlePayload = await getPassArticlePayload(formData);
     const targetDate = await getDateByValue(targetDateValue);
 
@@ -1723,7 +1741,7 @@ export async function createPassAction(
       return failure("No se encontro la fecha seleccionada para el pase.");
     }
 
-    const canOperateClosedDate = ["super-admin", "control"].includes(profile.roleKey);
+    const canOperateClosedDate = profile.roleKey === "super-admin";
 
     const canCaptureOnSelectedDate =
       ["abierto", "proximo"].includes(targetDate.estado) || (targetDate.cierre && canOperateClosedDate);
@@ -1919,8 +1937,8 @@ export async function updatePassAction(
     const passId = String(formData.get("listado_id") ?? "").trim();
     const internoId = String(formData.get("interno_id") ?? "").trim();
     const visitorIds = [...new Set(formData.getAll("visitor_ids").map((item) => String(item).trim()).filter(Boolean))];
-    const mentions = String(formData.get("menciones") ?? "").trim();
-    const specials = String(formData.get("especiales") ?? "").trim();
+    const mentions = capitalizeFirstLetterPerLine(String(formData.get("menciones") ?? ""));
+    const specials = capitalizeFirstLetterPerLine(String(formData.get("especiales") ?? ""));
     const typedArticlePayload = await getPassArticlePayload(formData);
 
     if (!passId || !internoId) {
