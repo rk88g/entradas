@@ -1679,11 +1679,6 @@ export async function createPassAction(
         .join(", ");
     }
 
-    let nextNumber: number | null = null;
-    if (targetDate.cierre && canOperateClosedDate) {
-      [nextNumber] = await reserveGlobalPassNumbers(supabase, 1);
-    }
-
     const orderedVisitors = [...selectedVisitors].sort((a, b) => (b.edad ?? 0) - (a.edad ?? 0));
     const specialText =
       canManageMentions(profile.roleKey)
@@ -1696,7 +1691,7 @@ export async function createPassAction(
         p_fecha_visita: targetDate.fechaCompleta,
         p_created_by: profile.id,
         p_duplicate_authorized_by: existingPass && profile.roleKey === "super-admin" && allowDuplicatePass ? profile.id : null,
-        p_numero_pase: nextNumber,
+        p_numero_pase: null,
         p_menciones: canManageMentions(profile.roleKey) && mentions ? mentions : null,
         p_especiales: specialText,
         p_visitor_ids: orderedVisitors.map((visitor) => visitor.id),
