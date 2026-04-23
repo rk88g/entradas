@@ -270,6 +270,111 @@ function measureWrappedBlockHeight(options: {
   return lines.length * size + Math.max(0, lines.length - 1) * lineGap;
 }
 
+function drawColumnizedBlocks(options: {
+  page: PDFPage;
+  x: number;
+  top: number;
+  width: number;
+  availableHeight: number;
+  columnGap: number;
+  allowTwoColumns: boolean;
+  items: Array<{
+    text: string;
+    color?: ReturnType<typeof rgb>;
+    font?: PDFFont;
+  }>;
+  defaultFont: PDFFont;
+  size: number;
+  lineGap?: number;
+}) {
+  const { page, x, top, width, availableHeight, columnGap, allowTwoColumns, items, defaultFont, size } = options;
+  const lineGap = options.lineGap ?? COMPACT_LINE_GAP;
+  const columnCount = allowTwoColumns ? 2 : 1;
+  const columnWidth = columnCount === 2 ? (width - columnGap) / 2 : width;
+  const measuredBlocks = items.map((item) => {
+    const font = item.font ?? defaultFont;
+    return {
+      ...item,
+      font,
+      height: measureWrappedBlockHeight({
+        font,
+        text: item.text,
+        width: columnWidth,
+        size,
+        lineGap
+      })
+    };
+  });
+
+  if (columnCount === 1) {
+    let currentTop = top;
+
+    measuredBlocks.forEach((item) => {
+      currentTop = drawWrappedBlock({
+        page,
+        font: item.font,
+        text: item.text,
+        x,
+        top: currentTop,
+        width: columnWidth,
+        size,
+        color: item.color,
+        lineGap
+      });
+    });
+
+    return currentTop;
+  }
+
+  const totalHeight = measuredBlocks.reduce((sum, item) => sum + item.height, 0);
+  const targetHeight = Math.min(availableHeight, Math.max(totalHeight / 2, 0));
+  const columns: typeof measuredBlocks[] = [[], []];
+  const columnHeights = [0, 0];
+  let currentColumnIndex = 0;
+
+  measuredBlocks.forEach((item, index) => {
+    const remainingItems = measuredBlocks.length - index;
+    const remainingColumns = columns.length - currentColumnIndex - 1;
+    const shouldMoveToNextColumn =
+      currentColumnIndex < columns.length - 1 &&
+      columnHeights[currentColumnIndex] > 0 &&
+      columnHeights[currentColumnIndex] + item.height > targetHeight &&
+      remainingItems > remainingColumns;
+
+    if (shouldMoveToNextColumn) {
+      currentColumnIndex += 1;
+    }
+
+    columns[currentColumnIndex].push(item);
+    columnHeights[currentColumnIndex] += item.height;
+  });
+
+  let maxBottom = top;
+
+  columns.forEach((column, columnIndex) => {
+    let currentTop = top;
+    const columnX = x + columnIndex * (columnWidth + columnGap);
+
+    column.forEach((item) => {
+      currentTop = drawWrappedBlock({
+        page,
+        font: item.font,
+        text: item.text,
+        x: columnX,
+        top: currentTop,
+        width: columnWidth,
+        size,
+        color: item.color,
+        lineGap
+      });
+    });
+
+    maxBottom = Math.max(maxBottom, currentTop);
+  });
+
+  return maxBottom;
+}
+
 function drawFooter(page: PDFPage, regularFont: PDFFont) {
   const footerSize = 5.2;
   let top = PAGE_HEIGHT - MARGINS.bottom - 20;
@@ -363,7 +468,6 @@ function drawMainListingCard(options: {
       : [])
   ];
   const visitorFontSize = LISTADO_TEXT_SIZE;
-  const visitorLineHeight = visitorFontSize + COMPACT_LINE_GAP;
   const sectionTopGap = 3;
   const sectionAfterTitleGap = 10;
   let reservedBottomHeight = 0;
@@ -398,30 +502,35 @@ function drawMainListingCard(options: {
 
   const innerBottom = top + cardHeight - 8;
   const availableVisitorHeight = Math.max(0, innerBottom - reservedBottomHeight - cursorTop);
-  const maxRowsSingleColumn = Math.max(1, Math.floor(availableVisitorHeight / visitorLineHeight));
-  const useTwoColumns = visitorLines.length > Math.max(4, maxRowsSingleColumn);
-  const columns = useTwoColumns ? 2 : 1;
-  const columnGap = 10;
-  const columnWidth = useTwoColumns ? (innerWidth - columnGap) / 2 : innerWidth;
-  const rowsPerColumn = Math.ceil(visitorLines.length / columns);
-  const startTop = cursorTop;
-
-  visitorLines.forEach((line, index) => {
-    const columnIndex = useTwoColumns ? Math.floor(index / rowsPerColumn) : 0;
-    const rowIndex = useTwoColumns ? index % rowsPerColumn : index;
-    const textX = innerX + columnIndex * (columnWidth + columnGap);
-    const textTop = startTop + rowIndex * visitorLineHeight;
-    drawTextLine(
-      page,
-      ellipsizeLine(line.text, regularFont, visitorFontSize, columnWidth),
-      textX,
-      textTop,
-      visitorFontSize,
-      regularFont,
-      line.color
-      );
-    });
-  const visitorBlockBottom = startTop + rowsPerColumn * visitorLineHeight;
+  const singleColumnHeight = visitorLines.reduce(
+    (sum, line) =>
+      sum +
+      measureWrappedBlockHeight({
+        font: regularFont,
+        text: line.text,
+        width: innerWidth,
+        size: visitorFontSize,
+        lineGap: COMPACT_LINE_GAP
+      }),
+    0
+  );
+  const visitorBlockBottom = drawColumnizedBlocks({
+    page,
+    x: innerX,
+    top: cursorTop,
+    width: innerWidth,
+    availableHeight: availableVisitorHeight,
+    columnGap: 10,
+    allowTwoColumns: singleColumnHeight > availableVisitorHeight,
+    items: visitorLines.map((line) => ({
+      text: line.text,
+      color: line.color,
+      font: regularFont
+    })),
+    defaultFont: regularFont,
+    size: visitorFontSize,
+    lineGap: COMPACT_LINE_GAP
+  });
   cursorTop =
     reservedBottomHeight > 0
       ? Math.max(visitorBlockBottom, innerBottom - reservedBottomHeight)
@@ -497,6 +606,7 @@ function drawSecondaryCard(options: {
   bodyLines: { text: string; color?: ReturnType<typeof rgb>; bold?: boolean }[];
   regularFont: PDFFont;
   boldFont: PDFFont;
+  allowTwoColumns?: boolean;
 }) {
   const { page, top, cardHeight, title, date, internalName, location, bodyLines, regularFont, boldFont } = options;
   const x = MARGINS.left;
@@ -525,20 +635,36 @@ function drawSecondaryCard(options: {
   drawTextLine(page, "Ubicacion:", innerX, cursorTop, SECONDARY_LISTING_TEXT_SIZE, boldFont);
   drawTextLine(page, location, innerX + 62, cursorTop, SECONDARY_LISTING_TEXT_SIZE, regularFont);
   cursorTop += 14;
+  const availableBodyHeight = Math.max(0, top + cardHeight - 8 - cursorTop);
+  const singleColumnHeight = bodyLines.reduce(
+    (sum, line) =>
+      sum +
+      measureWrappedBlockHeight({
+        font: line.bold ? boldFont : regularFont,
+        text: line.text,
+        width: innerWidth,
+        size: SECONDARY_LISTING_TEXT_SIZE,
+        lineGap: 0.45
+      }),
+    0
+  );
 
-  bodyLines.slice(0, 8).forEach((line) => {
-    cursorTop = drawWrappedBlock({
-      page,
-      font: line.bold ? boldFont : regularFont,
+  cursorTop = drawColumnizedBlocks({
+    page,
+    x: innerX,
+    top: cursorTop,
+    width: innerWidth,
+    availableHeight: availableBodyHeight,
+    columnGap: 10,
+    allowTwoColumns: Boolean(options.allowTwoColumns && singleColumnHeight > availableBodyHeight),
+    items: bodyLines.map((line) => ({
       text: line.text,
-      x: innerX,
-      top: cursorTop,
-      width: innerWidth,
-      size: SECONDARY_LISTING_TEXT_SIZE,
       color: line.color ?? COLORS.text,
-      maxLines: 2,
-      lineGap: 0.45
-    });
+      font: line.bold ? boldFont : regularFont
+    })),
+    defaultFont: regularFont,
+    size: SECONDARY_LISTING_TEXT_SIZE,
+    lineGap: 0.45
   });
 }
 
@@ -648,6 +774,7 @@ function drawSexosMode(pdf: PDFDocument, listings: ListingRecord[], regularFont:
         internalName: card.pass.internoNombre,
         location: card.pass.internoUbicacion,
         bodyLines: card.bodyLines,
+        allowTwoColumns: true,
         regularFont,
         boldFont
       });

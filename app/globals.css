@@ -1865,6 +1865,15 @@ html[data-theme="dark"] .admin-tab.active {
   gap: 0.08rem;
 }
 
+.apoyo-pass-list.two-columns {
+  column-count: 2;
+  column-gap: 1rem;
+}
+
+.apoyo-pass-list.two-columns .apoyo-pass-line {
+  break-inside: avoid;
+}
+
 .apoyo-pass-meta {
   font-size: 0.78rem;
 }

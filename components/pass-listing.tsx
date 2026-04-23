@@ -26,15 +26,6 @@ function getVisibleVisitors(pass: ListingRecord) {
   return { visibleVisitors, underTwelveCount };
 }
 
-function getCompactVisibleVisitors(pass: ListingRecord) {
-  const { visibleVisitors, underTwelveCount } = getVisibleVisitors(pass);
-  return {
-    listedVisitors: visibleVisitors.slice(0, 8),
-    hiddenVisitorsCount: Math.max(0, visibleVisitors.length - 8),
-    underTwelveCount
-  };
-}
-
 function formatVisitorLine(visitor: ListingRecord["visitantes"][number]) {
   if (visitor.edad >= 12 && visitor.edad <= 17) {
     return `${visitor.nombre} ${visitor.edad} años`;
@@ -80,7 +71,7 @@ function formatDeviceSummary(pass: ListingRecord) {
 
 function renderMainPass(pass: ListingRecord, roleKey: RoleKey) {
   const isSensitivePass = shouldMaskSensitiveInternal(roleKey, pass.internoId);
-  const { listedVisitors, hiddenVisitorsCount, underTwelveCount } = getCompactVisibleVisitors(pass);
+  const { visibleVisitors, underTwelveCount } = getVisibleVisitors(pass);
   const { basic, special } = splitMentions(pass.menciones);
   const extraSpecials = splitMentions(pass.especiales);
   const specialLines = [
@@ -111,10 +102,10 @@ function renderMainPass(pass: ListingRecord, roleKey: RoleKey) {
 
       <div className="apoyo-pass-section visits-section">
         <strong>Visitas:</strong>
-        <div className="apoyo-pass-list">
+        <div className={`apoyo-pass-list ${visibleVisitors.length + (underTwelveCount > 0 ? 1 : 0) > 8 ? "two-columns" : ""}`}>
           {isSensitivePass ? (
             <div className="apoyo-pass-line">{maskPrivateText("Privado", true)}</div>
-          ) : listedVisitors.map((visitor) => (
+          ) : visibleVisitors.map((visitor) => (
             <div
               key={`${pass.id}-${visitor.visitorId}`}
               className={`apoyo-pass-line ${visitor.edad < 18 ? "minor" : ""}`}
@@ -125,11 +116,6 @@ function renderMainPass(pass: ListingRecord, roleKey: RoleKey) {
           {!isSensitivePass && underTwelveCount > 0 ? (
             <div className="apoyo-pass-line minor">
               + {underTwelveCount} {underTwelveCount === 1 ? "menor" : "menores"}
-            </div>
-          ) : null}
-          {!isSensitivePass && hiddenVisitorsCount > 0 ? (
-            <div className="apoyo-pass-line warning">
-              + {hiddenVisitorsCount} visitas en Hombres / Mujeres
             </div>
           ) : null}
         </div>

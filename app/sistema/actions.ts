@@ -22,8 +22,7 @@ import {
   getDateOffset,
   isValidInternalLocation,
   getWeekRangeFromCutoff,
-  normalizeDeviceTypeName,
-  nextPassNumber
+  normalizeDeviceTypeName
 } from "@/lib/utils";
 
 function success(message: string): MutationState {
@@ -75,6 +74,27 @@ function capitalizeWords(value: string) {
 function normalizeParentesco(value: string) {
   const normalized = capitalizeWords(value);
   return normalized.toUpperCase() === "SN" ? "SN" : normalized;
+}
+
+async function reserveGlobalPassNumbers(
+  supabase: Awaited<ReturnType<typeof createServerSupabaseClient>>,
+  count: number
+) {
+  if (count <= 0) {
+    return [];
+  }
+
+  const { data, error } = await supabase.rpc("reserve_global_pass_numbers", {
+    p_count: count
+  });
+
+  if (error) {
+    throw new Error(error.message || "No se pudo reservar la numeracion global de pases.");
+  }
+
+  return ((data ?? []) as Array<{ sequence_order: number; numero_pase: number }>)
+    .sort((left, right) => left.sequence_order - right.sequence_order)
+    .map((item) => item.numero_pase);
 }
 
 function splitVisitorLegacyName(nombreCompleto: string) {
@@ -550,11 +570,15 @@ export async function closeDateAction(
             (a, b) => compareInternalLocations(a.internoUbicacion, b.internoUbicacion) || a.createdAt.localeCompare(b.createdAt)
           );
 
-    let currentNumber = numberedPasses[numberedPasses.length - 1]?.numeroPase ?? 0;
     const isInitialClosure = numberedPasses.length === 0;
+    const reservedNumbers = await reserveGlobalPassNumbers(supabase, orderedPendingPasses.length);
 
-    for (const pass of orderedPendingPasses) {
-      currentNumber = nextPassNumber(currentNumber);
+    for (const [index, pass] of orderedPendingPasses.entries()) {
+      const currentNumber = reservedNumbers[index];
+      if (!currentNumber) {
+        return failure("No se pudo obtener la numeracion global para los pases.");
+      }
+
       const { error } = await supabase
         .from("listado")
         .update({
@@ -1657,12 +1681,7 @@ export async function createPassAction(
 
     let nextNumber: number | null = null;
     if (targetDate.cierre && canOperateClosedDate) {
-      const existingPasses = await getListado({ fechaVisita: targetDate.fechaCompleta });
-      const maxNumber = existingPasses.reduce(
-        (current, item) => Math.max(current, item.numeroPase ?? 0),
-        0
-      );
-      nextNumber = nextPassNumber(maxNumber);
+      [nextNumber] = await reserveGlobalPassNumbers(supabase, 1);
     }
 
     const orderedVisitors = [...selectedVisitors].sort((a, b) => (b.edad ?? 0) - (a.edad ?? 0));
