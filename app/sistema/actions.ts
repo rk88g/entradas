@@ -465,6 +465,75 @@ export async function createDateAction(
     if (profile.roleKey !== "super-admin") {
       return failure("Tu rol no puede registrar fechas.");
     }
+
+    const supabase = await createServerSupabaseClient();
+    const dateValue = String(formData.get("fecha_completa") ?? "").trim();
+    const parsedDate = parseDateParts(dateValue);
+
+    if (!parsedDate) {
+      return failure("La fecha no es valida.");
+    }
+
+    const existing = await getDateByValue(dateValue);
+    if (existing) {
+      return failure("Esa fecha ya esta registrada.");
+    }
+
+    const dates = await getFechas();
+    const tomorrowValue = getDateOffset(1);
+    if (dateValue < tomorrowValue) {
+      return failure("Solo puedes registrar fechas a partir de manana.");
+    }
+
+    const futureOpenDates = [...dates]
+      .filter((item) => !item.cierre && item.fechaCompleta >= tomorrowValue)
+      .sort((left, right) => left.fechaCompleta.localeCompare(right.fechaCompleta));
+    const earliestFutureDate = futureOpenDates[0]?.fechaCompleta ?? null;
+    const nextStatus = !earliestFutureDate || dateValue < earliestFutureDate ? "abierto" : "proximo";
+
+    const { error } = await supabase.from("fechas").insert({
+      dia: parsedDate.day,
+      mes: parsedDate.month,
+      anio: parsedDate.year,
+      fecha_completa: dateValue,
+      cierre: false,
+      estado: nextStatus,
+      created_by: profile.id
+    });
+
+    if (error) {
+      return failure(error.message || "No se pudo registrar la fecha.");
+    }
+
+    await normalizeDateStatuses(supabase);
+
+    await auditAction({
+      userId: profile.id,
+      moduleKey: "fechas",
+      sectionKey: "crear-fecha",
+      actionKey: "create",
+      entityType: "fecha",
+      entityId: dateValue,
+      afterData: { fechaCompleta: dateValue, estado: nextStatus }
+    });
+
+    revalidatePath("/sistema/fechas");
+    revalidatePath("/sistema/listado");
+    return success("Fecha registrada.");
+  } catch (error) {
+    return failure(error instanceof Error ? error.message : "No se pudo registrar la fecha.");
+  }
+}
+
+async function createDateActionLegacy(
+  _prevState: MutationState,
+  formData: FormData
+): Promise<MutationState> {
+  try {
+    const profile = await requireProfile();
+    if (profile.roleKey !== "super-admin") {
+      return failure("Tu rol no puede registrar fechas.");
+    }
     const supabase = await createServerSupabaseClient();
 
     const dateValue = String(formData.get("fecha_completa") ?? "").trim();
@@ -557,9 +626,9 @@ export async function createDateAction(
     }
 
     const { error } = await supabase.from("fechas").insert({
-      dia: parsedDate.day,
-      mes: parsedDate.month,
-      anio: parsedDate.year,
+      dia: parsedDate!.day,
+      mes: parsedDate!.month,
+      anio: parsedDate!.year,
       fecha_completa: dateValue,
       cierre: false,
       estado: status,
@@ -567,7 +636,7 @@ export async function createDateAction(
     });
 
     if (error) {
-      return failure(error.message || "No se pudo registrar la fecha.");
+      return failure(error?.message || "No se pudo registrar la fecha.");
     }
 
     await auditAction({
