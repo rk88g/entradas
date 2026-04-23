@@ -974,14 +974,19 @@ export async function updateVisitorIdentityAction(
     const supabase = await createServerSupabaseClient();
     const visitorId = String(formData.get("visita_id") ?? "").trim();
     const nombreCompleto = capitalizeWords(String(formData.get("nombreCompleto") ?? ""));
+    const edad = Number(formData.get("edad") ?? 0);
 
     if (!visitorId || !nombreCompleto) {
       return failure("Debes elegir la visita y capturar el nombre completo.");
     }
 
+    if (!Number.isInteger(edad) || edad < 0 || edad > 120) {
+      return failure("Debes capturar una edad valida.");
+    }
+
     const { data: previousVisitor, error: previousError } = await supabase
       .from("visitas")
-      .select("nombreCompleto")
+      .select("nombreCompleto, edad, fecha_nacimiento, menor")
       .eq("id", visitorId)
       .maybeSingle();
 
@@ -1004,9 +1009,17 @@ export async function updateVisitorIdentityAction(
       return failure(await buildExistingVisitorAssignmentMessage(supabase, nombreCompleto));
     }
 
+    const fechaNacimiento = buildBirthDateFromAge(edad);
+    const menor = edad < 18;
+
     const { error } = await supabase
       .from("visitas")
-      .update({ nombreCompleto })
+      .update({
+        nombreCompleto,
+        edad,
+        menor,
+        fecha_nacimiento: fechaNacimiento
+      })
       .eq("id", visitorId);
 
     if (error?.code === "23505") {
@@ -1025,7 +1038,7 @@ export async function updateVisitorIdentityAction(
       entityType: "visita",
       entityId: visitorId,
       beforeData: previousVisitor,
-      afterData: { nombreCompleto }
+      afterData: { nombreCompleto, edad, menor, fecha_nacimiento: fechaNacimiento }
     });
 
     revalidatePath("/sistema/internos");

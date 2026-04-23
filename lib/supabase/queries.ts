@@ -982,7 +982,7 @@ export async function searchVisitors(
 
   const { data, error } = await supabase
     .from("visitas")
-      .select("id, nombreCompleto, parentesco, betada, fecha_betada, notas")
+      .select("id, nombreCompleto, parentesco, edad, betada, fecha_betada, notas")
     .ilike("nombreCompleto", searchPattern)
     .order("created_at", { ascending: false })
     .limit(limit);
@@ -1016,6 +1016,7 @@ export async function searchVisitors(
         id: item.id,
         fullName: item.nombreCompleto,
         parentesco: item.parentesco,
+        edad: Number(item.edad ?? 0),
         currentInternalName: currentInternal?.fullName,
         currentInternalLocation: currentInternal?.ubicacion,
         betada: Boolean(item.betada),
