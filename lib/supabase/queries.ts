@@ -2506,6 +2506,11 @@ export async function getIntegratedModuleCounts() {
 export async function getAdminPanelData() {
   const supabase = await createServerSupabaseClient();
   const configuredZones = await getConfiguredZones(supabase);
+  const now = new Date();
+  const connectionLogsCutoff = new Date(now);
+  connectionLogsCutoff.setDate(connectionLogsCutoff.getDate() - 7);
+  const actionLogsCutoff = new Date(now);
+  actionLogsCutoff.setDate(actionLogsCutoff.getDate() - 2);
   const [
     connectionLogsResponse,
     auditLogsResponse,
@@ -2537,6 +2542,7 @@ export async function getAdminPanelData() {
       supabase
         .from("connection_logs")
         .select("id, user_profile_id, email, success, failure_reason, ip_address, user_agent, country, region, city, created_at")
+        .gte("created_at", connectionLogsCutoff.toISOString())
         .order("created_at", { ascending: false })
         .range(from, to)
     ),
@@ -2555,6 +2561,7 @@ export async function getAdminPanelData() {
       supabase
         .from("action_audit_logs")
         .select("id, user_profile_id, module_key, section_key, action_key, entity_type, entity_id, before_data, after_data, created_at")
+        .gte("created_at", actionLogsCutoff.toISOString())
         .order("created_at", { ascending: false })
         .range(from, to)
     ),

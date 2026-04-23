@@ -68,7 +68,15 @@ function formatDateTime(value: string) {
 }
 
 function formatEstimatedLocation(log: ConnectionLogRecord) {
-  const parts = [log.city, log.region, log.country].filter(Boolean);
+  const parts = [log.city, log.region, log.country]
+    .filter(Boolean)
+    .map((part) => {
+      try {
+        return decodeURIComponent(String(part));
+      } catch {
+        return String(part);
+      }
+    });
   return parts.length > 0 ? parts.join(", ") : "Sin dato";
 }
 
@@ -945,7 +953,7 @@ export function AdminControlPanel({
             <span>{connectionLogs.length} registros</span>
           </summary>
           <div className="section-collapse-body">
-            <div className="table-wrap compact-table responsive-mobile-table">
+            <div className="table-wrap compact-table responsive-mobile-table danger-zone-log-table">
             <table>
               <thead>
                 <tr>
@@ -988,7 +996,7 @@ export function AdminControlPanel({
             <span>{actionLogs.length} registros</span>
           </summary>
           <div className="section-collapse-body">
-            <div className="table-wrap compact-table responsive-mobile-table">
+            <div className="table-wrap compact-table responsive-mobile-table danger-zone-action-table">
             <table>
               <thead>
                 <tr>

@@ -1615,6 +1615,35 @@ html[data-theme="dark"] .danger-zone-panel .section-collapse summary {
   min-width: max-content;
 }
 
+.danger-zone-panel .danger-zone-log-table table,
+.danger-zone-panel .danger-zone-action-table table {
+  min-width: 900px;
+}
+
+.danger-zone-panel .danger-zone-log-table td[data-label="Correo"],
+.danger-zone-panel .danger-zone-log-table td[data-label="Resultado"],
+.danger-zone-panel .danger-zone-log-table td[data-label="Ubicacion"],
+.danger-zone-panel .danger-zone-action-table td[data-label="Seccion"],
+.danger-zone-panel .danger-zone-action-table td[data-label="Elemento"] {
+  white-space: normal;
+  min-width: 15rem;
+  max-width: 24rem;
+  overflow-wrap: anywhere;
+  word-break: break-word;
+}
+
+.danger-zone-panel .danger-zone-log-table td[data-label="Correo"] {
+  min-width: 16rem;
+}
+
+.danger-zone-panel .danger-zone-log-table td[data-label="Ubicacion"] {
+  min-width: 14rem;
+}
+
+.danger-zone-panel .danger-zone-action-table td[data-label="Elemento"] {
+  min-width: 20rem;
+}
+
 .danger-zone-panel .field,
 .danger-zone-panel .remote-search-field,
 .danger-zone-panel .inline-search-list,
@@ -2237,6 +2266,11 @@ html[data-theme="dark"] .admin-tab.active {
     display: table;
     width: max-content;
     min-width: 980px;
+  }
+
+  .danger-zone-panel .danger-zone-log-table table,
+  .danger-zone-panel .danger-zone-action-table table {
+    min-width: 900px;
   }
 
   .danger-zone-panel .responsive-mobile-table thead {
