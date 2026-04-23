@@ -41,13 +41,18 @@ function getDateOptions(extraDates: DateRecord[] = [], openDate?: DateRecord | n
   return [...unique.values()].sort((left, right) => right.fechaCompleta.localeCompare(left.fechaCompleta));
 }
 
-function getDefaultDateValue(roleKey: RoleKey, openDate?: DateRecord | null, nextDate?: DateRecord | null) {
+function getDefaultDateValue(
+  roleKey: RoleKey,
+  openDate?: DateRecord | null,
+  nextDate?: DateRecord | null,
+  extraDates: DateRecord[] = []
+) {
   const preferredStatus = getDefaultDateStatusForRole(roleKey);
   if (preferredStatus === "proximo") {
-    return nextDate?.fechaCompleta ?? openDate?.fechaCompleta ?? "";
+    return nextDate?.fechaCompleta ?? openDate?.fechaCompleta ?? extraDates[0]?.fechaCompleta ?? "";
   }
 
-  return openDate?.fechaCompleta ?? nextDate?.fechaCompleta ?? "";
+  return openDate?.fechaCompleta ?? nextDate?.fechaCompleta ?? extraDates[0]?.fechaCompleta ?? "";
 }
 
 function getPassForDate(
@@ -337,10 +342,21 @@ export function InternalBrowser({
     setSearchLoading(false);
   }, [query, page, totalPages]);
 
+  useEffect(() => {
+    if (!modalInternalId || availableDates.length === 0) {
+      return;
+    }
+
+    const hasSelectedDate = availableDates.some((item) => item.fechaCompleta === selectedDateValue);
+    if (!selectedDateValue || !hasSelectedDate) {
+      setSelectedDateValue(getDefaultDateValue(roleKey, openDate, nextDate, availableDates));
+    }
+  }, [modalInternalId, availableDates, selectedDateValue, roleKey, openDate, nextDate]);
+
   function openInternalModal(profile: InternalProfile) {
     setModalInternalId(profile.id);
     setSelectedVisitorIds([]);
-    setSelectedDateValue(getDefaultDateValue(roleKey, openDate, nextDate));
+    setSelectedDateValue(getDefaultDateValue(roleKey, openDate, nextDate, availableDates));
       setVisitorQuery("");
     setAllowDuplicatePass(false);
     setPassLocalError(null);
