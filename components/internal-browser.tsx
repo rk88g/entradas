@@ -96,6 +96,32 @@ function getPassBadge(passExists: boolean) {
   );
 }
 
+function getPassSubmitIssue(options: {
+  selectedDateValue: string;
+  selectedVisitorCount: number;
+  selectedAdultCount: number;
+  duplicateRequiresAuthorization: boolean;
+  allowDuplicatePass: boolean;
+}) {
+  if (!options.selectedDateValue) {
+    return "Debes elegir la fecha del pase.";
+  }
+
+  if (options.selectedVisitorCount === 0) {
+    return "Debes elegir al menos una visita.";
+  }
+
+  if (options.selectedAdultCount === 0) {
+    return "Debes incluir al menos un adulto en el pase.";
+  }
+
+  if (options.duplicateRequiresAuthorization && !options.allowDuplicatePass) {
+    return "Marca la autorizacion para generar un pase duplicado en esa fecha.";
+  }
+
+  return null;
+}
+
 function getMaskedInternalLabel(roleKey: RoleKey, internalId: string, value: string) {
   return maskPrivateText(value, shouldMaskSensitiveInternal(roleKey, internalId));
 }
@@ -141,6 +167,7 @@ export function InternalBrowser({
   const [statusBannerStateKey, setStatusBannerStateKey] = useState(0);
   const [searchLoading, setSearchLoading] = useState(false);
   const [screenLoading, setScreenLoading] = useState(false);
+  const [passLocalError, setPassLocalError] = useState<string | null>(null);
   const [visitorQuery, setVisitorQuery] = useState("");
   const [allowDuplicatePass, setAllowDuplicatePass] = useState(false);
   const [recentCreatedPass, setRecentCreatedPass] = useState<{ internoId: string; fechaVisita: string } | null>(null);
@@ -198,12 +225,16 @@ export function InternalBrowser({
   const selectedAdults = selectedVisitors.filter((item) => item.visitor.edad >= 18);
   const canRenderPassButton = !selectedPass || roleKey === "super-admin";
   const duplicateRequiresAuthorization = roleKey === "super-admin" && Boolean(selectedPass);
+  const passSubmitIssue = getPassSubmitIssue({
+    selectedDateValue,
+    selectedVisitorCount: selectedVisitors.length,
+    selectedAdultCount: selectedAdults.length,
+    duplicateRequiresAuthorization,
+    allowDuplicatePass
+  });
   const canSubmitPass =
     Boolean(selected) &&
-    Boolean(selectedDateValue) &&
-    selectedVisitors.length > 0 &&
-    selectedAdults.length > 0 &&
-    (!duplicateRequiresAuthorization || allowDuplicatePass);
+    !passSubmitIssue;
   const hasVisitorBirthValue =
     visitorBirthInputMode === "edad"
       ? Boolean(visitorAgeInput.trim()) && Boolean(getEstimatedBirthDateFromAge(visitorAgeInput))
@@ -247,6 +278,12 @@ export function InternalBrowser({
       pendingPassContextRef.current = null;
     }
   }, [passState.error]);
+
+  useEffect(() => {
+    if (!passSubmitIssue) {
+      setPassLocalError(null);
+    }
+  }, [passSubmitIssue]);
 
   useEffect(() => {
     if (visitorState.success) {
@@ -305,8 +342,9 @@ export function InternalBrowser({
     setSelectedVisitorIds([]);
     setSelectedDateValue(getDefaultDateValue(roleKey, openDate, nextDate));
       setVisitorQuery("");
-      setAllowDuplicatePass(false);
-      setHistoryOpen(false);
+    setAllowDuplicatePass(false);
+    setPassLocalError(null);
+    setHistoryOpen(false);
       setHistorySections({});
       setFormSeed((current) => current + 1);
       setVisitorBirthInputMode("edad");
@@ -752,6 +790,7 @@ export function InternalBrowser({
 
               <article className="data-card">
                 <strong style={{ display: "block", marginBottom: "0.7rem" }}>Crear pase</strong>
+                {passLocalError ? <MutationBanner state={{ success: null, error: passLocalError }} stateKey={`local-pass-${passLocalError}`} /> : null}
                 <MutationBanner
                   state={passState}
                   resetKey={modalBannerResetKey}
@@ -762,7 +801,15 @@ export function InternalBrowser({
                   action={passAction}
                   className="field-grid"
                   autoComplete="off"
-                  onSubmitCapture={() => {
+                  onSubmitCapture={(event) => {
+                    if (!canSubmitPass) {
+                      event.preventDefault();
+                      setPassLocalError(passSubmitIssue ?? "No se puede crear el pase todavia.");
+                      setScreenLoading(false);
+                      return;
+                    }
+
+                    setPassLocalError(null);
                     setPassBannerStateKey((current) => current + 1);
                     pendingPassContextRef.current = selected
                       ? {
@@ -833,7 +880,7 @@ export function InternalBrowser({
 
                       {canRenderPassButton ? (
                         <div className="actions-row">
-                          <LoadingButton pending={passPending} label="CREAR PASE" loadingLabel="Loading..." className="button" disabled={!canSubmitPass} />
+                          <LoadingButton pending={passPending} label="CREAR PASE" loadingLabel="Loading..." className="button" />
                         </div>
                       ) : null}
                   </form>
