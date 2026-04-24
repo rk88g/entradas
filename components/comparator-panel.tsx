@@ -58,14 +58,23 @@ export function ComparatorPanel({
   const selectedInternal = internals.find((item) => item.id === selectedInternalId) ?? null;
   const selectedVisitor = visitors.find((item) => item.id === selectedVisitorId) ?? null;
 
-  function applySearch(paramKey: "iq" | "vq", rawValue: string) {
-    const normalized = rawValue.trim();
+  function applyCombinedSearch(rawInternalValue: string, rawVisitorValue: string) {
+    const normalizedInternal = rawInternalValue.trim();
+    const normalizedVisitor = rawVisitorValue.trim();
     const params = new URLSearchParams(searchParams.toString());
 
-    if (normalized) {
-      params.set(paramKey, normalized);
+    params.delete("q");
+
+    if (normalizedInternal) {
+      params.set("iq", normalizedInternal);
     } else {
-      params.delete(paramKey);
+      params.delete("iq");
+    }
+
+    if (normalizedVisitor) {
+      params.set("vq", normalizedVisitor);
+    } else {
+      params.delete("vq");
     }
 
     router.replace(params.size ? `${pathname}?${params.toString()}` : pathname, { scroll: false });
@@ -74,52 +83,69 @@ export function ComparatorPanel({
   return (
     <section className="module-grid module-grid-single">
       <article className="data-card">
-        <div className="actions-row" style={{ justifyContent: "space-between", alignItems: "center", marginBottom: "0.8rem" }}>
+        <div
+          className="actions-row"
+          style={{ justifyContent: "space-between", alignItems: "center", marginBottom: "0.8rem" }}
+        >
           <strong className="section-title">Comparador</strong>
-          <span className="muted">{internals.length} internos · {visitors.length} visitas</span>
+          <span className="muted">
+            {internals.length} internos · {visitors.length} visitas
+          </span>
         </div>
+
+        <form
+          className="actions-row"
+          style={{ alignItems: "stretch", gap: "0.8rem", flexWrap: "wrap" }}
+          onSubmit={(event) => {
+            event.preventDefault();
+            applyCombinedSearch(internalQueryInput, visitorQueryInput);
+          }}
+        >
+          <div className="field" style={{ flex: "1 1 320px" }}>
+            <input
+              value={internalQueryInput}
+              onChange={(event) => setInternalQueryInput(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Escape") {
+                  event.preventDefault();
+                  setInternalQueryInput("");
+                }
+              }}
+              placeholder="Buscar interno"
+              autoComplete="off"
+            />
+          </div>
+
+          <div className="field" style={{ flex: "1 1 320px" }}>
+            <input
+              value={visitorQueryInput}
+              onChange={(event) => setVisitorQueryInput(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Escape") {
+                  event.preventDefault();
+                  setVisitorQueryInput("");
+                }
+              }}
+              placeholder="Buscar visita"
+              autoComplete="off"
+            />
+          </div>
+
+          <button type="submit" className="button-soft">
+            Buscar
+          </button>
+        </form>
       </article>
 
       <section className="two-column-section">
         <article className="data-card">
-          <div className="actions-row" style={{ justifyContent: "space-between", alignItems: "center", marginBottom: "0.8rem" }}>
+          <div
+            className="actions-row"
+            style={{ justifyContent: "space-between", alignItems: "center", marginBottom: "0.8rem" }}
+          >
             <strong className="section-title">Ultimos 20 internos</strong>
             <span className="muted">{internals.length} resultados</span>
           </div>
-
-          <form
-            className="actions-row"
-            style={{ marginBottom: "0.8rem", alignItems: "stretch" }}
-            onSubmit={(event) => {
-              event.preventDefault();
-              applySearch("iq", internalQueryInput);
-            }}
-          >
-            <div className="field" style={{ flex: 1 }}>
-              <input
-                value={internalQueryInput}
-                onChange={(event) => setInternalQueryInput(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === "Escape") {
-                    event.preventDefault();
-                    setInternalQueryInput("");
-                    applySearch("iq", "");
-                    return;
-                  }
-
-                  if (event.key === "Enter") {
-                    event.preventDefault();
-                    applySearch("iq", internalQueryInput);
-                  }
-                }}
-                placeholder="Buscar interno"
-                autoComplete="off"
-              />
-            </div>
-            <button type="submit" className="button-soft">
-              Buscar
-            </button>
-          </form>
 
           <div className="table-wrap compact-table">
             <table>
@@ -161,14 +187,38 @@ export function ComparatorPanel({
             <strong style={{ display: "block", marginBottom: "0.7rem" }}>Detalle de interno</strong>
             {selectedInternal ? (
               <div className="mini-list">
-                <div className="mini-row"><span>Nombre</span><strong>{selectedInternal.fullName}</strong></div>
-                <div className="mini-row"><span>Ubicacion</span><strong>{selectedInternal.ubicacion}</strong></div>
-                <div className="mini-row"><span>Edad</span><strong>{selectedInternal.edad}</strong></div>
-                <div className="mini-row"><span>Estatus</span><strong>{selectedInternal.estatus}</strong></div>
-                <div className="mini-row"><span>Expediente</span><strong>{selectedInternal.expediente}</strong></div>
-                <div className="mini-row"><span>Llego</span><strong>{formatLongDate(selectedInternal.llego)}</strong></div>
-                <div className="mini-row"><span>Nacimiento</span><strong>{formatLongDate(selectedInternal.nacimiento)}</strong></div>
-                <div className="mini-row"><span>Observaciones</span><strong>{selectedInternal.observaciones || "Sin observaciones"}</strong></div>
+                <div className="mini-row">
+                  <span>Nombre</span>
+                  <strong>{selectedInternal.fullName}</strong>
+                </div>
+                <div className="mini-row">
+                  <span>Ubicacion</span>
+                  <strong>{selectedInternal.ubicacion}</strong>
+                </div>
+                <div className="mini-row">
+                  <span>Edad</span>
+                  <strong>{selectedInternal.edad}</strong>
+                </div>
+                <div className="mini-row">
+                  <span>Estatus</span>
+                  <strong>{selectedInternal.estatus}</strong>
+                </div>
+                <div className="mini-row">
+                  <span>Expediente</span>
+                  <strong>{selectedInternal.expediente}</strong>
+                </div>
+                <div className="mini-row">
+                  <span>Llego</span>
+                  <strong>{formatLongDate(selectedInternal.llego)}</strong>
+                </div>
+                <div className="mini-row">
+                  <span>Nacimiento</span>
+                  <strong>{formatLongDate(selectedInternal.nacimiento)}</strong>
+                </div>
+                <div className="mini-row">
+                  <span>Observaciones</span>
+                  <strong>{selectedInternal.observaciones || "Sin observaciones"}</strong>
+                </div>
               </div>
             ) : (
               <span className="muted">Sin interno seleccionado.</span>
@@ -177,44 +227,13 @@ export function ComparatorPanel({
         </article>
 
         <article className="data-card">
-          <div className="actions-row" style={{ justifyContent: "space-between", alignItems: "center", marginBottom: "0.8rem" }}>
+          <div
+            className="actions-row"
+            style={{ justifyContent: "space-between", alignItems: "center", marginBottom: "0.8rem" }}
+          >
             <strong className="section-title">Ultimas 20 visitas</strong>
             <span className="muted">{visitors.length} resultados</span>
           </div>
-
-          <form
-            className="actions-row"
-            style={{ marginBottom: "0.8rem", alignItems: "stretch" }}
-            onSubmit={(event) => {
-              event.preventDefault();
-              applySearch("vq", visitorQueryInput);
-            }}
-          >
-            <div className="field" style={{ flex: 1 }}>
-              <input
-                value={visitorQueryInput}
-                onChange={(event) => setVisitorQueryInput(event.target.value)}
-                onKeyDown={(event) => {
-                  if (event.key === "Escape") {
-                    event.preventDefault();
-                    setVisitorQueryInput("");
-                    applySearch("vq", "");
-                    return;
-                  }
-
-                  if (event.key === "Enter") {
-                    event.preventDefault();
-                    applySearch("vq", visitorQueryInput);
-                  }
-                }}
-                placeholder="Buscar visita"
-                autoComplete="off"
-              />
-            </div>
-            <button type="submit" className="button-soft">
-              Buscar
-            </button>
-          </form>
 
           <div className="table-wrap compact-table">
             <table>
@@ -256,14 +275,43 @@ export function ComparatorPanel({
             <strong style={{ display: "block", marginBottom: "0.7rem" }}>Detalle de visita</strong>
             {selectedVisitor ? (
               <div className="mini-list">
-                <div className="mini-row"><span>Nombre</span><strong>{selectedVisitor.fullName}</strong></div>
-                <div className="mini-row"><span>Interno actual</span><strong>{formatCurrentInternalLabel(selectedVisitor.currentInternalName, selectedVisitor.currentInternalLocation)}</strong></div>
-                <div className="mini-row"><span>Parentesco</span><strong>{selectedVisitor.parentesco}</strong></div>
-                <div className="mini-row"><span>Edad</span><strong>{selectedVisitor.edad}</strong></div>
-                <div className="mini-row"><span>Nacimiento</span><strong>{formatLongDate(selectedVisitor.fechaNacimiento)}</strong></div>
-                <div className="mini-row"><span>Estatus</span><strong>{getVisitorAvailabilityLabel(selectedVisitor.betada)}</strong></div>
-                <div className="mini-row"><span>Fecha no disponible</span><strong>{selectedVisitor.fechaBetada ? formatLongDate(selectedVisitor.fechaBetada) : "No aplica"}</strong></div>
-                <div className="mini-row"><span>Observaciones</span><strong>{selectedVisitor.notas || "Sin observaciones"}</strong></div>
+                <div className="mini-row">
+                  <span>Nombre</span>
+                  <strong>{selectedVisitor.fullName}</strong>
+                </div>
+                <div className="mini-row">
+                  <span>Interno actual</span>
+                  <strong>
+                    {formatCurrentInternalLabel(
+                      selectedVisitor.currentInternalName,
+                      selectedVisitor.currentInternalLocation
+                    )}
+                  </strong>
+                </div>
+                <div className="mini-row">
+                  <span>Parentesco</span>
+                  <strong>{selectedVisitor.parentesco}</strong>
+                </div>
+                <div className="mini-row">
+                  <span>Edad</span>
+                  <strong>{selectedVisitor.edad}</strong>
+                </div>
+                <div className="mini-row">
+                  <span>Nacimiento</span>
+                  <strong>{formatLongDate(selectedVisitor.fechaNacimiento)}</strong>
+                </div>
+                <div className="mini-row">
+                  <span>Estatus</span>
+                  <strong>{getVisitorAvailabilityLabel(selectedVisitor.betada)}</strong>
+                </div>
+                <div className="mini-row">
+                  <span>Fecha no disponible</span>
+                  <strong>{selectedVisitor.fechaBetada ? formatLongDate(selectedVisitor.fechaBetada) : "No aplica"}</strong>
+                </div>
+                <div className="mini-row">
+                  <span>Observaciones</span>
+                  <strong>{selectedVisitor.notas || "Sin observaciones"}</strong>
+                </div>
               </div>
             ) : (
               <span className="muted">Sin visita seleccionada.</span>
