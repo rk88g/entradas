@@ -68,6 +68,7 @@ export function VisitorManager({
   const [sectionsOpen, setSectionsOpen] = useState<Record<string, boolean>>({
     perfil: false,
     historial: false,
+    cambios: false,
     reasignacion: false,
     nueva: false
   });
@@ -348,6 +349,34 @@ export function VisitorManager({
                           <span>{entry.type === "reasignacion" ? "Reasignacion" : "Visita"} · {formatHistoryDate(entry.date)}</span>
                         </div>
                       ))
+                    )}
+                  </div>
+                </div>
+              ) : null}
+            </article>
+
+            <article className="data-card section-collapse">
+              <button type="button" className="button-soft collapse-trigger" onClick={() => toggleSection("cambios")}>
+                <span>Cambios</span>
+                <span>
+                  {selectedVisitor.historial.filter((entry) => (entry.details?.length ?? 0) > 0).length} {sectionsOpen.cambios ? "−" : "+"}
+                </span>
+              </button>
+              {sectionsOpen.cambios ? (
+                <div className="section-collapse-body">
+                  <div className="record-stack">
+                    {selectedVisitor.historial.filter((entry) => (entry.details?.length ?? 0) > 0).length === 0 ? (
+                      <span className="muted">Sin cambios.</span>
+                    ) : (
+                      selectedVisitor.historial
+                        .filter((entry) => (entry.details?.length ?? 0) > 0)
+                        .map((entry) => (
+                          <div key={`${entry.id}-change`} className="record-pill">
+                            <strong>{maskPrivateText(entry.internalName, selectedVisitorIsSensitive)}</strong>
+                            <span>{formatHistoryDate(entry.date)}</span>
+                            <small>{entry.details?.join(" · ")}</small>
+                          </div>
+                        ))
                     )}
                   </div>
                 </div>

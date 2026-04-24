@@ -1031,6 +1031,18 @@ export function InternalBrowser({
                       ))
                     },
                     {
+                      key: "cambios",
+                      title: "Cambios de datos",
+                      count: selectedHistory?.changeLogs.length ?? 0,
+                      content: !selectedHistory || selectedHistory.changeLogs.length === 0 ? <span className="muted">Sin cambios.</span> : selectedHistory.changeLogs.map((item) => (
+                        <div key={item.id} className="record-pill">
+                          <strong>{item.title}</strong>
+                          <span>{formatLongDate(item.createdAt.slice(0, 10))}</span>
+                          <small>{item.notes}</small>
+                        </div>
+                      ))
+                    },
+                    {
                       key: "notas",
                       title: "Notas y temporalidad",
                       count: selectedHistory?.notes.length ?? 0,

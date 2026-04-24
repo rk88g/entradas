@@ -603,6 +603,69 @@ function buildDisplayFullName(...parts: Array<string | null | undefined>) {
     .trim();
 }
 
+async function findLikelyDuplicateInternal(
+  supabase: Awaited<ReturnType<typeof createServerSupabaseClient>>,
+  options: {
+    fullName: string;
+    excludeInternalId?: string;
+  }
+) {
+  const { data: internals, error } = await supabase
+    .from("internos")
+    .select("id, nombres, apellido_pat, apellido_mat, ubicacion, estatus, created_at")
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    return {
+      duplicateInternal: null as {
+        id: string;
+        nombres: string;
+        apellido_pat: string;
+        apellido_mat?: string | null;
+        ubicacion?: string | null;
+        estatus?: string | null;
+      } | null,
+      error: error.message || "No se pudo validar el interno."
+    };
+  }
+
+  const duplicateInternal = (internals ?? [])
+    .filter((internal) => internal.id !== options.excludeInternalId)
+    .map((internal) => ({
+      internal,
+      score: getVisitorDuplicateScore(
+        options.fullName,
+        buildDisplayFullName(internal.nombres, internal.apellido_pat, internal.apellido_mat)
+      )
+    }))
+    .filter((item) => item.score > 0)
+    .sort((left, right) => {
+      if (right.score !== left.score) {
+        return right.score - left.score;
+      }
+
+      return (right.internal.created_at ?? "").localeCompare(left.internal.created_at ?? "");
+    })[0]?.internal ?? null;
+
+  return {
+    duplicateInternal,
+    error: null as string | null
+  };
+}
+
+function buildExistingInternalMessage(internal: {
+  nombres: string;
+  apellido_pat: string;
+  apellido_mat?: string | null;
+  ubicacion?: string | null;
+  estatus?: string | null;
+}) {
+  const fullName = buildDisplayFullName(internal.nombres, internal.apellido_pat, internal.apellido_mat);
+  const location = String(internal.ubicacion ?? "").trim() || "Sin ubicacion";
+  const status = String(internal.estatus ?? "").trim() || "activo";
+  return `Ya existe un interno muy parecido: ${fullName} - ubicacion ${location} - estatus ${status}.`;
+}
+
 async function getPassArticlePayload(formData: FormData) {
   const articlePairs = [...formData.entries()]
     .filter(([key]) => key.startsWith("article_qty_"))
@@ -1049,6 +1112,19 @@ export async function createInternalAction(
         return failure("La ubicacion debe tener formato numero-numero o letra-numero, por ejemplo 1-101, 15-8 o I-00.");
       }
 
+    const fullName = buildDisplayFullName(payload.nombres, payload.apellido_pat, payload.apellido_mat);
+    const { duplicateInternal, error: duplicateInternalError } = await findLikelyDuplicateInternal(supabase, {
+      fullName
+    });
+
+    if (duplicateInternalError) {
+      return failure(duplicateInternalError);
+    }
+
+    if (duplicateInternal) {
+      return failure(buildExistingInternalMessage(duplicateInternal));
+    }
+
     const { error } = await supabase.from("internos").insert(payload);
     if (error) {
       return failure(error.message || "No se pudo guardar el interno.");
@@ -1151,6 +1227,20 @@ export async function updateInternalIdentityAction(
 
     if (previousError || !previousInternal) {
       return failure("No se encontro el interno seleccionado.");
+    }
+
+    const fullName = buildDisplayFullName(nombres, apellidoPat, apellidoMat || null);
+    const { duplicateInternal, error: duplicateInternalError } = await findLikelyDuplicateInternal(supabase, {
+      fullName,
+      excludeInternalId: internalId
+    });
+
+    if (duplicateInternalError) {
+      return failure(duplicateInternalError);
+    }
+
+    if (duplicateInternal) {
+      return failure(buildExistingInternalMessage(duplicateInternal));
     }
 
     const { error } = await supabase

@@ -78,6 +78,70 @@ function getFirstRelation<T>(value: T | T[] | null | undefined): T | null {
   return Array.isArray(value) ? value[0] ?? null : value;
 }
 
+function parseAuditPayload(value: unknown) {
+  if (!value || typeof value !== "object" || Array.isArray(value)) {
+    return null;
+  }
+
+  return value as Record<string, unknown>;
+}
+
+function formatAuditValue(value: unknown) {
+  if (value === null || value === undefined || value === "") {
+    return "Vacio";
+  }
+
+  if (typeof value === "boolean") {
+    return value ? "Si" : "No";
+  }
+
+  return String(value);
+}
+
+function getAuditDisplayName(data: Record<string, unknown> | null) {
+  if (!data) {
+    return null;
+  }
+
+  const explicit = String(data.fullName ?? data.nombreCompleto ?? "").trim();
+  if (explicit) {
+    return explicit;
+  }
+
+  const combined = [data.nombres, data.apellido_pat, data.apellido_mat]
+    .map((part) => String(part ?? "").trim())
+    .filter(Boolean)
+    .join(" ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  return combined || null;
+}
+
+function buildAuditChangeDetails(
+  before: Record<string, unknown> | null,
+  after: Record<string, unknown> | null,
+  fields: Array<{ key: string; label: string }>
+) {
+  const changes: string[] = [];
+
+  const beforeName = getAuditDisplayName(before);
+  const afterName = getAuditDisplayName(after);
+  if (beforeName !== afterName && (beforeName || afterName)) {
+    changes.push(`Nombre: ${formatAuditValue(beforeName)} -> ${formatAuditValue(afterName)}`);
+  }
+
+  fields.forEach((field) => {
+    const beforeValue = before?.[field.key];
+    const afterValue = after?.[field.key];
+    if (beforeValue !== afterValue && (beforeValue !== undefined || afterValue !== undefined)) {
+      changes.push(`${field.label}: ${formatAuditValue(beforeValue)} -> ${formatAuditValue(afterValue)}`);
+    }
+  });
+
+  return changes;
+}
+
 function ensureRoleKey(value?: string | null): RoleKey {
   if (
     value === "super-admin" ||
@@ -351,6 +415,7 @@ function mapVisitorRecord(
 
 async function getVisitorHistoryData(supabase: SupabaseClient, visitorIds?: string[]) {
   const normalizedVisitorIds = [...new Set((visitorIds ?? []).filter(Boolean))];
+  const auditClient = isSupabaseAdminConfigured() ? createSupabaseAdminClient() : supabase;
   const fetchVisitHistory = async () => {
     if (normalizedVisitorIds.length > 0) {
       const rows: Array<{
@@ -417,9 +482,62 @@ async function getVisitorHistoryData(supabase: SupabaseClient, visitorIds?: stri
     );
   };
 
-  const [{ data: visitHistory }, { data: transferHistory }] = await Promise.all([
+  const fetchVisitorAuditHistory = async () => {
+    if (normalizedVisitorIds.length === 0) {
+      return { data: [] as Array<{ id: string; entity_id: string | null; before_data: unknown; after_data: unknown; created_at: string }> };
+    }
+
+    const rows: Array<{
+      id: string;
+      entity_id: string | null;
+      before_data: unknown;
+      after_data: unknown;
+      created_at: string;
+    }> = [];
+
+    for (const chunk of splitIntoChunks(normalizedVisitorIds)) {
+      const { data } = await auditClient
+        .from("action_audit_logs")
+        .select("id, entity_id, before_data, after_data, created_at")
+        .eq("entity_type", "visita")
+        .in("entity_id", chunk);
+      rows.push(...(data ?? []));
+    }
+
+    return { data: rows };
+  };
+
+  const fetchRelationAuditHistory = async () => {
+    if (normalizedVisitorIds.length === 0) {
+      return { data: [] as Array<{ id: string; entity_id: string | null; before_data: unknown; after_data: unknown; created_at: string }> };
+    }
+
+    const { data } = await fetchAllRows<{
+      id: string;
+      entity_id: string | null;
+      before_data: unknown;
+      after_data: unknown;
+      created_at: string;
+    }>((from, to) =>
+      auditClient
+        .from("action_audit_logs")
+        .select("id, entity_id, before_data, after_data, created_at")
+        .eq("entity_type", "interno_visita")
+        .range(from, to)
+    );
+
+    return {
+      data: (data ?? []).filter((item) =>
+        normalizedVisitorIds.some((visitorId) => String(item.entity_id ?? "").endsWith(`:${visitorId}`))
+      )
+    };
+  };
+
+  const [{ data: visitHistory }, { data: transferHistory }, { data: visitorAuditHistory }, { data: relationAuditHistory }] = await Promise.all([
     fetchVisitHistory(),
-    fetchTransferHistory()
+    fetchTransferHistory(),
+    fetchVisitorAuditHistory(),
+    fetchRelationAuditHistory()
   ]);
   const internalIdsFromTransfers = [...new Set((transferHistory ?? []).map((item) => item.interno_id))];
   const internals = internalIdsFromTransfers.length === 0
@@ -487,6 +605,61 @@ async function getVisitorHistoryData(supabase: SupabaseClient, visitorIds?: stri
     detailedHistoryMap.set(item.visita_id, historyEntries);
   });
 
+  (visitorAuditHistory ?? []).forEach((item) => {
+    const visitorId = String(item.entity_id ?? "").trim();
+    if (!visitorId) {
+      return;
+    }
+
+    const details = buildAuditChangeDetails(
+      parseAuditPayload(item.before_data),
+      parseAuditPayload(item.after_data),
+      [{ key: "edad", label: "Edad" }, { key: "parentesco", label: "Parentesco" }]
+    );
+
+    if (details.length === 0) {
+      return;
+    }
+
+    const historyEntries = detailedHistoryMap.get(visitorId) ?? [];
+    historyEntries.push({
+      id: item.id,
+      internalName: "Cambio de datos",
+      date: item.created_at,
+      type: "cambio",
+      details
+    });
+    detailedHistoryMap.set(visitorId, historyEntries);
+  });
+
+  (relationAuditHistory ?? []).forEach((item) => {
+    const entityId = String(item.entity_id ?? "").trim();
+    const visitorId = entityId.split(":").pop() ?? "";
+    if (!visitorId) {
+      return;
+    }
+
+    const details = buildAuditChangeDetails(
+      parseAuditPayload(item.before_data),
+      parseAuditPayload(item.after_data),
+      [{ key: "parentesco", label: "Parentesco" }]
+    );
+
+    if (details.length === 0) {
+      return;
+    }
+
+    const historyEntries = detailedHistoryMap.get(visitorId) ?? [];
+    historyEntries.push({
+      id: item.id,
+      internalName: "Cambio de vinculo",
+      date: item.created_at,
+      type: "cambio",
+      details
+    });
+    detailedHistoryMap.set(visitorId, historyEntries);
+  });
+
   detailedHistoryMap.forEach((entries, visitorId) => {
     detailedHistoryMap.set(
       visitorId,
@@ -550,7 +723,7 @@ async function getVisitorsMap(
     return new Map();
   }
 
-  const { historyMap, detailedHistoryMap } = await getVisitorHistoryData(supabase);
+  const { historyMap, detailedHistoryMap } = await getVisitorHistoryData(supabase, visitorIds);
   const rows: Array<{
     id: string;
     nombreCompleto: string;
@@ -1028,7 +1201,6 @@ export async function searchVisitors(
 
 export async function getVisitas(): Promise<VisitorRecord[]> {
   const supabase = await createServerSupabaseClient();
-  const { historyMap, detailedHistoryMap } = await getVisitorHistoryData(supabase);
   const [{ data, error }, { data: currentRelations, error: relationError }] = await Promise.all([
     fetchAllRows<{
       id: string;
@@ -1062,6 +1234,9 @@ export async function getVisitas(): Promise<VisitorRecord[]> {
   if (error || !data) {
     return [];
   }
+
+  const visitorIds = data.map((item) => item.id);
+  const { historyMap, detailedHistoryMap } = await getVisitorHistoryData(supabase, visitorIds);
 
   const relationInternalIds = [...new Set((currentRelations ?? []).map((item) => item.interno_id))];
   const relationInternalsMap = await getInternosMap(supabase, relationInternalIds);
@@ -1420,6 +1595,7 @@ export async function getInternalProfiles(options?: {
   includeBetadasVisitors?: boolean;
 }): Promise<InternalProfile[]> {
   const supabase = await createServerSupabaseClient();
+  const auditClient = isSupabaseAdminConfigured() ? createSupabaseAdminClient() : supabase;
   const includeHistory = options?.includeHistory ?? true;
   const includeBetadasVisitors = options?.includeBetadasVisitors ?? true;
   const [internos, nextDate, openDate] = await Promise.all([
@@ -1444,6 +1620,7 @@ export async function getInternalProfiles(options?: {
     { data: staffRows },
     { data: workplaceRows },
     { data: noteRows },
+    { data: changeRows },
     { data: fineRows },
     { data: seizureRows },
     { data: movementRows },
@@ -1523,6 +1700,29 @@ export async function getInternalProfiles(options?: {
               .order("created_at", { ascending: false })
           : Promise.resolve({ data: [] }),
         includeHistory && internalIds.length
+          ? (async () => {
+              const rows: Array<{
+                id: string;
+                entity_id: string | null;
+                before_data: unknown;
+                after_data: unknown;
+                created_at: string;
+              }> = [];
+
+              for (const chunk of splitIntoChunks(internalIds)) {
+                const { data } = await auditClient
+                  .from("action_audit_logs")
+                  .select("id, entity_id, before_data, after_data, created_at")
+                  .eq("entity_type", "interno")
+                  .in("entity_id", chunk)
+                  .order("created_at", { ascending: false });
+                rows.push(...(data ?? []));
+              }
+
+              return { data: rows };
+            })()
+          : Promise.resolve({ data: [] }),
+        includeHistory && internalIds.length
           ? supabase
               .from("internal_fines")
               .select("id, internal_id, concept, amount, status, created_at")
@@ -1559,6 +1759,7 @@ export async function getInternalProfiles(options?: {
       weeklyPayments: [],
       escalerasHistory: [],
       notes: [],
+      changeLogs: [],
       staffAssignments: [],
       workplaceAssignments: [],
       equipmentMovements: [],
@@ -1596,6 +1797,7 @@ export async function getInternalProfiles(options?: {
   const paymentMap = new Map<string, InternalWeeklyPaymentRecord[]>();
   const staffMap = new Map<string, ModuleStaffAssignment[]>();
   const noteMap = new Map<string, InternalNoteRecord[]>();
+  const changeMap = new Map<string, InternalNoteRecord[]>();
   const fineMap = new Map<string, InternalFineRecord[]>();
   const seizureMap = new Map<string, InternalSeizureRecord[]>();
   const movementMap = new Map<string, InternalEquipmentMovementRecord[]>();
@@ -1706,6 +1908,33 @@ export async function getInternalProfiles(options?: {
     noteMap.set(item.internal_id, current);
   });
 
+  (changeRows ?? []).forEach((item) => {
+    const internalId = String(item.entity_id ?? "").trim();
+    if (!internalId) {
+      return;
+    }
+
+    const details = buildAuditChangeDetails(
+      parseAuditPayload(item.before_data),
+      parseAuditPayload(item.after_data),
+      [{ key: "ubicacion", label: "Ubicacion" }]
+    );
+
+    if (details.length === 0) {
+      return;
+    }
+
+    const current = changeMap.get(internalId) ?? [];
+    current.push({
+      id: item.id,
+      sourceModule: "auditoria",
+      title: "Cambio de datos",
+      notes: details.join(" · "),
+      createdAt: item.created_at
+    });
+    changeMap.set(internalId, current);
+  });
+
   (fineRows ?? []).forEach((item) => {
     const current = fineMap.get(item.internal_id) ?? [];
     current.push({
@@ -1760,6 +1989,7 @@ export async function getInternalProfiles(options?: {
       weeklyPayments: paymentMap.get(interno.id) ?? [],
       escalerasHistory: escaleraMap.get(interno.id) ?? [],
       notes: noteMap.get(interno.id) ?? [],
+      changeLogs: changeMap.get(interno.id) ?? [],
       staffAssignments: staffMap.get(interno.id) ?? [],
       workplaceAssignments: workplaceMap.get(interno.id) ?? [],
       equipmentMovements: movementMap.get(interno.id) ?? [],
@@ -1866,6 +2096,7 @@ export async function getInternalHistoryById(internalId: string): Promise<Intern
     weeklyPayments: profile.weeklyPayments,
     escalerasHistory: profile.escalerasHistory,
     notes: profile.notes,
+    changeLogs: profile.changeLogs,
     staffAssignments: profile.staffAssignments,
     workplaceAssignments: profile.workplaceAssignments,
     equipmentMovements: profile.equipmentMovements,

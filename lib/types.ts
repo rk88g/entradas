@@ -102,6 +102,7 @@ export interface InternalProfile extends InternalRecord {
   weeklyPayments: InternalWeeklyPaymentRecord[];
   escalerasHistory: EscaleraRecord[];
   notes: InternalNoteRecord[];
+  changeLogs: InternalNoteRecord[];
   staffAssignments: ModuleStaffAssignment[];
   workplaceAssignments: WorkplacePositionRecord[];
   equipmentMovements: InternalEquipmentMovementRecord[];
@@ -136,7 +137,8 @@ export interface VisitorHistoryEntry {
   id: string;
   internalName: string;
   date: string;
-  type: "visita" | "reasignacion";
+  type: "visita" | "reasignacion" | "cambio";
+  details?: string[];
 }
 
 export interface DateRecord {
@@ -294,6 +296,7 @@ export interface InternalHistoryPayload {
   weeklyPayments: InternalWeeklyPaymentRecord[];
   escalerasHistory: EscaleraRecord[];
   notes: InternalNoteRecord[];
+  changeLogs: InternalNoteRecord[];
   staffAssignments: ModuleStaffAssignment[];
   workplaceAssignments: WorkplacePositionRecord[];
   equipmentMovements: InternalEquipmentMovementRecord[];
