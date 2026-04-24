@@ -1103,6 +1103,7 @@ export async function getVisitasPage(options?: {
   query?: string;
   page?: number;
   pageSize?: number;
+  availability?: "all" | "active" | "unavailable";
 }): Promise<PaginatedResult<VisitorRecord>> {
   const supabase = await createServerSupabaseClient();
   const query = options?.query?.trim() ?? "";
@@ -1111,6 +1112,7 @@ export async function getVisitasPage(options?: {
   const from = (page - 1) * pageSize;
   const to = from + pageSize - 1;
   const normalized = query.toLowerCase();
+  const availability = options?.availability ?? "all";
 
   let matchingVisitorIds: string[] | null = null;
 
@@ -1162,6 +1164,14 @@ export async function getVisitasPage(options?: {
       .select("id, nombreCompleto, fecha_nacimiento, fecha_betada, edad, menor, sexo, parentesco, betada, telefono, notas, created_at, updated_at")
     .order("created_at", { ascending: false })
     .range(from, to);
+
+  if (availability === "active") {
+    countQuery = countQuery.eq("betada", false);
+    dataQuery = dataQuery.eq("betada", false);
+  } else if (availability === "unavailable") {
+    countQuery = countQuery.eq("betada", true);
+    dataQuery = dataQuery.eq("betada", true);
+  }
 
   if (matchingVisitorIds) {
     countQuery = countQuery.in("id", matchingVisitorIds);
@@ -1407,9 +1417,11 @@ export async function getInternalProfiles(options?: {
   includeInactive?: boolean;
   presetInternos?: InternalRecord[];
   includeHistory?: boolean;
+  includeBetadasVisitors?: boolean;
 }): Promise<InternalProfile[]> {
   const supabase = await createServerSupabaseClient();
   const includeHistory = options?.includeHistory ?? true;
+  const includeBetadasVisitors = options?.includeBetadasVisitors ?? true;
   const [internos, nextDate, openDate] = await Promise.all([
     options?.presetInternos
       ? Promise.resolve(options.presetInternos)
@@ -1561,7 +1573,7 @@ export async function getInternalProfiles(options?: {
 
   (relationRows ?? []).forEach((item) => {
     const visitor = visitorsMap.get(item.visita_id);
-    if (!visitor) {
+    if (!visitor || (!includeBetadasVisitors && visitor.betada)) {
       return;
     }
 
@@ -1763,6 +1775,7 @@ export async function getInternalProfilesPage(options?: {
   includeInactive?: boolean;
   nextDateValue?: string | null;
   openDateValue?: string | null;
+  includeBetadasVisitors?: boolean;
 }): Promise<PaginatedResult<InternalProfile>> {
   const supabase = await createServerSupabaseClient();
   const query = options?.query?.trim() ?? "";
@@ -1810,7 +1823,8 @@ export async function getInternalProfilesPage(options?: {
     includeInactive: options?.includeInactive,
     nextDateValue: options?.nextDateValue,
     openDateValue: options?.openDateValue,
-    includeHistory: false
+    includeHistory: false,
+    includeBetadasVisitors: options?.includeBetadasVisitors
   });
 
   return {

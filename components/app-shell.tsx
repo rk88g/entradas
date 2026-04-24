@@ -9,12 +9,20 @@ import { createBrowserSupabaseClient } from "@/lib/supabase/client";
 import { UserProfile } from "@/lib/types";
 import { canAccessCoreSystem, canAccessModule, canAccessScope } from "@/lib/utils";
 
-const coreNavItems = [
+const primaryCoreNavItems = [
   { href: "/sistema", icon: "IN", label: "Inicio", scopeKey: "inicio" },
   { href: "/sistema/internos", icon: "IT", label: "Internos", scopeKey: "internos" },
-  { href: "/sistema/visitas", icon: "VS", label: "Visitas", scopeKey: "visitas" },
+  { href: "/sistema/visitas", icon: "VS", label: "Visitas", scopeKey: "visitas" }
+];
+
+const secondaryCoreNavItems = [
   { href: "/sistema/listado", icon: "LS", label: "Listado", scopeKey: "listado" },
   { href: "/sistema/fechas", icon: "FC", label: "Fechas", scopeKey: "fechas" }
+];
+
+const superAdminCoreNavItems = [
+  { href: "/sistema/betadas", icon: "BT", label: "Betadas", scopeKey: "betadas" },
+  { href: "/sistema/comparador", icon: "CP", label: "Comparador", scopeKey: "comparador" }
 ];
 
 const supportNavItem = { href: "/sistema/tickets", icon: "TK", label: "Cumplido Chat", scopeKey: "tickets" };
@@ -47,17 +55,22 @@ export function AppShell({
   const [showScrollTop, setShowScrollTop] = useState(false);
   const idleLogoutFormRef = useRef<HTMLFormElement | null>(null);
   const idleTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const visibleNavItems = [
-    ...(canAccessCoreSystem(user.roleKey, user.moduleOnly)
-      ? coreNavItems.filter((item) =>
-          canAccessScope(
-            user.roleKey,
-            user.permissionGrants,
-            item.scopeKey,
-            true
-          )
+  const coreItems = canAccessCoreSystem(user.roleKey, user.moduleOnly)
+    ? [
+        ...primaryCoreNavItems,
+        ...(user.roleKey === "super-admin" ? superAdminCoreNavItems : []),
+        ...secondaryCoreNavItems
+      ].filter((item) =>
+        canAccessScope(
+          user.roleKey,
+          user.permissionGrants,
+          item.scopeKey,
+          true
         )
-      : []),
+      )
+    : [];
+  const visibleNavItems = [
+    ...coreItems,
     ...(canAccessScope(user.roleKey, user.permissionGrants, supportNavItem.scopeKey, true)
       ? [supportNavItem]
       : []),

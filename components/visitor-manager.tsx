@@ -47,7 +47,9 @@ export function VisitorManager({
   page,
   totalPages,
   roleKey,
-  canViewSensitiveData
+  canViewSensitiveData,
+  title = "Visitas",
+  showCreateSection = true
 }: {
   visitors: VisitorRecord[];
   query: string;
@@ -55,6 +57,8 @@ export function VisitorManager({
   totalPages: number;
   roleKey: RoleKey;
   canViewSensitiveData: boolean;
+  title?: string;
+  showCreateSection?: boolean;
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -189,7 +193,7 @@ export function VisitorManager({
       <FullscreenLoading active={searchLoading || screenLoading || createPending || reassignPending} />
       <article className="data-card">
         <div className="actions-row" style={{ justifyContent: "space-between", alignItems: "center", marginBottom: "0.8rem" }}>
-          <strong className="section-title">Visitas</strong>
+          <strong className="section-title">{title}</strong>
         </div>
 
         <form
@@ -389,6 +393,7 @@ export function VisitorManager({
           <span className="muted">Selecciona una visita para ver su perfil.</span>
         )}
 
+        {showCreateSection ? (
         <article className="data-card section-collapse">
           <button type="button" className="button-soft collapse-trigger" onClick={() => toggleSection("nueva")}>
             <span>Nueva visita</span>
@@ -470,6 +475,7 @@ export function VisitorManager({
             </div>
           ) : null}
         </article>
+        ) : null}
       </article>
     </section>
   );
