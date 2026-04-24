@@ -80,6 +80,87 @@ function formatEstimatedLocation(log: ConnectionLogRecord) {
   return parts.length > 0 ? parts.join(", ") : "Sin dato";
 }
 
+function parseAuditPayload(value?: string | null) {
+  if (!value) {
+    return null;
+  }
+
+  try {
+    const parsed = JSON.parse(value) as Record<string, unknown>;
+    return parsed && typeof parsed === "object" ? parsed : null;
+  } catch {
+    return null;
+  }
+}
+
+function formatAuditValue(value: unknown) {
+  if (value === null || value === undefined || value === "") {
+    return "Vacio";
+  }
+
+  if (typeof value === "boolean") {
+    return value ? "Si" : "No";
+  }
+
+  return String(value);
+}
+
+function getAuditDisplayName(data: Record<string, unknown> | null) {
+  if (!data) {
+    return null;
+  }
+
+  const explicit = String(data.fullName ?? data.nombreCompleto ?? "").trim();
+  if (explicit) {
+    return explicit;
+  }
+
+  const combined = [data.nombres, data.apellido_pat, data.apellido_mat]
+    .map((part) => String(part ?? "").trim())
+    .filter(Boolean)
+    .join(" ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  return combined || null;
+}
+
+function describeAuditChanges(log: ActionAuditRecord) {
+  const before = parseAuditPayload(log.beforeData);
+  const after = parseAuditPayload(log.afterData);
+  const changes: string[] = [];
+
+  const beforeName = getAuditDisplayName(before);
+  const afterName = getAuditDisplayName(after);
+  if (beforeName !== afterName && (beforeName || afterName)) {
+    changes.push(`Nombre: ${formatAuditValue(beforeName)} -> ${formatAuditValue(afterName)}`);
+  }
+
+  const trackedFields: Array<{ key: string; label: string }> = [
+    { key: "edad", label: "Edad" },
+    { key: "parentesco", label: "Parentesco" },
+    { key: "ubicacion", label: "Ubicacion" }
+  ];
+
+  trackedFields.forEach((field) => {
+    const beforeValue = before?.[field.key];
+    const afterValue = after?.[field.key];
+    if (beforeValue !== afterValue && (beforeValue !== undefined || afterValue !== undefined)) {
+      changes.push(`${field.label}: ${formatAuditValue(beforeValue)} -> ${formatAuditValue(afterValue)}`);
+    }
+  });
+
+  if (changes.length > 0) {
+    return changes;
+  }
+
+  if (before || after) {
+    return ["Cambio registrado"];
+  }
+
+  return ["-"];
+}
+
 export function AdminControlPanel({
   connectionLogs,
   actionLogs,
@@ -1006,12 +1087,13 @@ export function AdminControlPanel({
                   <th>Seccion</th>
                   <th>Accion</th>
                   <th>Elemento</th>
+                  <th>Detalle</th>
                 </tr>
               </thead>
               <tbody>
                 {actionLogs.length === 0 ? (
                   <tr>
-                    <td colSpan={6}>Sin logs.</td>
+                    <td colSpan={7}>Sin logs.</td>
                   </tr>
                 ) : (
                   actionLogs.map((log) => (
@@ -1022,6 +1104,13 @@ export function AdminControlPanel({
                       <td data-label="Seccion">{log.sectionKey}</td>
                       <td data-label="Accion">{log.actionKey}</td>
                       <td data-label="Elemento">{`${log.entityType}${log.entityId ? ` (${log.entityId})` : ""}`}</td>
+                      <td data-label="Detalle">
+                        <div className="audit-change-list">
+                          {describeAuditChanges(log).map((change, index) => (
+                            <span key={`${log.id}-change-${index}`}>{change}</span>
+                          ))}
+                        </div>
+                      </td>
                     </tr>
                   ))
                 )}

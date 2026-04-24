@@ -1645,10 +1645,18 @@ html[data-theme="dark"] .danger-zone-panel .section-collapse summary {
 .danger-zone-panel .danger-zone-log-table td[data-label="Resultado"],
 .danger-zone-panel .danger-zone-log-table td[data-label="Ubicacion"],
 .danger-zone-panel .danger-zone-action-table td[data-label="Seccion"],
-.danger-zone-panel .danger-zone-action-table td[data-label="Elemento"] {
+.danger-zone-panel .danger-zone-action-table td[data-label="Elemento"],
+.danger-zone-panel .danger-zone-action-table td[data-label="Detalle"] {
   white-space: normal;
   overflow-wrap: anywhere;
   word-break: break-word;
+}
+
+.danger-zone-panel .audit-change-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.2rem;
+  min-width: 12rem;
 }
 
 .danger-zone-panel .field,

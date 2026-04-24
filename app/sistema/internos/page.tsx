@@ -48,7 +48,8 @@ export default async function InternosPage({
     pageSize: 100,
     includeInactive: profile?.roleKey === "super-admin",
     openDateValue: openDate?.fechaCompleta,
-    nextDateValue: nextDate?.fechaCompleta
+    nextDateValue: nextDate?.fechaCompleta,
+    includeBetadasVisitors: profile?.roleKey === "super-admin"
   });
   const extraPassDates = [...fechas]
     .filter((date) => profile?.roleKey === "super-admin" || !date.cierre)

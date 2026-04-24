@@ -47,7 +47,9 @@ export function VisitorManager({
   page,
   totalPages,
   roleKey,
-  canViewSensitiveData
+  canViewSensitiveData,
+  title = "Visitas",
+  showCreateSection = true
 }: {
   visitors: VisitorRecord[];
   query: string;
@@ -55,6 +57,8 @@ export function VisitorManager({
   totalPages: number;
   roleKey: RoleKey;
   canViewSensitiveData: boolean;
+  title?: string;
+  showCreateSection?: boolean;
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -64,6 +68,7 @@ export function VisitorManager({
   const [sectionsOpen, setSectionsOpen] = useState<Record<string, boolean>>({
     perfil: false,
     historial: false,
+    cambios: false,
     reasignacion: false,
     nueva: false
   });
@@ -189,7 +194,7 @@ export function VisitorManager({
       <FullscreenLoading active={searchLoading || screenLoading || createPending || reassignPending} />
       <article className="data-card">
         <div className="actions-row" style={{ justifyContent: "space-between", alignItems: "center", marginBottom: "0.8rem" }}>
-          <strong className="section-title">Visitas</strong>
+          <strong className="section-title">{title}</strong>
         </div>
 
         <form
@@ -350,6 +355,34 @@ export function VisitorManager({
               ) : null}
             </article>
 
+            <article className="data-card section-collapse">
+              <button type="button" className="button-soft collapse-trigger" onClick={() => toggleSection("cambios")}>
+                <span>Cambios</span>
+                <span>
+                  {selectedVisitor.historial.filter((entry) => (entry.details?.length ?? 0) > 0).length} {sectionsOpen.cambios ? "−" : "+"}
+                </span>
+              </button>
+              {sectionsOpen.cambios ? (
+                <div className="section-collapse-body">
+                  <div className="record-stack">
+                    {selectedVisitor.historial.filter((entry) => (entry.details?.length ?? 0) > 0).length === 0 ? (
+                      <span className="muted">Sin cambios.</span>
+                    ) : (
+                      selectedVisitor.historial
+                        .filter((entry) => (entry.details?.length ?? 0) > 0)
+                        .map((entry) => (
+                          <div key={`${entry.id}-change`} className="record-pill">
+                            <strong>{maskPrivateText(entry.internalName, selectedVisitorIsSensitive)}</strong>
+                            <span>{formatHistoryDate(entry.date)}</span>
+                            <small>{entry.details?.join(" · ")}</small>
+                          </div>
+                        ))
+                    )}
+                  </div>
+                </div>
+              ) : null}
+            </article>
+
             {canReassign ? (
               <article className="data-card section-collapse">
                 <button type="button" className="button-soft collapse-trigger" onClick={() => toggleSection("reasignacion")}>
@@ -389,6 +422,7 @@ export function VisitorManager({
           <span className="muted">Selecciona una visita para ver su perfil.</span>
         )}
 
+        {showCreateSection ? (
         <article className="data-card section-collapse">
           <button type="button" className="button-soft collapse-trigger" onClick={() => toggleSection("nueva")}>
             <span>Nueva visita</span>
@@ -470,6 +504,7 @@ export function VisitorManager({
             </div>
           ) : null}
         </article>
+        ) : null}
       </article>
     </section>
   );

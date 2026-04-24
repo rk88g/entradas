@@ -64,6 +64,28 @@ function normalizeFullName(value: string) {
   return value.replace(/\s+/g, " ").trim();
 }
 
+const VISITOR_NAME_PARTICLES = new Set([
+  "da",
+  "das",
+  "de",
+  "del",
+  "der",
+  "di",
+  "do",
+  "dos",
+  "el",
+  "la",
+  "las",
+  "los",
+  "mac",
+  "mc",
+  "san",
+  "santa",
+  "van",
+  "von",
+  "y"
+]);
+
 function capitalizeWords(value: string) {
   const normalized = normalizeFullName(value).toLocaleLowerCase("es-MX");
   return normalized.replace(/(^|[\s-])([\p{L}])/gu, (_match, prefix: string, letter: string) => {
@@ -92,6 +114,167 @@ function capitalizeFirstLetterPerLine(value: string) {
     })
     .join("\n")
     .trim();
+}
+
+function normalizeVisitorComparisonName(value: string) {
+  return normalizeFullName(value)
+    .toLocaleLowerCase("es-MX")
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "")
+    .replace(/[^\p{L}\p{N}\s]/gu, " ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+function getVisitorComparisonTokens(value: string, ignoreParticles = false) {
+  const normalizedTokens = normalizeVisitorComparisonName(value).split(" ").filter(Boolean);
+  if (!ignoreParticles) {
+    return normalizedTokens;
+  }
+
+  const filteredTokens = normalizedTokens.filter((token) => !VISITOR_NAME_PARTICLES.has(token));
+  return filteredTokens.length > 0 ? filteredTokens : normalizedTokens;
+}
+
+function getLevenshteinDistance(left: string, right: string) {
+  if (left === right) {
+    return 0;
+  }
+
+  if (!left.length) {
+    return right.length;
+  }
+
+  if (!right.length) {
+    return left.length;
+  }
+
+  const previous = Array.from({ length: right.length + 1 }, (_, index) => index);
+  const current = new Array(right.length + 1).fill(0);
+
+  for (let leftIndex = 1; leftIndex <= left.length; leftIndex += 1) {
+    current[0] = leftIndex;
+
+    for (let rightIndex = 1; rightIndex <= right.length; rightIndex += 1) {
+      const substitutionCost = left[leftIndex - 1] === right[rightIndex - 1] ? 0 : 1;
+      current[rightIndex] = Math.min(
+        current[rightIndex - 1] + 1,
+        previous[rightIndex] + 1,
+        previous[rightIndex - 1] + substitutionCost
+      );
+    }
+
+    for (let index = 0; index < previous.length; index += 1) {
+      previous[index] = current[index];
+    }
+  }
+
+  return previous[right.length];
+}
+
+function getVisitorTokenDuplicateScore(leftTokens: string[], rightTokens: string[]) {
+  if (leftTokens.length < 2 || leftTokens.length !== rightTokens.length) {
+    return 0;
+  }
+
+  let totalDistance = 0;
+  let exactMatches = 0;
+  let maxDistance = 0;
+
+  for (let index = 0; index < leftTokens.length; index += 1) {
+    const distance = getLevenshteinDistance(leftTokens[index] ?? "", rightTokens[index] ?? "");
+
+    if (distance === 0) {
+      exactMatches += 1;
+      continue;
+    }
+
+    if (distance > 2) {
+      return 0;
+    }
+
+    totalDistance += distance;
+    maxDistance = Math.max(maxDistance, distance);
+  }
+
+  if (totalDistance === 0) {
+    return 240;
+  }
+
+  if (totalDistance > 2 || maxDistance > 2 || exactMatches < leftTokens.length - 2) {
+    return 0;
+  }
+
+  return 140 + exactMatches * 10 - totalDistance;
+}
+
+function getVisitorDuplicateScore(leftName: string, rightName: string) {
+  const normalizedLeft = normalizeVisitorComparisonName(leftName);
+  const normalizedRight = normalizeVisitorComparisonName(rightName);
+
+  if (!normalizedLeft || !normalizedRight) {
+    return 0;
+  }
+
+  if (normalizedLeft === normalizedRight) {
+    return 300;
+  }
+
+  const rawScore = getVisitorTokenDuplicateScore(
+    getVisitorComparisonTokens(normalizedLeft),
+    getVisitorComparisonTokens(normalizedRight)
+  );
+
+  const filteredLeft = getVisitorComparisonTokens(normalizedLeft, true);
+  const filteredRight = getVisitorComparisonTokens(normalizedRight, true);
+  const filteredExact = filteredLeft.join(" ") === filteredRight.join(" ");
+
+  if (filteredExact) {
+    return 260;
+  }
+
+  const filteredScore = getVisitorTokenDuplicateScore(filteredLeft, filteredRight);
+  return Math.max(rawScore, filteredScore > 0 ? filteredScore - 5 : 0);
+}
+
+async function findLikelyDuplicateVisitor(
+  supabase: Awaited<ReturnType<typeof createServerSupabaseClient>>,
+  options: {
+    nombreCompleto: string;
+    excludeVisitorId?: string;
+  }
+) {
+  const { data: visitors, error } = await supabase
+    .from("visitas")
+    .select("id, \"nombreCompleto\", created_at")
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    return {
+      duplicateVisitor: null as { id: string; nombreCompleto: string; created_at?: string | null } | null,
+      error: error.message || "No se pudo validar la visita."
+    };
+  }
+
+  const duplicateVisitor = (visitors ?? [])
+    .filter((visitor) => visitor.id !== options.excludeVisitorId)
+    .map((visitor) => ({
+      visitor,
+      score: getVisitorDuplicateScore(options.nombreCompleto, visitor.nombreCompleto)
+    }))
+    .filter((item) => item.score > 0)
+    .sort((left, right) => {
+      if (right.score !== left.score) {
+        return right.score - left.score;
+      }
+
+      return (right.visitor.created_at ?? "").localeCompare(left.visitor.created_at ?? "");
+    })[0]?.visitor ?? null;
+
+  return {
+    duplicateVisitor,
+    error: null as string | null
+  };
 }
 
 async function reserveGlobalPassNumbers(
@@ -387,6 +570,100 @@ async function buildExistingVisitorAssignmentMessage(
   return `La visita ya esta asignada a ${internal.nombres} ${internal.apellido_pat} ${internal.apellido_mat ?? ""} - ubicacion ${internal.ubicacion}.`
     .replace(/\s+/g, " ")
     .trim();
+}
+
+async function buildExistingVisitorAssignmentMessageByVisitorId(
+  supabase: Awaited<ReturnType<typeof createServerSupabaseClient>>,
+  visitorId: string,
+  fallbackName?: string
+) {
+  const { data: visitor } = await supabase
+    .from("visitas")
+    .select("id, \"nombreCompleto\"")
+    .eq("id", visitorId)
+    .maybeSingle();
+
+  const visitorName = visitor?.nombreCompleto ?? fallbackName ?? "La visita";
+  const assignmentMessage = await buildExistingVisitorAssignmentMessage(supabase, visitorName);
+
+  if (assignmentMessage.startsWith("La visita ")) {
+    const detail = assignmentMessage.replace(/^La visita /, "");
+    return `Ya existe una visita muy parecida: ${visitorName}. ${detail.charAt(0).toUpperCase()}${detail.slice(1)}`;
+  }
+
+  return `Ya existe una visita muy parecida: ${visitorName}. ${assignmentMessage}`;
+}
+
+function buildDisplayFullName(...parts: Array<string | null | undefined>) {
+  return parts
+    .map((part) => String(part ?? "").trim())
+    .filter(Boolean)
+    .join(" ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
+async function findLikelyDuplicateInternal(
+  supabase: Awaited<ReturnType<typeof createServerSupabaseClient>>,
+  options: {
+    fullName: string;
+    excludeInternalId?: string;
+  }
+) {
+  const { data: internals, error } = await supabase
+    .from("internos")
+    .select("id, nombres, apellido_pat, apellido_mat, ubicacion, estatus, created_at")
+    .order("created_at", { ascending: false });
+
+  if (error) {
+    return {
+      duplicateInternal: null as {
+        id: string;
+        nombres: string;
+        apellido_pat: string;
+        apellido_mat?: string | null;
+        ubicacion?: string | null;
+        estatus?: string | null;
+      } | null,
+      error: error.message || "No se pudo validar el interno."
+    };
+  }
+
+  const duplicateInternal = (internals ?? [])
+    .filter((internal) => internal.id !== options.excludeInternalId)
+    .map((internal) => ({
+      internal,
+      score: getVisitorDuplicateScore(
+        options.fullName,
+        buildDisplayFullName(internal.nombres, internal.apellido_pat, internal.apellido_mat)
+      )
+    }))
+    .filter((item) => item.score > 0)
+    .sort((left, right) => {
+      if (right.score !== left.score) {
+        return right.score - left.score;
+      }
+
+      return (right.internal.created_at ?? "").localeCompare(left.internal.created_at ?? "");
+    })[0]?.internal ?? null;
+
+  return {
+    duplicateInternal,
+    error: null as string | null
+  };
+}
+
+function buildExistingInternalMessage(internal: {
+  nombres: string;
+  apellido_pat: string;
+  apellido_mat?: string | null;
+  ubicacion?: string | null;
+  estatus?: string | null;
+}) {
+  const fullName = buildDisplayFullName(internal.nombres, internal.apellido_pat, internal.apellido_mat);
+  const location = String(internal.ubicacion ?? "").trim() || "Sin ubicacion";
+  const status = String(internal.estatus ?? "").trim() || "activo";
+  return `Ya existe un interno muy parecido: ${fullName} - ubicacion ${location} - estatus ${status}.`;
 }
 
 async function getPassArticlePayload(formData: FormData) {
@@ -835,6 +1112,19 @@ export async function createInternalAction(
         return failure("La ubicacion debe tener formato numero-numero o letra-numero, por ejemplo 1-101, 15-8 o I-00.");
       }
 
+    const fullName = buildDisplayFullName(payload.nombres, payload.apellido_pat, payload.apellido_mat);
+    const { duplicateInternal, error: duplicateInternalError } = await findLikelyDuplicateInternal(supabase, {
+      fullName
+    });
+
+    if (duplicateInternalError) {
+      return failure(duplicateInternalError);
+    }
+
+    if (duplicateInternal) {
+      return failure(buildExistingInternalMessage(duplicateInternal));
+    }
+
     const { error } = await supabase.from("internos").insert(payload);
     if (error) {
       return failure(error.message || "No se pudo guardar el interno.");
@@ -939,6 +1229,20 @@ export async function updateInternalIdentityAction(
       return failure("No se encontro el interno seleccionado.");
     }
 
+    const fullName = buildDisplayFullName(nombres, apellidoPat, apellidoMat || null);
+    const { duplicateInternal, error: duplicateInternalError } = await findLikelyDuplicateInternal(supabase, {
+      fullName,
+      excludeInternalId: internalId
+    });
+
+    if (duplicateInternalError) {
+      return failure(duplicateInternalError);
+    }
+
+    if (duplicateInternal) {
+      return failure(buildExistingInternalMessage(duplicateInternal));
+    }
+
     const { error } = await supabase
       .from("internos")
       .update({
@@ -960,8 +1264,16 @@ export async function updateInternalIdentityAction(
       actionKey: "update",
       entityType: "interno",
       entityId: internalId,
-      beforeData: previousInternal,
+      beforeData: {
+        ...previousInternal,
+        fullName: buildDisplayFullName(
+          previousInternal.nombres,
+          previousInternal.apellido_pat,
+          previousInternal.apellido_mat
+        )
+      },
       afterData: {
+        fullName: buildDisplayFullName(nombres, apellidoPat, apellidoMat || null),
         nombres,
         apellido_pat: apellidoPat,
         apellido_mat: apellidoMat || null,
@@ -1012,19 +1324,25 @@ export async function updateVisitorIdentityAction(
       return failure("No se encontro la visita seleccionada.");
     }
 
-    const { data: duplicateVisitor, error: duplicateError } = await supabase
-      .from("visitas")
-      .select("id")
-      .ilike("nombreCompleto", nombreCompleto)
-      .neq("id", visitorId)
+    const { data: currentRelation } = await supabase
+      .from("interno_visitas")
+      .select("parentesco")
+      .eq("visita_id", visitorId)
       .maybeSingle();
 
+    const { duplicateVisitor, error: duplicateError } = await findLikelyDuplicateVisitor(supabase, {
+      nombreCompleto,
+      excludeVisitorId: visitorId
+    });
+
     if (duplicateError) {
-      return failure(duplicateError.message || "No se pudo validar el nombre de la visita.");
+      return failure(duplicateError);
     }
 
     if (duplicateVisitor) {
-      return failure(await buildExistingVisitorAssignmentMessage(supabase, nombreCompleto));
+      return failure(
+        await buildExistingVisitorAssignmentMessageByVisitorId(supabase, duplicateVisitor.id, duplicateVisitor.nombreCompleto)
+      );
     }
 
     const fechaNacimiento = buildBirthDateFromAge(edad);
@@ -1055,8 +1373,17 @@ export async function updateVisitorIdentityAction(
       actionKey: "update",
       entityType: "visita",
       entityId: visitorId,
-      beforeData: previousVisitor,
-      afterData: { nombreCompleto, edad, menor, fecha_nacimiento: fechaNacimiento }
+      beforeData: {
+        ...previousVisitor,
+        parentesco: currentRelation?.parentesco ?? null
+      },
+      afterData: {
+        nombreCompleto,
+        edad,
+        menor,
+        fecha_nacimiento: fechaNacimiento,
+        parentesco: currentRelation?.parentesco ?? null
+      }
     });
 
     revalidatePath("/sistema/internos");
@@ -1180,21 +1507,24 @@ export async function createVisitorAction(
       return failure("Debes asignar la visita a un interno.");
     }
 
-    const { data: duplicateVisitors, error: existingVisitorError } = await supabase
-      .from("visitas")
-      .select("id, \"nombreCompleto\"")
-      .ilike("nombreCompleto", visitorPayload.nombreCompleto)
-      .order("created_at", { ascending: false });
+    const { duplicateVisitor: existingVisitor, error: existingVisitorError } = await findLikelyDuplicateVisitor(
+      supabase,
+      {
+        nombreCompleto: visitorPayload.nombreCompleto
+      }
+    );
 
     if (existingVisitorError) {
-      return failure(existingVisitorError.message || "No se pudo validar la visita.");
+      return failure(existingVisitorError);
     }
-
-    const existingVisitor = duplicateVisitors?.[0] ?? null;
 
     if (existingVisitor) {
       return failure(
-        await buildExistingVisitorAssignmentMessage(supabase, visitorPayload.nombreCompleto)
+        await buildExistingVisitorAssignmentMessageByVisitorId(
+          supabase,
+          existingVisitor.id,
+          existingVisitor.nombreCompleto
+        )
       );
     }
 
@@ -1682,7 +2012,7 @@ export async function linkVisitorAction(
 
     const { data: currentRelation, error: relationLookupError } = await supabase
       .from("interno_visitas")
-      .select("interno_id")
+      .select("interno_id, parentesco, titular")
       .eq("visita_id", visitaId)
       .maybeSingle();
 
@@ -1709,8 +2039,31 @@ export async function linkVisitorAction(
       return failure(error.message || "No se pudo vincular la visita.");
     }
 
+    await auditAction({
+      userId: profile.id,
+      moduleKey: "visitas",
+      sectionKey: "vincular-visita",
+      actionKey: "update",
+      entityType: "interno_visita",
+      entityId: `${internoId}:${visitaId}`,
+      beforeData: currentRelation
+        ? {
+            interno_id: currentRelation.interno_id,
+            parentesco: currentRelation.parentesco ?? null,
+            titular: Boolean(currentRelation.titular)
+          }
+        : null,
+      afterData: {
+        interno_id: internoId,
+        parentesco: parentesco || null,
+        titular
+      }
+    });
+
     revalidatePath("/sistema/internos");
+    revalidatePath("/sistema/visitas");
     revalidatePath("/sistema/listado");
+    revalidatePath("/sistema/admin");
     return success("Visita vinculada.");
   } catch (error) {
     return failure(error instanceof Error ? error.message : "No se pudo vincular la visita.");
