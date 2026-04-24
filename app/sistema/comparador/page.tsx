@@ -5,10 +5,12 @@ import { getCurrentUserProfile, getInternalProfilesPage, getVisitasPage } from "
 export default async function ComparadorPage({
   searchParams
 }: {
-  searchParams?: Promise<{ q?: string }>;
+  searchParams?: Promise<{ q?: string; iq?: string; vq?: string }>;
 }) {
   const resolvedSearchParams = (await searchParams) ?? {};
-  const query = String(resolvedSearchParams.q ?? "").trim();
+  const fallbackQuery = String(resolvedSearchParams.q ?? "").trim();
+  const internalQuery = String(resolvedSearchParams.iq ?? fallbackQuery).trim();
+  const visitorQuery = String(resolvedSearchParams.vq ?? fallbackQuery).trim();
   const profile = await getCurrentUserProfile();
 
   if (!profile?.active || profile.roleKey !== "super-admin") {
@@ -17,14 +19,14 @@ export default async function ComparadorPage({
 
   const [internalsPage, visitorsPage] = await Promise.all([
     getInternalProfilesPage({
-      query,
+      query: internalQuery,
       page: 1,
       pageSize: 20,
       includeInactive: true,
       includeBetadasVisitors: true
     }),
     getVisitasPage({
-      query,
+      query: visitorQuery,
       page: 1,
       pageSize: 20,
       availability: "all"
@@ -35,7 +37,8 @@ export default async function ComparadorPage({
     <ComparatorPanel
       internals={internalsPage.items}
       visitors={visitorsPage.items}
-      query={query}
+      internalQuery={internalQuery}
+      visitorQuery={visitorQuery}
     />
   );
 }

@@ -19,22 +19,29 @@ function formatCurrentInternalLabel(name?: string | null, location?: string | nu
 export function ComparatorPanel({
   internals,
   visitors,
-  query
+  internalQuery,
+  visitorQuery
 }: {
   internals: InternalProfile[];
   visitors: VisitorRecord[];
-  query: string;
+  internalQuery: string;
+  visitorQuery: string;
 }) {
   const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
-  const [queryInput, setQueryInput] = useState(query);
+  const [internalQueryInput, setInternalQueryInput] = useState(internalQuery);
+  const [visitorQueryInput, setVisitorQueryInput] = useState(visitorQuery);
   const [selectedInternalId, setSelectedInternalId] = useState<string | null>(internals[0]?.id ?? null);
   const [selectedVisitorId, setSelectedVisitorId] = useState<string | null>(visitors[0]?.id ?? null);
 
   useEffect(() => {
-    setQueryInput(query);
-  }, [query]);
+    setInternalQueryInput(internalQuery);
+  }, [internalQuery]);
+
+  useEffect(() => {
+    setVisitorQueryInput(visitorQuery);
+  }, [visitorQuery]);
 
   useEffect(() => {
     setSelectedInternalId((current) =>
@@ -51,13 +58,14 @@ export function ComparatorPanel({
   const selectedInternal = internals.find((item) => item.id === selectedInternalId) ?? null;
   const selectedVisitor = visitors.find((item) => item.id === selectedVisitorId) ?? null;
 
-  function applySearch(rawValue: string) {
+  function applySearch(paramKey: "iq" | "vq", rawValue: string) {
     const normalized = rawValue.trim();
     const params = new URLSearchParams(searchParams.toString());
+
     if (normalized) {
-      params.set("q", normalized);
+      params.set(paramKey, normalized);
     } else {
-      params.delete("q");
+      params.delete(paramKey);
     }
 
     router.replace(params.size ? `${pathname}?${params.toString()}` : pathname, { scroll: false });
@@ -70,40 +78,6 @@ export function ComparatorPanel({
           <strong className="section-title">Comparador</strong>
           <span className="muted">{internals.length} internos · {visitors.length} visitas</span>
         </div>
-
-        <form
-          className="actions-row"
-          style={{ marginBottom: "0.8rem", alignItems: "stretch" }}
-          onSubmit={(event) => {
-            event.preventDefault();
-            applySearch(queryInput);
-          }}
-        >
-          <div className="field" style={{ flex: 1 }}>
-            <input
-              value={queryInput}
-              onChange={(event) => setQueryInput(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === "Escape") {
-                  event.preventDefault();
-                  setQueryInput("");
-                  applySearch("");
-                  return;
-                }
-
-                if (event.key === "Enter") {
-                  event.preventDefault();
-                  applySearch(queryInput);
-                }
-              }}
-              placeholder="Buscar interno o visita"
-              autoComplete="off"
-            />
-          </div>
-          <button type="submit" className="button-soft">
-            Buscar
-          </button>
-        </form>
       </article>
 
       <section className="two-column-section">
@@ -112,6 +86,40 @@ export function ComparatorPanel({
             <strong className="section-title">Ultimos 20 internos</strong>
             <span className="muted">{internals.length} resultados</span>
           </div>
+
+          <form
+            className="actions-row"
+            style={{ marginBottom: "0.8rem", alignItems: "stretch" }}
+            onSubmit={(event) => {
+              event.preventDefault();
+              applySearch("iq", internalQueryInput);
+            }}
+          >
+            <div className="field" style={{ flex: 1 }}>
+              <input
+                value={internalQueryInput}
+                onChange={(event) => setInternalQueryInput(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Escape") {
+                    event.preventDefault();
+                    setInternalQueryInput("");
+                    applySearch("iq", "");
+                    return;
+                  }
+
+                  if (event.key === "Enter") {
+                    event.preventDefault();
+                    applySearch("iq", internalQueryInput);
+                  }
+                }}
+                placeholder="Buscar interno"
+                autoComplete="off"
+              />
+            </div>
+            <button type="submit" className="button-soft">
+              Buscar
+            </button>
+          </form>
 
           <div className="table-wrap compact-table">
             <table>
@@ -173,6 +181,40 @@ export function ComparatorPanel({
             <strong className="section-title">Ultimas 20 visitas</strong>
             <span className="muted">{visitors.length} resultados</span>
           </div>
+
+          <form
+            className="actions-row"
+            style={{ marginBottom: "0.8rem", alignItems: "stretch" }}
+            onSubmit={(event) => {
+              event.preventDefault();
+              applySearch("vq", visitorQueryInput);
+            }}
+          >
+            <div className="field" style={{ flex: 1 }}>
+              <input
+                value={visitorQueryInput}
+                onChange={(event) => setVisitorQueryInput(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Escape") {
+                    event.preventDefault();
+                    setVisitorQueryInput("");
+                    applySearch("vq", "");
+                    return;
+                  }
+
+                  if (event.key === "Enter") {
+                    event.preventDefault();
+                    applySearch("vq", visitorQueryInput);
+                  }
+                }}
+                placeholder="Buscar visita"
+                autoComplete="off"
+              />
+            </div>
+            <button type="submit" className="button-soft">
+              Buscar
+            </button>
+          </form>
 
           <div className="table-wrap compact-table">
             <table>

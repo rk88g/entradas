@@ -594,6 +594,15 @@ async function buildExistingVisitorAssignmentMessageByVisitorId(
   return `Ya existe una visita muy parecida: ${visitorName}. ${assignmentMessage}`;
 }
 
+function buildDisplayFullName(...parts: Array<string | null | undefined>) {
+  return parts
+    .map((part) => String(part ?? "").trim())
+    .filter(Boolean)
+    .join(" ")
+    .replace(/\s+/g, " ")
+    .trim();
+}
+
 async function getPassArticlePayload(formData: FormData) {
   const articlePairs = [...formData.entries()]
     .filter(([key]) => key.startsWith("article_qty_"))
@@ -1165,8 +1174,16 @@ export async function updateInternalIdentityAction(
       actionKey: "update",
       entityType: "interno",
       entityId: internalId,
-      beforeData: previousInternal,
+      beforeData: {
+        ...previousInternal,
+        fullName: buildDisplayFullName(
+          previousInternal.nombres,
+          previousInternal.apellido_pat,
+          previousInternal.apellido_mat
+        )
+      },
       afterData: {
+        fullName: buildDisplayFullName(nombres, apellidoPat, apellidoMat || null),
         nombres,
         apellido_pat: apellidoPat,
         apellido_mat: apellidoMat || null,
@@ -1217,6 +1234,12 @@ export async function updateVisitorIdentityAction(
       return failure("No se encontro la visita seleccionada.");
     }
 
+    const { data: currentRelation } = await supabase
+      .from("interno_visitas")
+      .select("parentesco")
+      .eq("visita_id", visitorId)
+      .maybeSingle();
+
     const { duplicateVisitor, error: duplicateError } = await findLikelyDuplicateVisitor(supabase, {
       nombreCompleto,
       excludeVisitorId: visitorId
@@ -1260,8 +1283,17 @@ export async function updateVisitorIdentityAction(
       actionKey: "update",
       entityType: "visita",
       entityId: visitorId,
-      beforeData: previousVisitor,
-      afterData: { nombreCompleto, edad, menor, fecha_nacimiento: fechaNacimiento }
+      beforeData: {
+        ...previousVisitor,
+        parentesco: currentRelation?.parentesco ?? null
+      },
+      afterData: {
+        nombreCompleto,
+        edad,
+        menor,
+        fecha_nacimiento: fechaNacimiento,
+        parentesco: currentRelation?.parentesco ?? null
+      }
     });
 
     revalidatePath("/sistema/internos");
@@ -1890,7 +1922,7 @@ export async function linkVisitorAction(
 
     const { data: currentRelation, error: relationLookupError } = await supabase
       .from("interno_visitas")
-      .select("interno_id")
+      .select("interno_id, parentesco, titular")
       .eq("visita_id", visitaId)
       .maybeSingle();
 
@@ -1917,8 +1949,31 @@ export async function linkVisitorAction(
       return failure(error.message || "No se pudo vincular la visita.");
     }
 
+    await auditAction({
+      userId: profile.id,
+      moduleKey: "visitas",
+      sectionKey: "vincular-visita",
+      actionKey: "update",
+      entityType: "interno_visita",
+      entityId: `${internoId}:${visitaId}`,
+      beforeData: currentRelation
+        ? {
+            interno_id: currentRelation.interno_id,
+            parentesco: currentRelation.parentesco ?? null,
+            titular: Boolean(currentRelation.titular)
+          }
+        : null,
+      afterData: {
+        interno_id: internoId,
+        parentesco: parentesco || null,
+        titular
+      }
+    });
+
     revalidatePath("/sistema/internos");
+    revalidatePath("/sistema/visitas");
     revalidatePath("/sistema/listado");
+    revalidatePath("/sistema/admin");
     return success("Visita vinculada.");
   } catch (error) {
     return failure(error instanceof Error ? error.message : "No se pudo vincular la visita.");
