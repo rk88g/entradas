@@ -47,6 +47,8 @@ import {
   StoredPermissionGrantRecord,
   SupportMessageRecord,
   SupportTicketRecord,
+  SupportTicketStatus,
+  SupportTicketType,
   UserProfile,
   VisitorSearchOption,
   VisitorHistoryEntry,
@@ -3146,25 +3148,43 @@ export async function getSupportTicketsPage(options?: {
   const page = Math.max(1, options?.page ?? 1);
   const from = (page - 1) * pageSize;
   const to = from + pageSize - 1;
+  const mexicoToday = getTodayDate();
+  const mexicoDateFormatter = new Intl.DateTimeFormat("en-CA", {
+    timeZone: "America/Mexico_City",
+    year: "numeric",
+    month: "2-digit",
+    day: "2-digit"
+  });
 
-  let request = supabase
-    .from("support_tickets")
-    .select(
-      "id, subject, type, status, created_by, assigned_to, context_snapshot, last_message_at, created_at, updated_at",
-      { count: "exact" }
-    )
-    .order("last_message_at", { ascending: false })
-    .range(from, to);
+  const { data, error } = await fetchAllRows<{
+    id: string;
+    subject: string;
+    type: SupportTicketType;
+    status: SupportTicketStatus;
+    created_by: string;
+    assigned_to: string | null;
+    context_snapshot: unknown;
+    last_message_at: string;
+    created_at: string;
+    updated_at: string;
+  }>((rangeFrom, rangeTo) => {
+    let request = supabase
+      .from("support_tickets")
+      .select("id, subject, type, status, created_by, assigned_to, context_snapshot, last_message_at, created_at, updated_at")
+      .order("last_message_at", { ascending: false })
+      .range(rangeFrom, rangeTo);
 
-  if (profile.roleKey !== "super-admin") {
-    request = request.eq("created_by", profile.id);
-  }
+    if (profile.roleKey !== "super-admin") {
+      request = request.eq("created_by", profile.id);
+    }
 
-  if (query) {
-    request = request.ilike("subject", `%${query}%`);
-  }
+    if (query) {
+      request = request.ilike("subject", `%${query}%`);
+    }
 
-  const { data, error, count } = await request;
+    return request;
+  });
+
   if (error || !data) {
     return {
       items: [],
@@ -3175,14 +3195,29 @@ export async function getSupportTicketsPage(options?: {
     } satisfies PaginatedResult<SupportTicketRecord>;
   }
 
+  const filteredRows = data.filter((item) => {
+    if (item.status !== "realizado") {
+      return true;
+    }
+
+    const createdAt = new Date(item.created_at);
+    if (Number.isNaN(createdAt.getTime())) {
+      return false;
+    }
+
+    return mexicoDateFormatter.format(createdAt) === mexicoToday;
+  });
+
+  const pagedRows = filteredRows.slice(from, to + 1);
+
   const userIds = [
     ...new Set(
-      data
+      pagedRows
         .flatMap((item) => [item.created_by, item.assigned_to].filter(Boolean))
         .filter(Boolean)
     )
   ] as string[];
-  const usersMap = new Map<string, string>();
+    const usersMap = new Map<string, string>();
 
   if (userIds.length > 0) {
     const { data: users } = await supabase
@@ -3195,10 +3230,10 @@ export async function getSupportTicketsPage(options?: {
     });
   }
 
-  const ticketIds = data.map((item) => item.id);
-  const { data: unreadMessages } = ticketIds.length
-    ? await supabase
-        .from("support_messages")
+    const ticketIds = pagedRows.map((item) => item.id);
+    const { data: unreadMessages } = ticketIds.length
+      ? await supabase
+          .from("support_messages")
         .select("ticket_id")
         .in("ticket_id", ticketIds)
         .is("read_by_recipient_at", null)
@@ -3210,11 +3245,11 @@ export async function getSupportTicketsPage(options?: {
     unreadCountMap.set(item.ticket_id, (unreadCountMap.get(item.ticket_id) ?? 0) + 1);
   });
 
-  return {
-    items: data.map((item) => ({
-      id: item.id,
-      subject: item.subject,
-      type: item.type,
+    return {
+      items: pagedRows.map((item) => ({
+        id: item.id,
+        subject: item.subject,
+        type: item.type,
       status: item.status,
       createdBy: item.created_by,
       createdByName: usersMap.get(item.created_by) ?? "Usuario",
@@ -3223,13 +3258,13 @@ export async function getSupportTicketsPage(options?: {
       unreadCount: unreadCountMap.get(item.id) ?? 0,
       lastMessageAt: item.last_message_at,
       createdAt: item.created_at,
-      updatedAt: item.updated_at,
-      context: (item.context_snapshot as SupportTicketRecord["context"]) ?? null
-    })),
-    total: count ?? 0,
-    page,
-    pageSize,
-    query
+        updatedAt: item.updated_at,
+        context: (item.context_snapshot as SupportTicketRecord["context"]) ?? null
+      })),
+      total: filteredRows.length,
+      page,
+      pageSize,
+      query
   } satisfies PaginatedResult<SupportTicketRecord>;
 }
 

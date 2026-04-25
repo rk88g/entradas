@@ -552,7 +552,7 @@ export function SupportTicketsPanel({
                       <span>{formatDateTime(ticket.lastMessageAt)}</span>
                     </div>
                     {ticket.context?.label ? (
-                      <div className="muted">{ticket.context.label}</div>
+                      <div className="muted ticket-list-context">{ticket.context.label}</div>
                     ) : null}
                   </button>
                 ))
