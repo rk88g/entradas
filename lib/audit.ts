@@ -82,8 +82,8 @@ export async function logAuditEvent(payload: AuditPayload) {
       action_key: payload.actionKey,
       entity_type: payload.entityType,
       entity_id: payload.entityId ?? null,
-      before_data: payload.beforeData ? JSON.stringify(payload.beforeData) : null,
-      after_data: payload.afterData ? JSON.stringify(payload.afterData) : null
+      before_data: payload.beforeData ?? null,
+      after_data: payload.afterData ?? null
     });
   } catch {
     // Silent by design: audit logging should not block user actions.

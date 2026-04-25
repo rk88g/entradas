@@ -79,7 +79,23 @@ function getFirstRelation<T>(value: T | T[] | null | undefined): T | null {
 }
 
 function parseAuditPayload(value: unknown) {
-  if (!value || typeof value !== "object" || Array.isArray(value)) {
+  if (!value) {
+    return null;
+  }
+
+  if (typeof value === "string") {
+    try {
+      const parsed = JSON.parse(value);
+      if (parsed && typeof parsed === "object" && !Array.isArray(parsed)) {
+        return parsed as Record<string, unknown>;
+      }
+      return null;
+    } catch {
+      return null;
+    }
+  }
+
+  if (typeof value !== "object" || Array.isArray(value)) {
     return null;
   }
 
