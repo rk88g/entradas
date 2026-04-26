@@ -867,6 +867,7 @@ function drawNumbersRow(options: {
   const leftWidth = 58;
   const rightWidth = 64;
   const middleWidth = width - leftWidth - rightWidth - 24;
+  const passNumberText = String(pass.numeroPase ?? "-");
 
   page.drawRectangle({
     x,
@@ -888,25 +889,34 @@ function drawNumbersRow(options: {
     size: PASS_NUMBER_TEXT_SIZE,
     maxLines: 1
   });
-  drawWrappedBlock({
-    page,
-    font: boldFont,
-    text: `${pass.internoNombre}    [${pass.numeroPase ?? "-"}]`,
-    x: x + leftWidth + 4,
-    top: textTop,
-    width: middleWidth,
-    size: PASS_NUMBER_TEXT_SIZE,
-    maxLines: 2
-  });
-  drawTextLine(
-    page,
-    String(pass.numeroPase ?? "-"),
-    x + width - rightWidth + 18,
-    top + rowHeight / 2 - 18,
-    PASS_NUMBER_SIZE,
-    boldFont
-  );
-}
+    drawWrappedBlock({
+      page,
+      font: boldFont,
+      text: `${pass.internoNombre}    [${passNumberText}]`,
+      x: x + leftWidth + 4,
+      top: textTop,
+      width: middleWidth,
+      size: PASS_NUMBER_TEXT_SIZE,
+      maxLines: 2
+    });
+    let passNumberSize = PASS_NUMBER_SIZE;
+    const maxPassNumberWidth = rightWidth - 8;
+
+    while (passNumberSize > 22 && boldFont.widthOfTextAtSize(passNumberText, passNumberSize) > maxPassNumberWidth) {
+      passNumberSize -= 1;
+    }
+
+    const passNumberWidth = boldFont.widthOfTextAtSize(passNumberText, passNumberSize);
+    const passNumberX = x + width - 6 - passNumberWidth;
+    drawTextLine(
+      page,
+      passNumberText,
+      passNumberX,
+      top + rowHeight / 2 - passNumberSize / 2 - 4,
+      passNumberSize,
+      boldFont
+    );
+  }
 
 function drawListadoMode(pdf: PDFDocument, listings: ListingRecord[], regularFont: PDFFont, boldFont: PDFFont) {
   const footerHeight = 22;
