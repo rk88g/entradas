@@ -1,8 +1,8 @@
-﻿import fontkit from "@pdf-lib/fontkit";
+import fontkit from "@pdf-lib/fontkit";
 import { readFile } from "fs/promises";
 import { PDFDocument, PDFFont, PDFPage, StandardFonts, rgb } from "pdf-lib";
 import { ListingRecord, PassVisitor } from "@/lib/types";
-import { formatLongDate, sortListingsForPrint } from "@/lib/utils";
+import { formatLongDate, sanitizeText, sortListingsForPrint } from "@/lib/utils";
 
 export type ListingPdfMode = "listado" | "sexos" | "numeros" | "menciones";
 
@@ -74,7 +74,7 @@ function getListingVisitors(pass: ListingRecord) {
 }
 
 function splitMentions(menciones?: string) {
-  const lines = (menciones ?? "")
+  const lines = sanitizeText(menciones ?? "")
     .split(/\r?\n/)
     .map((item) => item.trim())
     .filter(Boolean);
@@ -98,14 +98,14 @@ function formatDeviceSummary(pass: ListingRecord) {
     return null;
   }
 
-  return pass.deviceItems.map((item) => `${item.name} [${item.quantity}]`).join(", ");
+  return pass.deviceItems.map((item) => `${sanitizeText(item.name)} [${item.quantity}]`).join(", ");
 }
 
 function formatVisitorLine(visitor: PassVisitor) {
   if (visitor.edad >= 12 && visitor.edad <= 17) {
-    return `${visitor.nombre} ${visitor.edad} aÃ±os`;
+    return `${sanitizeText(visitor.nombre)} ${visitor.edad} años`;
   }
-  return visitor.nombre;
+  return sanitizeText(visitor.nombre);
 }
 
 function filterListingsForPdf(
@@ -144,7 +144,7 @@ function chunkItems<T>(items: T[], size: number) {
 }
 
 function wrapText(text: string, font: PDFFont, size: number, maxWidth: number) {
-  const clean = text.replace(/\s+/g, " ").trim();
+  const clean = sanitizeText(text).replace(/\s+/g, " ").trim();
   if (!clean) {
     return [];
   }
@@ -198,10 +198,10 @@ function ellipsizeLine(text: string, font: PDFFont, size: number, maxWidth: numb
   }
 
   let value = text;
-  while (value.length > 1 && font.widthOfTextAtSize(`${value}â€¦`, size) > maxWidth) {
+  while (value.length > 1 && font.widthOfTextAtSize(`${value}…`, size) > maxWidth) {
     value = value.slice(0, -1);
   }
-  return `${value}â€¦`;
+  return `${value}…`;
 }
 
 function drawTextLine(
@@ -213,7 +213,7 @@ function drawTextLine(
   font: PDFFont,
   color = COLORS.text
 ) {
-  page.drawText(text, {
+  page.drawText(sanitizeText(text), {
     x,
     y: PAGE_HEIGHT - top - size,
     size,
@@ -986,9 +986,9 @@ function drawMentionsMode(pdf: PDFDocument, listings: ListingRecord[], regularFo
       ...(!pass.especiales?.trim() && formatDeviceSummary(pass) ? [formatDeviceSummary(pass) as string] : [])
     ];
     const bodyLines = [
-      ...(basic.length > 0 ? [{ text: "MenciÃ³n", color: COLORS.danger, bold: true }] : []),
+      ...(basic.length > 0 ? [{ text: "Mención", color: COLORS.danger, bold: true }] : []),
       ...basic.map((item) => ({ text: item, color: COLORS.warning })),
-      ...(mergedSpecialLines.length > 0 ? [{ text: "MenciÃ³n especial", color: COLORS.danger, bold: true }] : []),
+      ...(mergedSpecialLines.length > 0 ? [{ text: "Mención especial", color: COLORS.danger, bold: true }] : []),
       ...mergedSpecialLines.map((item) => ({ text: item, color: COLORS.danger }))
     ];
     return {

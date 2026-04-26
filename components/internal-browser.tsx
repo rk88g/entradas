@@ -359,6 +359,7 @@ export function InternalBrowser({
   const [statusState, statusAction, statusPending] = useActionState(updateInternalStatusAction, mutationInitialState);
   const visitorFormRef = useRef<HTMLFormElement>(null);
   const internalFormRef = useRef<HTMLFormElement>(null);
+  const passPreviewApprovalRef = useRef<HTMLInputElement | null>(null);
   const handledPassSuccessKeyRef = useRef<number | null>(null);
   const pendingPassContextRef = useRef<{ internoId: string; fechaVisita: string } | null>(null);
   const canManageVisitorAvailability = roleKey === "super-admin" || roleKey === "control";
@@ -1001,6 +1002,11 @@ export function InternalBrowser({
     goToWizardStep(currentWizardStepIndex + 1);
   }
 
+  function focusPassPreviewApproval() {
+    passPreviewApprovalRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    passPreviewApprovalRef.current?.focus();
+  }
+
   useEffect(() => {
     if (!selectedPass) {
       setAllowDuplicatePass(false);
@@ -1464,6 +1470,9 @@ export function InternalBrowser({
                   onSubmitCapture={(event) => {
                     if (!canSubmitPass) {
                       event.preventDefault();
+                      if (requiresPassPreviewAcceptance && !passPreviewAccepted) {
+                        focusPassPreviewApproval();
+                      }
                       setPassLocalError(
                         passSubmitIssue ?? (requiresPassPreviewAcceptance && !passPreviewAccepted
                           ? "Debes validar la vista previa del pase antes de generarlo."
@@ -1928,8 +1937,23 @@ export function InternalBrowser({
                           ) : null}
                         </article>
 
+                        {requiresPassPreviewAcceptance && !passPreviewAccepted ? (
+                          <div className="wizard-pass-approval-warning">
+                            <MutationBanner
+                              state={{ success: null, error: "Falta validar que el pase esté correcto antes de generarlo." }}
+                              stateKey="wizard-preview-approval-required"
+                            />
+                            <div className="actions-row" style={{ marginTop: "0.6rem" }}>
+                              <button type="button" className="button-soft" onClick={focusPassPreviewApproval}>
+                                Ir al switch de validación
+                              </button>
+                            </div>
+                          </div>
+                        ) : null}
+
                         <label className="wizard-pass-approval switch-row">
                           <input
+                            ref={passPreviewApprovalRef}
                             type="checkbox"
                             checked={passPreviewAccepted}
                             onChange={(event) => setPassPreviewAccepted(event.target.checked)}
@@ -2045,6 +2069,11 @@ export function InternalBrowser({
                       {canCaptureWizardMentions && currentWizardStep !== "verificar" ? (
                         <button type="button" className="button" onClick={goToNextWizardStep}>
                           {currentWizardStep === "especiales" ? "Verificar pase" : "Siguiente"}
+                        </button>
+                      ) : null}
+                      {canRenderPassButton && currentWizardStep === "verificar" && requiresPassPreviewAcceptance && !passPreviewAccepted ? (
+                        <button type="button" className="button-soft" onClick={focusPassPreviewApproval}>
+                          Validar pase
                         </button>
                       ) : null}
                       {canRenderPassButton && (!canCaptureWizardMentions || currentWizardStep === "verificar") ? (

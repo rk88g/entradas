@@ -2093,6 +2093,10 @@ html[data-theme="dark"] .admin-tab.active {
   color: var(--ink);
 }
 
+.wizard-pass-approval-warning {
+  margin-bottom: 0.85rem;
+}
+
 .wizard-pass-approval input {
   margin-top: 0;
 }

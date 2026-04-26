@@ -17,6 +17,24 @@ const SENSITIVE_INTERNAL_IDS = new Set([
   "4df7451f-5900-42f7-9336-e87180a2e336"
 ]);
 const PRIVATE_MASK = "****";
+const MOJIBAKE_TOKENS = [
+  "Ã",
+  "Â",
+  "â€¦",
+  "â€“",
+  "â€”",
+  "â€œ",
+  "â€",
+  "â€",
+  "â€™",
+  "â€¢",
+  "ï¿½",
+  "�"
+];
+
+function needsEncodingRepair(value: string) {
+  return MOJIBAKE_TOKENS.some((token) => value.includes(token));
+}
 
 function formatPartsToIso(parts: Intl.DateTimeFormatPart[]) {
   const year = parts.find((part) => part.type === "year")?.value ?? "0000";
@@ -33,6 +51,52 @@ function parseLocalDate(input: string) {
   }
 
   return new Date(input);
+}
+
+export function repairTextEncoding(value: string | number | null | undefined) {
+  return sanitizeText(value);
+}
+
+export function sanitizeText(value: string | number | null | undefined) {
+  let text = String(value ?? "");
+  if (!text || !needsEncodingRepair(text)) {
+    return text;
+  }
+
+  for (let attempt = 0; attempt < 2; attempt += 1) {
+    if (!needsEncodingRepair(text)) {
+      break;
+    }
+
+    try {
+      const bytes = Uint8Array.from(Array.from(text).map((character) => character.charCodeAt(0) & 0xff));
+      const decoded = new TextDecoder("utf-8", { fatal: false }).decode(bytes);
+      if (!decoded || decoded === text) {
+        break;
+      }
+
+      text = decoded;
+    } catch {
+      break;
+    }
+  }
+
+  return text
+    .replace(/â€¦/g, "…")
+    .replace(/â€“/g, "–")
+    .replace(/â€”/g, "—")
+    .replace(/â€œ/g, "“")
+    .replace(/â€\u001d/g, "”")
+    .replace(/â€\u0018/g, "‘")
+    .replace(/â€™/g, "’")
+    .replace(/â€¢/g, "•")
+    .replace(/Â¿/g, "¿")
+    .replace(/Â¡/g, "¡")
+    .replace(/Â·/g, "·")
+    .replace(/Â /g, " ")
+    .replace(/Â/g, "")
+    .replace(/ï¿½/g, "")
+    .replace(/�/g, "");
 }
 
 export function getAgeFromDate(input: string) {

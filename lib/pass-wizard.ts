@@ -4,6 +4,7 @@ import {
   PassWizardVisit,
   WizardCard
 } from "@/lib/types";
+import { sanitizeText } from "@/lib/utils";
 
 export const DOCUMENT_OPTIONS = [
   "CURP",
@@ -181,7 +182,7 @@ const SPECIAL_ARTICLE_ALIASES: Record<string, string[]> = {
 };
 
 function normalizeKey(value: string) {
-  return value
+  return sanitizeText(value)
     .normalize("NFD")
     .replace(/[\u0300-\u036f]/g, "")
     .toLowerCase()
@@ -191,7 +192,7 @@ function normalizeKey(value: string) {
 }
 
 function lowerFirst(value: string) {
-  const trimmed = value.trim();
+  const trimmed = sanitizeText(value).trim();
   if (!trimmed) {
     return "";
   }
@@ -204,7 +205,7 @@ function lowerFirst(value: string) {
 }
 
 function withPeriod(value: string) {
-  const trimmed = value.trim();
+  const trimmed = sanitizeText(value).trim();
   if (!trimmed) {
     return "";
   }
@@ -213,7 +214,7 @@ function withPeriod(value: string) {
 }
 
 function joinSpanishList(items: string[]) {
-  const normalized = items.map((item) => item.trim()).filter(Boolean);
+  const normalized = items.map((item) => sanitizeText(item).trim()).filter(Boolean);
   if (normalized.length === 0) {
     return "";
   }
@@ -281,11 +282,11 @@ function cardsCoverWholeCohort(
 }
 
 function makeMinorLead(visit: PassWizardVisit) {
-  return `${visit.sexo === "mujer" ? "La menor" : "El menor"} ${visit.visitante_nombre}`;
+  return `${visit.sexo === "mujer" ? "La menor" : "El menor"} ${sanitizeText(visit.visitante_nombre)}`;
 }
 
 function makeNamedSubject(visit: PassWizardVisit) {
-  return isMinor(visit) ? makeMinorLead(visit) : visit.visitante_nombre;
+  return isMinor(visit) ? makeMinorLead(visit) : sanitizeText(visit.visitante_nombre);
 }
 
 function buildDocumentationSentence(card: WizardCard, visit: PassWizardVisit | null) {
@@ -298,15 +299,15 @@ function buildDocumentationSentence(card: WizardCard, visit: PassWizardVisit | n
   }
 
   if (card.valor === "Sin INE") {
-    return withPeriod(`${visit.visitante_nombre} ingresa sin INE`);
+    return withPeriod(`${sanitizeText(visit.visitante_nombre)} ingresa sin INE`);
   }
 
   if (card.valor === "INE vencida") {
-    return withPeriod(`${visit.visitante_nombre} ingresa con INE vencida`);
+    return withPeriod(`${sanitizeText(visit.visitante_nombre)} ingresa con INE vencida`);
   }
 
   if (card.valor === "INE en trámite") {
-    return withPeriod(`${visit.visitante_nombre} ingresa con INE en trámite`);
+    return withPeriod(`${sanitizeText(visit.visitante_nombre)} ingresa con INE en trámite`);
   }
 
   return withPeriod(`${makeNamedSubject(visit)} ingresa con ${card.valor}`);
@@ -335,7 +336,7 @@ function buildCompanionSentence(card: WizardCard, visit: PassWizardVisit | null)
     return withPeriod(`Ingresan acompañados por su ${companion}`);
   }
 
-  const subject = isMinor(visit) ? makeMinorLead(visit) : visit.visitante_nombre;
+  const subject = isMinor(visit) ? makeMinorLead(visit) : sanitizeText(visit.visitante_nombre);
   return withPeriod(`${subject} ingresa acompañado por su ${companion}`);
 }
 
@@ -354,7 +355,7 @@ function buildConditionSentence(card: WizardCard, visit: PassWizardVisit | null)
       return withPeriod("Se quedan de noche");
     }
 
-    return withPeriod(`${visit.visitante_nombre} se queda de noche`);
+    return withPeriod(`${sanitizeText(visit.visitante_nombre)} se queda de noche`);
   }
 
   if (CONDITION_WITH_ACCESSORY.has(card.valor) || CONDITION_WITH_STATUS.has(card.valor)) {
@@ -362,14 +363,14 @@ function buildConditionSentence(card: WizardCard, visit: PassWizardVisit | null)
       return withPeriod(`Ingresan con ${lowerFirst(card.valor)}`);
     }
 
-    return withPeriod(`${visit.visitante_nombre} ingresa con ${lowerFirst(card.valor)}`);
+    return withPeriod(`${sanitizeText(visit.visitante_nombre)} ingresa con ${lowerFirst(card.valor)}`);
   }
 
   if (!visit) {
     return withPeriod(`Ingresan con ${lowerFirst(card.valor)}`);
   }
 
-  return withPeriod(`${visit.visitante_nombre} ingresa con ${lowerFirst(card.valor)}`);
+  return withPeriod(`${sanitizeText(visit.visitante_nombre)} ingresa con ${lowerFirst(card.valor)}`);
 }
 
 function buildConditionGroupSentence(card: WizardCard, cohort: VisitCohortKey) {
@@ -389,13 +390,13 @@ function buildPregnancySentence(visit: PassWizardVisit | null) {
     return withPeriod("Ingresan con embarazo y ECO reciente");
   }
 
-  return withPeriod(`${visit.visitante_nombre} ingresa con embarazo y ECO reciente`);
+  return withPeriod(`${sanitizeText(visit.visitante_nombre)} ingresa con embarazo y ECO reciente`);
 }
 
 function buildSimpleSpecialSentence(card: WizardCard, visit: PassWizardVisit | null) {
   if (card.valor === "33 económico") {
     if (visit) {
-      return withPeriod(`${visit.visitante_nombre} ingresa con 33 económico`);
+      return withPeriod(`${sanitizeText(visit.visitante_nombre)} ingresa con 33 económico`);
     }
 
     return withPeriod("Ingresa 33 económico");
@@ -405,7 +406,7 @@ function buildSimpleSpecialSentence(card: WizardCard, visit: PassWizardVisit | n
     return withPeriod(`Ingresan con ${lowerFirst(card.valor)}`);
   }
 
-  return withPeriod(`${visit.visitante_nombre} ingresa con ${lowerFirst(card.valor)}`);
+  return withPeriod(`${sanitizeText(visit.visitante_nombre)} ingresa con ${lowerFirst(card.valor)}`);
 }
 
 function buildSimpleSpecialGroupSentence(card: WizardCard, cohort: VisitCohortKey) {
@@ -413,14 +414,15 @@ function buildSimpleSpecialGroupSentence(card: WizardCard, cohort: VisitCohortKe
 }
 
 function buildQuantitySpecialPhrase(card: WizardCard, quantity: number) {
-  const detail = card.detalle.trim() ? ` (${card.detalle.trim()})` : "";
+  const detailText = sanitizeText(card.detalle).trim();
+  const detail = detailText ? ` (${detailText})` : "";
   const review = card.requiere_revision ? " para revisión" : "";
   return `${Math.max(1, quantity || 1)} ${lowerFirst(card.valor)}${review}${detail}`;
 }
 
 function buildFinalText(generated: string, manual: string) {
-  const generatedText = generated.trim();
-  const manualText = manual.trim();
+  const generatedText = sanitizeText(generated).trim();
+  const manualText = sanitizeText(manual).trim();
   if (!generatedText) {
     return manualText;
   }
@@ -465,7 +467,7 @@ function serializeQuantityEntries(items: Map<string, { card: WizardCard; quantit
     [...items.values()]
       .map(({ card, quantity }) => ({
         valor: normalizeKey(card.valor),
-        detalle: card.detalle.trim(),
+        detalle: sanitizeText(card.detalle).trim(),
         revision: card.requiere_revision ? 1 : 0,
         quantity
       }))
@@ -699,7 +701,7 @@ export function generateMenciones(wizardState: PassWizardState) {
     }
 
     basicSentences.push(
-      withPeriod(`${visit.visitante_nombre} ingresa con ${joinSpanishList(uniquePreserveOrder(values))}`)
+      withPeriod(`${sanitizeText(visit.visitante_nombre)} ingresa con ${joinSpanishList(uniquePreserveOrder(values))}`)
     );
   }
 
@@ -739,7 +741,7 @@ export function generateMenciones(wizardState: PassWizardState) {
     .forEach((card) => {
       const targetKey = card.visitante_id ?? GENERAL_TARGET_KEY;
       const currentTargetItems = groupedQuantitySpecials.get(targetKey) ?? new Map();
-      const aggregateKey = `${normalizeKey(card.valor)}|${card.requiere_revision ? "1" : "0"}|${card.detalle.trim()}`;
+      const aggregateKey = `${normalizeKey(card.valor)}|${card.requiere_revision ? "1" : "0"}|${sanitizeText(card.detalle).trim()}`;
       const existing = currentTargetItems.get(aggregateKey);
 
       if (existing) {
@@ -811,7 +813,7 @@ export function generateMenciones(wizardState: PassWizardState) {
 
     specialSentences.push(
       withPeriod(
-        `${visit.visitante_nombre} ingresa con ${joinSpanishList(
+        `${sanitizeText(visit.visitante_nombre)} ingresa con ${joinSpanishList(
           [...items.values()].map(({ card, quantity }) => buildQuantitySpecialPhrase(card, quantity))
         )}`
       )
