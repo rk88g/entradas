@@ -17,7 +17,7 @@ import {
 import { MutationState } from "@/lib/types";
 import {
   getAllowedModuleDeviceNames,
-  canManageMentions,
+  canManagePassMentions,
   compareInternalLocations,
   getDateOffset,
   isValidInternalLocation,
@@ -2112,11 +2112,14 @@ export async function createPassAction(
       return failure("Debes elegir al menos una visita.");
     }
 
-    if (mentions && !canManageMentions(profile.roleKey)) {
+    const canManageBasicMentions = canManagePassMentions(profile.roleKey, profile.permissionGrants, "basicas");
+    const canManageSpecialMentions = canManagePassMentions(profile.roleKey, profile.permissionGrants, "especiales");
+
+    if (mentions && !canManageBasicMentions) {
       return failure("Tu rol no puede capturar menciones.");
     }
 
-    if (specials && !canManageMentions(profile.roleKey)) {
+    if (specials && !canManageSpecialMentions) {
       return failure("Tu rol no puede capturar peticiones especiales.");
     }
 
@@ -2219,7 +2222,7 @@ export async function createPassAction(
 
     const orderedVisitors = [...selectedVisitors].sort((a, b) => (b.edad ?? 0) - (a.edad ?? 0));
     const specialText =
-      canManageMentions(profile.roleKey)
+      canManageSpecialMentions
         ? wizardMode
           ? specials || null
           : appendDeviceSummaryToSpecials(specials, articleSummary)
@@ -2232,7 +2235,7 @@ export async function createPassAction(
         p_created_by: profile.id,
         p_duplicate_authorized_by: existingPass && profile.roleKey === "super-admin" && allowDuplicatePass ? profile.id : null,
         p_numero_pase: null,
-        p_menciones: canManageMentions(profile.roleKey) && mentions ? mentions : null,
+        p_menciones: canManageBasicMentions && mentions ? mentions : null,
         p_especiales: specialText,
         p_visitor_ids: orderedVisitors.map((visitor) => visitor.id),
         p_device_items: articlePayload

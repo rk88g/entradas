@@ -381,8 +381,34 @@ export function getStatsFromListings(listings: ListingRecord[]) {
   };
 }
 
-export function canManageMentions(role: RoleKey) {
-  return role === "super-admin" || role === "control";
+export const PASS_BASIC_MENTIONS_SCOPE = "listado.captura-menciones";
+export const PASS_SPECIAL_MENTIONS_SCOPE = "listado.captura-especiales";
+
+export function canManagePassMentions(
+  role: RoleKey,
+  permissionGrants: PermissionGrantRecord[] = [],
+  target: "basicas" | "especiales" | "any" = "any"
+): boolean {
+  if (target === "basicas") {
+    return canManageScope(role, permissionGrants, PASS_BASIC_MENTIONS_SCOPE, role === "control");
+  }
+
+  if (target === "especiales") {
+    return canManageScope(role, permissionGrants, PASS_SPECIAL_MENTIONS_SCOPE, role === "control");
+  }
+
+  return (
+    canManagePassMentions(role, permissionGrants, "basicas") ||
+    canManagePassMentions(role, permissionGrants, "especiales")
+  );
+}
+
+export function canManageMentions(
+  role: RoleKey,
+  permissionGrants: PermissionGrantRecord[] = [],
+  target: "basicas" | "especiales" | "any" = "any"
+): boolean {
+  return canManagePassMentions(role, permissionGrants, target);
 }
 
 export function getDefaultDateStatusForRole(role: RoleKey): AccessStatus {
