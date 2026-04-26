@@ -2094,7 +2094,18 @@ html[data-theme="dark"] .admin-tab.active {
 }
 
 .wizard-pass-approval input {
-  margin-top: 0.2rem;
+  margin-top: 0;
+}
+
+.wizard-pass-approval .switch-ui {
+  margin-top: 0.05rem;
+  flex-shrink: 0;
+}
+
+.wizard-pass-approval span:last-child {
+  display: inline-block;
+  max-width: 34rem;
+  line-height: 1.35;
 }
 
 .ticket-badge {

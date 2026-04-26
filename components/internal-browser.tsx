@@ -1923,12 +1923,13 @@ export function InternalBrowser({
                           ) : null}
                         </article>
 
-                        <label className="wizard-pass-approval">
+                        <label className="wizard-pass-approval switch-row">
                           <input
                             type="checkbox"
                             checked={passPreviewAccepted}
                             onChange={(event) => setPassPreviewAccepted(event.target.checked)}
                           />
+                          <span className="switch-ui" aria-hidden="true" />
                           <span>Acepto que así viene el pase y autorizo generarlo.</span>
                         </label>
                       </section>
