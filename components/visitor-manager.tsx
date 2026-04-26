@@ -32,6 +32,11 @@ function formatCurrentInternalLabel(name?: string | null, location?: string | nu
   return normalizedLocation ? `${normalizedName} [${normalizedLocation}]` : normalizedName;
 }
 
+function navigateToSearchTarget(pathname: string, params: URLSearchParams) {
+  const target = params.size ? `${pathname}?${params.toString()}` : pathname;
+  window.location.assign(target);
+}
+
 function getEstimatedBirthDateFromAge(ageValue: string) {
   const age = Number(ageValue);
   if (!Number.isFinite(age) || age < 0 || age > 120) {
@@ -203,7 +208,7 @@ export function VisitorManager({
       params.set("page", String(nextPage));
     }
 
-    router.replace(params.size ? `${pathname}?${params.toString()}` : pathname, { scroll: false });
+    navigateToSearchTarget(pathname, params);
   }
 
   function applySearch(rawValue: string) {
@@ -221,7 +226,7 @@ export function VisitorManager({
       params.delete("q");
     }
     params.delete("page");
-    router.replace(params.size ? `${pathname}?${params.toString()}` : pathname, { scroll: false });
+    navigateToSearchTarget(pathname, params);
   }
 
   function openSupportTicketForVisitor() {
@@ -246,7 +251,7 @@ export function VisitorManager({
 
   return (
     <section className="module-grid module-grid-single">
-      <FullscreenLoading active={searchLoading || screenLoading || createPending || reassignPending} />
+      <FullscreenLoading active={screenLoading || createPending || reassignPending} />
       <article className="data-card">
         <div className="actions-row" style={{ justifyContent: "space-between", alignItems: "center", marginBottom: "0.8rem" }}>
           <strong className="section-title">{title}</strong>

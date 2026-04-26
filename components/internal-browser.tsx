@@ -142,6 +142,11 @@ function getPassBadge(passExists: boolean) {
   );
 }
 
+function navigateToSearchTarget(pathname: string, params: URLSearchParams) {
+  const target = params.size ? `${pathname}?${params.toString()}` : pathname;
+  window.location.assign(target);
+}
+
 function getPassSubmitIssue(options: {
   selectedDateValue: string;
   selectedVisitorCount: number;
@@ -1060,7 +1065,7 @@ export function InternalBrowser({
       params.set("page", String(nextPage));
     }
 
-    router.replace(params.size ? `${pathname}?${params.toString()}` : pathname, { scroll: false });
+    navigateToSearchTarget(pathname, params);
   }
 
   function applySearch(rawValue: string) {
@@ -1078,7 +1083,7 @@ export function InternalBrowser({
       params.delete("q");
     }
     params.delete("page");
-    router.replace(params.size ? `${pathname}?${params.toString()}` : pathname, { scroll: false });
+    navigateToSearchTarget(pathname, params);
   }
 
   function openSupportTicketForInternal() {
@@ -1128,7 +1133,7 @@ export function InternalBrowser({
 
   return (
     <>
-      <FullscreenLoading active={searchLoading || screenLoading || createPending || passPending || visitorPending || statusPending} />
+      <FullscreenLoading active={screenLoading || createPending || passPending || visitorPending || statusPending} />
       <section className="module-grid module-grid-single">
         <article className="data-card">
           <div className="actions-row" style={{ justifyContent: "space-between", alignItems: "center", marginBottom: "0.8rem" }}>

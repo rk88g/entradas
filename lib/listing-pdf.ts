@@ -1,4 +1,4 @@
-import fontkit from "@pdf-lib/fontkit";
+﻿import fontkit from "@pdf-lib/fontkit";
 import { readFile } from "fs/promises";
 import { PDFDocument, PDFFont, PDFPage, StandardFonts, rgb } from "pdf-lib";
 import { ListingRecord, PassVisitor } from "@/lib/types";
@@ -103,7 +103,7 @@ function formatDeviceSummary(pass: ListingRecord) {
 
 function formatVisitorLine(visitor: PassVisitor) {
   if (visitor.edad >= 12 && visitor.edad <= 17) {
-    return `${visitor.nombre} ${visitor.edad} años`;
+    return `${visitor.nombre} ${visitor.edad} aÃ±os`;
   }
   return visitor.nombre;
 }
@@ -198,10 +198,10 @@ function ellipsizeLine(text: string, font: PDFFont, size: number, maxWidth: numb
   }
 
   let value = text;
-  while (value.length > 1 && font.widthOfTextAtSize(`${value}…`, size) > maxWidth) {
+  while (value.length > 1 && font.widthOfTextAtSize(`${value}â€¦`, size) > maxWidth) {
     value = value.slice(0, -1);
   }
-  return `${value}…`;
+  return `${value}â€¦`;
 }
 
 function drawTextLine(
@@ -588,13 +588,13 @@ function drawMainListingCard(options: {
   const { visibleVisitors, underTwelveCount } = getListingVisitors(pass);
   const { basic, special } = splitMentions(pass.menciones);
   const extraSpecials = splitMentions(pass.especiales);
-  const basicLines = basic.slice(0, 2);
-  const specialLines = [
+  const basicSummary = basic.join(" ").trim();
+  const specialSummary = [
     ...extraSpecials.basic,
     ...extraSpecials.special,
     ...special,
     ...(!pass.especiales?.trim() && formatDeviceSummary(pass) ? [formatDeviceSummary(pass) as string] : [])
-  ].slice(0, 2);
+  ].join(" ").trim();
 
   const compactGap = 0.7;
   const titleText = "REGISTRO PASE PARA TERRAZA";
@@ -634,29 +634,27 @@ function drawMainListingCard(options: {
   const sectionAfterTitleGap = 10;
   let reservedBottomHeight = 0;
 
-  if (basicLines.length > 0) {
+  if (basicSummary) {
     reservedBottomHeight += sectionTopGap + sectionAfterTitleGap;
-    basicLines.forEach((item) => {
-      reservedBottomHeight += measureWrappedBlockHeight({
-        font: regularFont,
-        text: item,
-        width: innerWidth,
-        size: LISTADO_TEXT_SIZE,
-        lineGap: compactGap
-      });
+    reservedBottomHeight += measureWrappedBlockHeight({
+      font: regularFont,
+      text: basicSummary,
+      width: innerWidth,
+      size: LISTADO_TEXT_SIZE,
+      maxLines: 1,
+      lineGap: compactGap
     });
   }
 
-  if (specialLines.length > 0) {
+  if (specialSummary) {
     reservedBottomHeight += sectionTopGap + sectionAfterTitleGap;
-    specialLines.forEach((item) => {
-      reservedBottomHeight += measureWrappedBlockHeight({
-        font: boldFont,
-        text: item,
-        width: innerWidth,
-        size: LISTADO_TEXT_SIZE,
-        lineGap: compactGap
-      });
+    reservedBottomHeight += measureWrappedBlockHeight({
+      font: boldFont,
+      text: specialSummary,
+      width: innerWidth,
+      size: LISTADO_TEXT_SIZE,
+      maxLines: 1,
+      lineGap: compactGap
     });
   }
 
@@ -699,41 +697,41 @@ function drawMainListingCard(options: {
       ? Math.max(visitorBlockBottom, innerBottom - reservedBottomHeight)
       : visitorBlockBottom;
 
-  if (basicLines.length > 0) {
+  if (basicSummary) {
     cursorTop += sectionTopGap;
     drawTextLine(page, "Petición:", innerX, cursorTop, LISTADO_TEXT_SIZE, boldFont);
     cursorTop += sectionAfterTitleGap;
-    basicLines.forEach((item) => {
-      cursorTop = drawWrappedBlock({
-        page,
-        font: regularFont,
-        text: item,
-        x: innerX,
-        top: cursorTop,
-        width: innerWidth,
-        size: LISTADO_TEXT_SIZE,
-        color: COLORS.warning,
-        lineGap: compactGap
-      });
+    cursorTop = drawWrappedBlock({
+      page,
+      font: regularFont,
+      text: basicSummary,
+      x: innerX,
+      top: cursorTop,
+      width: innerWidth,
+      size: LISTADO_TEXT_SIZE,
+      color: COLORS.warning,
+      lineGap: compactGap,
+      maxLines: 1,
+      forceEllipsisOnLastLine: true
     });
   }
 
-  if (specialLines.length > 0) {
+  if (specialSummary) {
     cursorTop += sectionTopGap;
     drawTextLine(page, "Petición especial:", innerX, cursorTop, LISTADO_TEXT_SIZE, boldFont, COLORS.danger);
     cursorTop += sectionAfterTitleGap;
-    specialLines.forEach((item) => {
-      cursorTop = drawWrappedBlock({
-        page,
-        font: boldFont,
-        text: item,
-        x: innerX,
-        top: cursorTop,
-        width: innerWidth,
-        size: LISTADO_TEXT_SIZE,
-        color: COLORS.danger,
-        lineGap: compactGap
-      });
+    cursorTop = drawWrappedBlock({
+      page,
+      font: boldFont,
+      text: specialSummary,
+      x: innerX,
+      top: cursorTop,
+      width: innerWidth,
+      size: LISTADO_TEXT_SIZE,
+      color: COLORS.danger,
+      lineGap: compactGap,
+      maxLines: 1,
+      forceEllipsisOnLastLine: true
     });
   }
 }
@@ -988,9 +986,9 @@ function drawMentionsMode(pdf: PDFDocument, listings: ListingRecord[], regularFo
       ...(!pass.especiales?.trim() && formatDeviceSummary(pass) ? [formatDeviceSummary(pass) as string] : [])
     ];
     const bodyLines = [
-      ...(basic.length > 0 ? [{ text: "Mención", color: COLORS.danger, bold: true }] : []),
+      ...(basic.length > 0 ? [{ text: "MenciÃ³n", color: COLORS.danger, bold: true }] : []),
       ...basic.map((item) => ({ text: item, color: COLORS.warning })),
-      ...(mergedSpecialLines.length > 0 ? [{ text: "Mención especial", color: COLORS.danger, bold: true }] : []),
+      ...(mergedSpecialLines.length > 0 ? [{ text: "MenciÃ³n especial", color: COLORS.danger, bold: true }] : []),
       ...mergedSpecialLines.map((item) => ({ text: item, color: COLORS.danger }))
     ];
     return {
@@ -1065,3 +1063,4 @@ export async function generateListingPdf(options: {
 
   return pdf.save();
 }
+
