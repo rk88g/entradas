@@ -118,6 +118,22 @@ function getEstimatedBirthDateFromAge(ageValue: string) {
   return `01/01/${new Date().getFullYear() - age}`;
 }
 
+function splitPreviewLines(value: string) {
+  return value
+    .replace(/\r\n/g, "\n")
+    .split("\n")
+    .map((item) => item.trim())
+    .filter(Boolean);
+}
+
+function formatPreviewVisitorLine(visitor: PassWizardVisit) {
+  if (visitor.edad >= 12 && visitor.edad <= 17) {
+    return `${visitor.visitante_nombre} ${visitor.edad} años`;
+  }
+
+  return visitor.visitante_nombre;
+}
+
 function getPassBadge(passExists: boolean) {
   return passExists ? (
     <StatusBadge variant="warn">Con pase</StatusBadge>
@@ -158,21 +174,46 @@ function getPassSubmitIssue(options: {
   return null;
 }
 
+function getWizardStepIssue(options: {
+  currentStep: string;
+  selectedDateValue: string;
+  selectedVisitorCount: number;
+  selectedAdultCount: number;
+}) {
+  if (options.currentStep !== "visitas") {
+    return null;
+  }
+
+  if (!options.selectedDateValue) {
+    return "Debes elegir la fecha del pase.";
+  }
+
+  if (options.selectedVisitorCount === 0) {
+    return "Debes elegir al menos una visita.";
+  }
+
+  if (options.selectedAdultCount === 0) {
+    return "Debes incluir al menos un adulto en el pase.";
+  }
+
+  return null;
+}
+
 function getMaskedInternalLabel(roleKey: RoleKey, internalId: string, value: string) {
   return maskPrivateText(value, shouldMaskSensitiveInternal(roleKey, internalId));
 }
 
 const PASS_WIZARD_STEPS = [
   { key: "visitas", label: "Visitas" },
-  { key: "documentacion", label: "Documentación" },
-  { key: "condiciones", label: "Condiciones" },
+  { key: "documentacion", label: "Documentación y condiciones" },
   { key: "articulos", label: "Artículos" },
-  { key: "especiales", label: "Especiales y vista previa" }
+  { key: "especiales", label: "Especiales" },
+  { key: "verificar", label: "Verificar pase" }
 ] as const;
 
 const PASS_WIZARD_READ_ONLY_STEPS = [
   { key: "visitas", label: "Visitas" },
-  { key: "especiales", label: "Vista previa" }
+  { key: "verificar", label: "Vista previa" }
 ] as const;
 
 const WIZARD_GENERAL_TARGET = "__general__";
@@ -281,6 +322,7 @@ export function InternalBrowser({
   const [searchLoading, setSearchLoading] = useState(false);
   const [screenLoading, setScreenLoading] = useState(false);
   const [passLocalError, setPassLocalError] = useState<string | null>(null);
+  const [passPreviewAccepted, setPassPreviewAccepted] = useState(false);
   const [visitorQuery, setVisitorQuery] = useState("");
   const [allowDuplicatePass, setAllowDuplicatePass] = useState(false);
   const [recentCreatedPass, setRecentCreatedPass] = useState<{ internoId: string; fechaVisita: string } | null>(null);
@@ -369,12 +411,15 @@ export function InternalBrowser({
     selectedDateClosed,
     canUseClosedDate
   });
+  const requiresPassPreviewAcceptance = canManageMentions(roleKey);
   const canSubmitPass =
     Boolean(selected) &&
-    !passSubmitIssue;
+    !passSubmitIssue &&
+    (!requiresPassPreviewAcceptance || passPreviewAccepted);
   const canCaptureWizardMentions = canManageMentions(roleKey);
   const wizardSteps = canCaptureWizardMentions ? PASS_WIZARD_STEPS : PASS_WIZARD_READ_ONLY_STEPS;
   const currentWizardStep = wizardSteps[Math.min(wizardStepIndex, wizardSteps.length - 1)]?.key ?? "visitas";
+  const currentWizardStepIndex = Math.min(wizardStepIndex, wizardSteps.length - 1);
   const selectedWizardVisits = useMemo<PassWizardVisit[]>(
     () =>
       selectedVisitors
@@ -398,6 +443,16 @@ export function InternalBrowser({
     activeWizardTargetId === WIZARD_GENERAL_TARGET
       ? null
       : selectedWizardVisitOptions.find((item) => item.visitante_id === activeWizardTargetId) ?? null;
+  const passPreviewVisibleVisitors = selectedWizardVisits.filter((item) => item.edad >= 12);
+  const passPreviewUnderTwelveCount = selectedWizardVisits.filter((item) => item.edad < 12).length;
+  const passPreviewBasicLines = splitPreviewLines(wizardState.menciones_basicas_final);
+  const passPreviewSpecialLines = splitPreviewLines(wizardState.menciones_especiales_final);
+  const wizardStepIssue = getWizardStepIssue({
+    currentStep: currentWizardStep,
+    selectedDateValue,
+    selectedVisitorCount: selectedVisitors.length,
+    selectedAdultCount: selectedAdults.length
+  });
   const activeWizardTargetLabel = activeWizardVisit
     ? formatWizardVisitChip(activeWizardVisit, selectedIsSensitive)
     : "General";
@@ -487,6 +542,7 @@ export function InternalBrowser({
     pendingPassContextRef.current = null;
     setSelectedVisitorIds([]);
     setWizardStepIndex(0);
+    setPassPreviewAccepted(false);
     setWizardAutoSync({ basicas: true, especiales: true });
     setWizardState(createEmptyWizardState());
     resetWizardAuxiliaryInputs();
@@ -504,6 +560,16 @@ export function InternalBrowser({
       setPassLocalError(null);
     }
   }, [passSubmitIssue]);
+
+  useEffect(() => {
+    if (passPreviewAccepted && !passSubmitIssue) {
+      setPassLocalError(null);
+    }
+  }, [passPreviewAccepted, passSubmitIssue]);
+
+  useEffect(() => {
+    setPassPreviewAccepted(false);
+  }, [selectedDateValue, selectedVisitorIds, wizardState.menciones_basicas_final, wizardState.menciones_especiales_final]);
 
   useEffect(() => {
     if (!selected) {
@@ -910,6 +976,24 @@ export function InternalBrowser({
     };
     setWizardAutoSync(nextSync);
     updateWizardState((current) => current, nextSync);
+  }
+
+  function goToWizardStep(nextIndex: number) {
+    if (nextIndex > currentWizardStepIndex && wizardStepIssue) {
+      setPassLocalError(wizardStepIssue);
+      return;
+    }
+
+    setPassLocalError(null);
+    setWizardStepIndex(Math.max(0, Math.min(nextIndex, wizardSteps.length - 1)));
+  }
+
+  function goToPreviousWizardStep() {
+    goToWizardStep(currentWizardStepIndex - 1);
+  }
+
+  function goToNextWizardStep() {
+    goToWizardStep(currentWizardStepIndex + 1);
   }
 
   useEffect(() => {
@@ -1375,7 +1459,11 @@ export function InternalBrowser({
                   onSubmitCapture={(event) => {
                     if (!canSubmitPass) {
                       event.preventDefault();
-                      setPassLocalError(passSubmitIssue ?? "No se puede crear el pase todavia.");
+                      setPassLocalError(
+                        passSubmitIssue ?? (requiresPassPreviewAcceptance && !passPreviewAccepted
+                          ? "Debes validar la vista previa del pase antes de generarlo."
+                          : "No se puede crear el pase todavía.")
+                      );
                       setScreenLoading(false);
                       return;
                     }
@@ -1440,68 +1528,72 @@ export function InternalBrowser({
                     </label>
                   ) : null}
 
-                  <div className="field visitor-search-field" style={{ gridColumn: "1 / -1" }}>
-                    <input
-                      value={visitorQuery}
-                      onChange={(event) => setVisitorQuery(event.target.value)}
-                      onKeyDown={(event) => {
-                        if (event.key === "Escape") {
-                          event.preventDefault();
-                          setVisitorQuery("");
-                        }
-                      }}
-                      placeholder="Buscar visita del interno"
-                      autoComplete="off"
-                    />
-                  </div>
-
-                  <section className="two-column-section visitor-columns-section" style={{ gridColumn: "1 / -1" }}>
-                    <article className="data-card visitor-column-card">
-                      <strong style={{ display: "block", marginBottom: "0.7rem" }}>No vendrán</strong>
-                      <div className="visitor-choice-grid visitor-column-list">
-                        {filteredAvailableVisitors.length === 0 ? (
-                          <span className="muted visitor-column-empty">Sin registros.</span>
-                        ) : (
-                          filteredAvailableVisitors.map((item) => (
-                            <button
-                              key={item.id}
-                              type="button"
-                              className="visitor-choice-item available"
-                              onClick={() => toggleVisitor(item.visitaId)}
-                            >
-                              <strong>{maskPrivateText(item.visitor.fullName, selectedIsSensitive)}</strong>
-                              <span className="muted">
-                                {maskValue(item.visitor.edad, canViewSensitiveData && !selectedIsSensitive)} años
-                              </span>
-                            </button>
-                          ))
-                        )}
+                  {currentWizardStep === "visitas" ? (
+                    <>
+                      <div className="field visitor-search-field" style={{ gridColumn: "1 / -1" }}>
+                        <input
+                          value={visitorQuery}
+                          onChange={(event) => setVisitorQuery(event.target.value)}
+                          onKeyDown={(event) => {
+                            if (event.key === "Escape") {
+                              event.preventDefault();
+                              setVisitorQuery("");
+                            }
+                          }}
+                          placeholder="Buscar visita del interno"
+                          autoComplete="off"
+                        />
                       </div>
-                    </article>
 
-                    <article className="data-card visitor-column-card">
-                      <strong style={{ display: "block", marginBottom: "0.7rem" }}>Vendrán</strong>
-                      <div className="visitor-choice-grid visitor-column-list">
-                        {filteredSelectedVisitors.length === 0 ? (
-                          <span className="muted visitor-column-empty">Sin registros.</span>
-                        ) : (
-                          filteredSelectedVisitors.map((item) => (
-                            <button
-                              key={item.id}
-                              type="button"
-                              className="visitor-choice-item selected"
-                              onClick={() => toggleVisitor(item.visitaId)}
-                            >
-                              <strong>{maskPrivateText(item.visitor.fullName, selectedIsSensitive)}</strong>
-                              <span className="muted">
-                                {maskValue(item.visitor.edad, canViewSensitiveData && !selectedIsSensitive)} años
-                              </span>
-                            </button>
-                          ))
-                        )}
-                      </div>
-                    </article>
-                  </section>
+                      <section className="two-column-section visitor-columns-section" style={{ gridColumn: "1 / -1" }}>
+                        <article className="data-card visitor-column-card">
+                          <strong style={{ display: "block", marginBottom: "0.7rem" }}>No vendrán</strong>
+                          <div className="visitor-choice-grid visitor-column-list">
+                            {filteredAvailableVisitors.length === 0 ? (
+                              <span className="muted visitor-column-empty">Sin registros.</span>
+                            ) : (
+                              filteredAvailableVisitors.map((item) => (
+                                <button
+                                  key={item.id}
+                                  type="button"
+                                  className="visitor-choice-item available"
+                                  onClick={() => toggleVisitor(item.visitaId)}
+                                >
+                                  <strong>{maskPrivateText(item.visitor.fullName, selectedIsSensitive)}</strong>
+                                  <span className="muted">
+                                    {maskValue(item.visitor.edad, canViewSensitiveData && !selectedIsSensitive)} años
+                                  </span>
+                                </button>
+                              ))
+                            )}
+                          </div>
+                        </article>
+
+                        <article className="data-card visitor-column-card">
+                          <strong style={{ display: "block", marginBottom: "0.7rem" }}>Vendrán</strong>
+                          <div className="visitor-choice-grid visitor-column-list">
+                            {filteredSelectedVisitors.length === 0 ? (
+                              <span className="muted visitor-column-empty">Sin registros.</span>
+                            ) : (
+                              filteredSelectedVisitors.map((item) => (
+                                <button
+                                  key={item.id}
+                                  type="button"
+                                  className="visitor-choice-item selected"
+                                  onClick={() => toggleVisitor(item.visitaId)}
+                                >
+                                  <strong>{maskPrivateText(item.visitor.fullName, selectedIsSensitive)}</strong>
+                                  <span className="muted">
+                                    {maskValue(item.visitor.edad, canViewSensitiveData && !selectedIsSensitive)} años
+                                  </span>
+                                </button>
+                              ))
+                            )}
+                          </div>
+                        </article>
+                      </section>
+                    </>
+                  ) : null}
 
                   <div className="record-pill" style={{ gridColumn: "1 / -1" }}>
                     <strong>{selectedVisitors.length} visitas seleccionadas</strong>
@@ -1510,10 +1602,25 @@ export function InternalBrowser({
 
                   {canCaptureWizardMentions ? (
                     <section className="wizard-quick-board" style={{ gridColumn: "1 / -1" }}>
+                      <div className="wizard-step-nav">
+                        {wizardSteps.map((step, index) => (
+                          <button
+                            key={step.key}
+                            type="button"
+                            className={`wizard-step-pill ${currentWizardStepIndex === index ? "active" : ""} ${index < currentWizardStepIndex ? "done" : ""}`}
+                            onClick={() => goToWizardStep(index)}
+                          >
+                            <span className="wizard-step-pill-index">{index + 1}</span>
+                            <span>{step.label}</span>
+                          </button>
+                        ))}
+                      </div>
+
+                      {(currentWizardStep === "documentacion" || currentWizardStep === "articulos" || currentWizardStep === "especiales") ? (
                       <div className="wizard-target-panel">
                         <div className="wizard-target-header">
-                          <strong>Captura rápida del pase</strong>
-                          <span className="muted">Selecciona persona activa, toca chips y revisa la vista previa antes de guardar.</span>
+                          <strong>Captura del pase</strong>
+                          <span className="muted">Selecciona persona activa y toca chips para agregar rápido.</span>
                         </div>
                         <div className="wizard-target-chip-row">
                           <button
@@ -1539,7 +1646,9 @@ export function InternalBrowser({
                           <span>{activeWizardTargetLabel}</span>
                         </div>
                       </div>
+                      ) : null}
 
+                      {currentWizardStep === "documentacion" ? (
                       <section className="wizard-chip-section">
                         <div className="wizard-chip-header">
                           <strong>Documentación</strong>
@@ -1557,7 +1666,9 @@ export function InternalBrowser({
                           ))}
                         </div>
                       </section>
+                      ) : null}
 
+                      {currentWizardStep === "documentacion" ? (
                       <section className="wizard-chip-section">
                         <div className="wizard-chip-header">
                           <strong>Condiciones</strong>
@@ -1575,7 +1686,9 @@ export function InternalBrowser({
                           ))}
                         </div>
                       </section>
+                      ) : null}
 
+                      {currentWizardStep === "articulos" ? (
                       <section className="wizard-chip-section">
                         <div className="wizard-chip-header">
                           <strong>Artículos</strong>
@@ -1600,7 +1713,9 @@ export function InternalBrowser({
                           ))}
                         </div>
                       </section>
+                      ) : null}
 
+                      {currentWizardStep === "especiales" ? (
                       <section className="wizard-chip-section">
                         <div className="wizard-chip-header">
                           <strong>Especiales</strong>
@@ -1705,7 +1820,9 @@ export function InternalBrowser({
                           </div>
                         ) : null}
                       </section>
+                      ) : null}
 
+                      {currentWizardStep !== "visitas" ? (
                       <section className="wizard-chip-section">
                         <div className="wizard-chip-header">
                           <strong>Seleccionado</strong>
@@ -1728,7 +1845,96 @@ export function InternalBrowser({
                           </div>
                         )}
                       </section>
+                      ) : null}
 
+                      {currentWizardStep === "verificar" ? (
+                      <section className="wizard-chip-section">
+                        <div className="wizard-chip-header">
+                          <strong>Vista previa del pase</strong>
+                          <span className="muted">Revisa exactamente cómo quedará antes de generarlo.</span>
+                        </div>
+                        <article className="pass-card apoyo-pass-card wizard-pass-preview-card">
+                          <div className="apoyo-pass-header">
+                            <div className="apoyo-pass-headline">
+                              <div className="apoyo-pass-kicker">Registro pase para terraza</div>
+                              <div className="apoyo-pass-date">{selectedDateValue ? formatLongDate(selectedDateValue) : "Sin fecha"}</div>
+                            </div>
+                            <div className="apoyo-pass-number">-</div>
+                          </div>
+
+                          <div className="apoyo-pass-meta">
+                            <div>
+                              <strong>PPL:</strong> {maskPrivateText(selected!.fullName, selectedIsSensitive)}
+                            </div>
+                            <div>
+                              <strong>Ubicación:</strong> {maskPrivateText(selected!.ubicacion, selectedIsSensitive)}
+                            </div>
+                          </div>
+
+                          <div className="apoyo-pass-section visits-section">
+                            <strong>Visitas:</strong>
+                            <div className={`apoyo-pass-list ${passPreviewVisibleVisitors.length + (passPreviewUnderTwelveCount > 0 ? 1 : 0) > 8 ? "two-columns" : ""}`}>
+                              {selectedIsSensitive ? (
+                                <div className="apoyo-pass-line">****</div>
+                              ) : (
+                                <>
+                                  {passPreviewVisibleVisitors.map((visit) => (
+                                    <div
+                                      key={`preview-visit-${visit.visitante_id}`}
+                                      className={`apoyo-pass-line ${visit.edad < 18 ? "minor" : ""}`}
+                                    >
+                                      {formatPreviewVisitorLine(visit)}
+                                    </div>
+                                  ))}
+                                  {passPreviewUnderTwelveCount > 0 ? (
+                                    <div className="apoyo-pass-line minor">
+                                      + {passPreviewUnderTwelveCount} {passPreviewUnderTwelveCount === 1 ? "menor" : "menores"}
+                                    </div>
+                                  ) : null}
+                                </>
+                              )}
+                            </div>
+                          </div>
+
+                          {passPreviewBasicLines.length > 0 ? (
+                            <div className="apoyo-pass-section basic-section">
+                              <strong>Petición:</strong>
+                              <div className="apoyo-pass-list">
+                                {(selectedIsSensitive ? ["****"] : passPreviewBasicLines).map((item, index) => (
+                                  <div key={`preview-basic-${index}`} className="apoyo-pass-line warning ellipsis-block">
+                                    {item}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          ) : null}
+
+                          {passPreviewSpecialLines.length > 0 ? (
+                            <div className="apoyo-pass-section special-section">
+                              <strong>Petición especial:</strong>
+                              <div className="apoyo-pass-list">
+                                {(selectedIsSensitive ? ["****"] : passPreviewSpecialLines).map((item, index) => (
+                                  <div key={`preview-special-${index}`} className="apoyo-pass-line minor ellipsis-block">
+                                    {item}
+                                  </div>
+                                ))}
+                              </div>
+                            </div>
+                          ) : null}
+                        </article>
+
+                        <label className="wizard-pass-approval">
+                          <input
+                            type="checkbox"
+                            checked={passPreviewAccepted}
+                            onChange={(event) => setPassPreviewAccepted(event.target.checked)}
+                          />
+                          <span>Acepto que así viene el pase y autorizo generarlo.</span>
+                        </label>
+                      </section>
+                      ) : null}
+
+                      {currentWizardStep === "verificar" ? (
                       <section className="wizard-preview-grid">
                         <div className="field" style={{ gridColumn: "1 / -1" }}>
                           <label>Menciones basicas generadas</label>
@@ -1811,6 +2017,7 @@ export function InternalBrowser({
                           />
                         </div>
                       </section>
+                      ) : null}
                     </section>
                   ) : (
                     <div className="record-pill" style={{ gridColumn: "1 / -1" }}>
@@ -1819,10 +2026,25 @@ export function InternalBrowser({
                     </div>
                   )}
 
-                  <div className="actions-row" style={{ gridColumn: "1 / -1", justifyContent: "flex-end", marginTop: "0.4rem" }}>
-                    {canRenderPassButton ? (
-                      <LoadingButton pending={passPending} label="CREAR PASE" loadingLabel="Loading..." className="button" />
-                    ) : null}
+                  <div className="wizard-step-actions" style={{ gridColumn: "1 / -1" }}>
+                    <div className="actions-row">
+                      {currentWizardStepIndex > 0 ? (
+                        <button type="button" className="button-soft" onClick={goToPreviousWizardStep}>
+                          Anterior
+                        </button>
+                      ) : null}
+                    </div>
+
+                    <div className="actions-row">
+                      {canCaptureWizardMentions && currentWizardStep !== "verificar" ? (
+                        <button type="button" className="button" onClick={goToNextWizardStep}>
+                          {currentWizardStep === "especiales" ? "Verificar pase" : "Siguiente"}
+                        </button>
+                      ) : null}
+                      {canRenderPassButton && (!canCaptureWizardMentions || currentWizardStep === "verificar") ? (
+                        <LoadingButton pending={passPending} label="CREAR PASE" loadingLabel="Loading..." className="button" disabled={!canSubmitPass} />
+                      ) : null}
+                    </div>
                   </div>
                 </form>
               </article>
