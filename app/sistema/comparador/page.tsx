@@ -29,7 +29,8 @@ export default async function ComparadorPage({
       query: visitorQuery,
       page: 1,
       pageSize: 20,
-      availability: "all"
+      availability: "all",
+      includeHistory: false
     })
   ]);
 
