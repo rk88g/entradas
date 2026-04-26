@@ -282,6 +282,8 @@ values
   ('listado', null, 'module', null, 'Listado', 'Modulo de pases e impresion', 40),
   ('listado.hombres-mujeres', null, 'section', 'listado', 'Hombres / Mujeres', 'Listado separado por sexo', 41),
   ('listado.menciones', null, 'section', 'listado', 'Menciones', 'Listado de menciones', 42),
+  ('listado.captura-menciones', null, 'section', 'listado', 'Captura de menciones', 'Permite capturar y editar peticiones basicas en el pase.', 43),
+  ('listado.captura-especiales', null, 'section', 'listado', 'Captura de menciones especiales', 'Permite capturar y editar peticiones especiales en el pase.', 44),
   ('fechas', null, 'module', null, 'Fechas', 'Modulo de fechas', 50),
   ('fechas.crear', null, 'section', 'fechas', 'Crear fechas', 'Registrar nuevas fechas', 51),
   ('fechas.cerrar', null, 'section', 'fechas', 'Cerrar fechas', 'Cerrar fechas operativas', 52),

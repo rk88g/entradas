@@ -20,6 +20,7 @@ import {
   MutationState,
   PassWizardState,
   PassWizardVisit,
+  PermissionGrantRecord,
   RoleKey,
   WizardCard
 } from "@/lib/types";
@@ -295,6 +296,7 @@ export function InternalBrowser({
   openDate,
   passArticles,
   roleKey,
+  permissionGrants = [],
   canViewSensitiveData
 }: {
   profiles: InternalProfile[];
@@ -306,6 +308,7 @@ export function InternalBrowser({
   openDate?: DateRecord | null;
   passArticles: ModuleDeviceType[];
   roleKey: RoleKey;
+  permissionGrants?: PermissionGrantRecord[];
   canViewSensitiveData: boolean;
 }) {
   const router = useRouter();
@@ -417,13 +420,27 @@ export function InternalBrowser({
     selectedDateClosed,
     canUseClosedDate
   });
-  const requiresPassPreviewAcceptance = canManageMentions(roleKey);
+  const canManageBasicMentions = canManageMentions(roleKey, permissionGrants, "basicas");
+  const canManageSpecialMentions = canManageMentions(roleKey, permissionGrants, "especiales");
+  const canCaptureWizardMentions = canManageBasicMentions || canManageSpecialMentions;
+  const requiresPassPreviewAcceptance = canCaptureWizardMentions;
   const canSubmitPass =
     Boolean(selected) &&
     !passSubmitIssue &&
     (!requiresPassPreviewAcceptance || passPreviewAccepted);
-  const canCaptureWizardMentions = canManageMentions(roleKey);
-  const wizardSteps = canCaptureWizardMentions ? PASS_WIZARD_STEPS : PASS_WIZARD_READ_ONLY_STEPS;
+  const wizardSteps = canCaptureWizardMentions
+    ? PASS_WIZARD_STEPS.filter((step) => {
+        if (step.key === "documentacion" || step.key === "articulos") {
+          return canManageBasicMentions;
+        }
+
+        if (step.key === "especiales") {
+          return canManageSpecialMentions;
+        }
+
+        return true;
+      })
+    : PASS_WIZARD_READ_ONLY_STEPS;
   const currentWizardStep = wizardSteps[Math.min(wizardStepIndex, wizardSteps.length - 1)]?.key ?? "visitas";
   const currentWizardStepIndex = Math.min(wizardStepIndex, wizardSteps.length - 1);
   const selectedWizardVisits = useMemo<PassWizardVisit[]>(
@@ -1966,14 +1983,19 @@ export function InternalBrowser({
 
                       {currentWizardStep === "verificar" ? (
                       <section className="wizard-preview-grid">
+                        {canManageBasicMentions ? (
                         <div className="field" style={{ gridColumn: "1 / -1" }}>
                           <label>Menciones basicas generadas</label>
                           <textarea value={wizardState.menciones_basicas_generadas} readOnly />
                         </div>
+                        ) : null}
+                        {canManageSpecialMentions ? (
                         <div className="field" style={{ gridColumn: "1 / -1" }}>
                           <label>Menciones especiales generadas</label>
                           <textarea value={wizardState.menciones_especiales_generadas} readOnly />
                         </div>
+                        ) : null}
+                        {canManageBasicMentions ? (
                         <div className="field">
                           <label>Basicas manuales</label>
                           <textarea
@@ -1989,6 +2011,8 @@ export function InternalBrowser({
                             style={{ borderColor: "#d97706", boxShadow: "0 0 0 3px rgba(217,119,6,0.10)" }}
                           />
                         </div>
+                        ) : null}
+                        {canManageSpecialMentions ? (
                         <div className="field">
                           <label>Especiales manuales</label>
                           <textarea
@@ -2004,6 +2028,8 @@ export function InternalBrowser({
                             style={{ borderColor: "#c23030", boxShadow: "0 0 0 3px rgba(194,48,48,0.10)" }}
                           />
                         </div>
+                        ) : null}
+                        {canManageBasicMentions ? (
                         <div className="field" style={{ gridColumn: "1 / -1" }}>
                           <div className="actions-row" style={{ justifyContent: "space-between", marginBottom: "0.4rem" }}>
                             <label style={{ marginBottom: 0 }}>Menciones basicas finales</label>
@@ -2025,6 +2051,8 @@ export function InternalBrowser({
                             style={{ borderColor: "#d97706", boxShadow: "0 0 0 3px rgba(217,119,6,0.10)" }}
                           />
                         </div>
+                        ) : null}
+                        {canManageSpecialMentions ? (
                         <div className="field" style={{ gridColumn: "1 / -1" }}>
                           <div className="actions-row" style={{ justifyContent: "space-between", marginBottom: "0.4rem" }}>
                             <label style={{ marginBottom: 0 }}>Menciones especiales finales</label>
@@ -2046,6 +2074,7 @@ export function InternalBrowser({
                             style={{ borderColor: "#c23030", boxShadow: "0 0 0 3px rgba(194,48,48,0.10)" }}
                           />
                         </div>
+                        ) : null}
                       </section>
                       ) : null}
                     </section>
@@ -2152,14 +2181,18 @@ export function InternalBrowser({
                           </label>
                         ) : null}
 
-                      {canManageMentions(roleKey) ? (
+                      {canManageBasicMentions || canManageSpecialMentions ? (
                       <>
+                        {canManageBasicMentions ? (
                         <div className="field" style={{ gridColumn: "1 / -1" }}>
                           <textarea name="menciones" placeholder="Peticiones basicas" autoComplete="off" style={{ borderColor: "#d97706", boxShadow: "0 0 0 3px rgba(217,119,6,0.10)" }} />
                         </div>
+                        ) : null}
+                        {canManageSpecialMentions ? (
                         <div className="field" style={{ gridColumn: "1 / -1" }}>
                           <textarea name="especiales" placeholder="Peticiones especiales" autoComplete="off" style={{ borderColor: "#c23030", boxShadow: "0 0 0 3px rgba(194,48,48,0.10)" }} />
                         </div>
+                        ) : null}
                         <div className="field" style={{ gridColumn: "1 / -1" }}>
                           <label>Articulos</label>
                           <div className="article-grid">

@@ -67,6 +67,7 @@ export default async function InternosPage({
       extraDates={extraPassDates}
       passArticles={passArticles}
       roleKey={profile?.roleKey ?? "capturador"}
+      permissionGrants={profile?.permissionGrants ?? []}
       canViewSensitiveData={canViewSensitiveSystemData(profile?.roleKey ?? "capturador", profile?.id)}
     />
   );
