@@ -804,23 +804,78 @@ async function buildListingsForRows(
   }
 
   const internalIds = [...new Set(listadoRows.map((item) => item.interno_id))];
-  const [internosMap, { data: listadoVisitasRows, error: listadoVisitasError }, { data: deviceItemRows }] = await Promise.all([
+  const listadoIds = listadoRows.map((item) => item.id);
+  const [internosMap, listadoVisitasResponse, deviceItemsResponse] = await Promise.all([
     getInternosMap(supabase, internalIds),
-    supabase
-      .from("listado_visitas")
-      .select("listado_id, visita_id, orden")
-      .in(
-        "listado_id",
-        listadoRows.map((item) => item.id)
-      ),
-    supabase
-      .from("listing_device_items")
-      .select("id, listado_id, quantity, device_type_id, module_device_types!inner(id, module_key, name)")
-      .in(
-        "listado_id",
-        listadoRows.map((item) => item.id)
-      )
+    (async () => {
+      const rows: Array<{ listado_id: string; visita_id: string; orden: number }> = [];
+
+      for (const chunk of splitIntoChunks(listadoIds, 500)) {
+        const { data, error } = await fetchAllRows<{ listado_id: string; visita_id: string; orden: number }>(
+          (from, to) =>
+            supabase
+              .from("listado_visitas")
+              .select("listado_id, visita_id, orden")
+              .in("listado_id", chunk)
+              .range(from, to)
+        );
+
+        if (error) {
+          return { data: null as Array<{ listado_id: string; visita_id: string; orden: number }> | null, error };
+        }
+
+        rows.push(...(data ?? []));
+      }
+
+      return { data: rows, error: null as unknown };
+    })(),
+    (async () => {
+      const rows: Array<{
+        id: string;
+        listado_id: string;
+        quantity: number;
+        device_type_id: string;
+        module_device_types: Array<{ id: string; module_key: string; name: string }>;
+      }> = [];
+
+      for (const chunk of splitIntoChunks(listadoIds, 500)) {
+        const { data, error } = await fetchAllRows<{
+          id: string;
+          listado_id: string;
+          quantity: number;
+          device_type_id: string;
+          module_device_types: Array<{ id: string; module_key: string; name: string }>;
+        }>((from, to) =>
+          supabase
+            .from("listing_device_items")
+            .select("id, listado_id, quantity, device_type_id, module_device_types!inner(id, module_key, name)")
+            .in("listado_id", chunk)
+            .range(from, to)
+        );
+
+        if (error) {
+          return {
+            data: null as Array<{
+              id: string;
+              listado_id: string;
+              quantity: number;
+              device_type_id: string;
+              module_device_types: Array<{ id: string; module_key: string; name: string }>;
+            }> | null,
+            error
+          };
+        }
+
+        rows.push(...(data ?? []));
+      }
+
+      return { data: rows, error: null as unknown };
+    })()
   ]);
+
+  const listadoVisitasRows = listadoVisitasResponse.data;
+  const deviceItemRows = deviceItemsResponse.data;
+  const listadoVisitasError = listadoVisitasResponse.error;
 
   if (listadoVisitasError) {
     return [];
