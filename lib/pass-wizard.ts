@@ -148,6 +148,8 @@ export const QUANTITY_SPECIAL_OPTIONS = [
 
 const GENERAL_TARGET_KEY = "__general__";
 
+type VisitCohortKey = "minors" | "adults";
+
 const SIMPLE_SPECIAL_SET = new Set<string>(SIMPLE_SPECIAL_OPTIONS);
 
 const CONDITION_WITH_ACCESSORY = new Set([
@@ -235,6 +237,49 @@ function isMinor(visit: PassWizardVisit) {
   return visit.edad < 18;
 }
 
+function getVisitCohortKey(visit: PassWizardVisit): VisitCohortKey {
+  return isMinor(visit) ? "minors" : "adults";
+}
+
+function getCohortLabel(cohort: VisitCohortKey) {
+  return cohort === "minors" ? "Los menores" : "Los adultos";
+}
+
+function getCohortVisits(visits: PassWizardVisit[], cohort: VisitCohortKey) {
+  return visits.filter((visit) => getVisitCohortKey(visit) === cohort);
+}
+
+function cardsCoverWholeCohort(
+  cards: WizardCard[],
+  visits: PassWizardVisit[],
+  visitMap: Map<string, PassWizardVisit>,
+  cohort: VisitCohortKey
+) {
+  const cohortVisitIds = getCohortVisits(visits, cohort)
+    .map((visit) => visit.visitante_id)
+    .sort();
+
+  if (cohortVisitIds.length < 2) {
+    return false;
+  }
+
+  const cardVisitIds = uniquePreserveOrder(
+    cards
+      .map((card) => card.visitante_id ?? "")
+      .filter(Boolean)
+      .filter((visitId) => {
+        const visit = visitMap.get(visitId);
+        return Boolean(visit) && getVisitCohortKey(visit!) === cohort;
+      })
+  ).sort();
+
+  if (cardVisitIds.length !== cohortVisitIds.length) {
+    return false;
+  }
+
+  return cardVisitIds.every((visitId, index) => visitId === cohortVisitIds[index]);
+}
+
 function makeMinorLead(visit: PassWizardVisit) {
   return `${visit.sexo === "mujer" ? "La menor" : "El menor"} ${visit.visitante_nombre}`;
 }
@@ -267,6 +312,23 @@ function buildDocumentationSentence(card: WizardCard, visit: PassWizardVisit | n
   return withPeriod(`${makeNamedSubject(visit)} ingresa con ${card.valor}`);
 }
 
+function buildDocumentationGroupSentence(card: WizardCard, cohort: VisitCohortKey) {
+  const lead = getCohortLabel(cohort);
+  if (card.valor === "Sin INE") {
+    return withPeriod(`${lead} ingresan sin INE`);
+  }
+
+  if (card.valor === "INE vencida") {
+    return withPeriod(`${lead} ingresan con INE vencida`);
+  }
+
+  if (card.valor === "INE en trámite") {
+    return withPeriod(`${lead} ingresan con INE en trámite`);
+  }
+
+  return withPeriod(`${lead} ingresan con ${card.valor}`);
+}
+
 function buildCompanionSentence(card: WizardCard, visit: PassWizardVisit | null) {
   const companion = lowerFirst(card.valor.replace(/^Acompañado por\s+/u, ""));
   if (!visit) {
@@ -275,6 +337,11 @@ function buildCompanionSentence(card: WizardCard, visit: PassWizardVisit | null)
 
   const subject = isMinor(visit) ? makeMinorLead(visit) : visit.visitante_nombre;
   return withPeriod(`${subject} ingresa acompañado por su ${companion}`);
+}
+
+function buildCompanionGroupSentence(card: WizardCard, cohort: VisitCohortKey) {
+  const companion = lowerFirst(card.valor.replace(/^Acompañado por\s+/u, ""));
+  return withPeriod(`${getCohortLabel(cohort)} ingresan acompañados por su ${companion}`);
 }
 
 function buildConditionSentence(card: WizardCard, visit: PassWizardVisit | null) {
@@ -305,6 +372,18 @@ function buildConditionSentence(card: WizardCard, visit: PassWizardVisit | null)
   return withPeriod(`${visit.visitante_nombre} ingresa con ${lowerFirst(card.valor)}`);
 }
 
+function buildConditionGroupSentence(card: WizardCard, cohort: VisitCohortKey) {
+  if (card.valor.startsWith("Acompañado por ")) {
+    return buildCompanionGroupSentence(card, cohort);
+  }
+
+  if (card.valor === "Se queda de noche") {
+    return withPeriod(`${getCohortLabel(cohort)} se quedan de noche`);
+  }
+
+  return withPeriod(`${getCohortLabel(cohort)} ingresan con ${lowerFirst(card.valor)}`);
+}
+
 function buildPregnancySentence(visit: PassWizardVisit | null) {
   if (!visit) {
     return withPeriod("Ingresan con embarazo y ECO reciente");
@@ -327,6 +406,10 @@ function buildSimpleSpecialSentence(card: WizardCard, visit: PassWizardVisit | n
   }
 
   return withPeriod(`${visit.visitante_nombre} ingresa con ${lowerFirst(card.valor)}`);
+}
+
+function buildSimpleSpecialGroupSentence(card: WizardCard, cohort: VisitCohortKey) {
+  return withPeriod(`${getCohortLabel(cohort)} ingresan con ${lowerFirst(card.valor)}`);
 }
 
 function buildQuantitySpecialPhrase(card: WizardCard, quantity: number) {
@@ -373,6 +456,96 @@ function sortCardsByWizardOrder(cards: WizardCard[]) {
   });
 }
 
+function serializeStringList(values: string[]) {
+  return JSON.stringify(uniquePreserveOrder(values.map((value) => normalizeKey(value))));
+}
+
+function serializeQuantityEntries(items: Map<string, { card: WizardCard; quantity: number }>) {
+  return JSON.stringify(
+    [...items.values()]
+      .map(({ card, quantity }) => ({
+        valor: normalizeKey(card.valor),
+        detalle: card.detalle.trim(),
+        revision: card.requiere_revision ? 1 : 0,
+        quantity
+      }))
+      .sort((left, right) => {
+        const valueDiff = left.valor.localeCompare(right.valor);
+        if (valueDiff !== 0) {
+          return valueDiff;
+        }
+
+        const detailDiff = left.detalle.localeCompare(right.detalle);
+        if (detailDiff !== 0) {
+          return detailDiff;
+        }
+
+        return left.quantity - right.quantity;
+      })
+  );
+}
+
+function groupCardsByNormalizedValue(cards: WizardCard[]) {
+  return cards.reduce<Map<string, WizardCard[]>>((groups, card) => {
+    const key = normalizeKey(card.valor);
+    const current = groups.get(key) ?? [];
+    current.push(card);
+    groups.set(key, current);
+    return groups;
+  }, new Map());
+}
+
+function pushWholeCohortSentences(options: {
+  visits: PassWizardVisit[];
+  visitMap: Map<string, PassWizardVisit>;
+  cards: WizardCard[];
+  buildSentence: (card: WizardCard, cohort: VisitCohortKey) => string;
+  ignoreValues?: Set<string>;
+}) {
+  const handledCardIds = new Set<string>();
+  const groups = groupCardsByNormalizedValue(options.cards);
+
+  groups.forEach((group) => {
+    const normalizedValue = normalizeKey(group[0]?.valor ?? "");
+    if (options.ignoreValues?.has(normalizedValue)) {
+      return;
+    }
+
+    for (const cohort of ["minors", "adults"] as const) {
+      const cohortCards = group.filter((card) => {
+        const visit = card.visitante_id ? options.visitMap.get(card.visitante_id) ?? null : null;
+        return visit ? getVisitCohortKey(visit) === cohort : false;
+      });
+
+      if (cardsCoverWholeCohort(cohortCards, options.visits, options.visitMap, cohort)) {
+        handledCardIds; // keep TS narrow on mutation pattern
+        cohortCards.forEach((card) => handledCardIds.add(card.id));
+      }
+    }
+  });
+
+  const sentences: string[] = [];
+  groups.forEach((group) => {
+    const normalizedValue = normalizeKey(group[0]?.valor ?? "");
+    if (options.ignoreValues?.has(normalizedValue)) {
+      return;
+    }
+
+    for (const cohort of ["minors", "adults"] as const) {
+      const cohortCards = group.filter((card) => {
+        const visit = card.visitante_id ? options.visitMap.get(card.visitante_id) ?? null : null;
+        return visit ? getVisitCohortKey(visit) === cohort : false;
+      });
+
+      if (cardsCoverWholeCohort(cohortCards, options.visits, options.visitMap, cohort)) {
+        sentences.push(options.buildSentence(cohortCards[0], cohort));
+      }
+    }
+  });
+
+  return { handledCardIds, sentences };
+}
+
 export function createEmptyWizardState(): PassWizardState {
   return {
     fecha_visita: "",
@@ -390,28 +563,64 @@ export function createEmptyWizardState(): PassWizardState {
 }
 
 export function generateMenciones(wizardState: PassWizardState) {
-  const visitMap = new Map(
-    wizardState.visitas_seleccionadas.map((visit) => [visit.visitante_id, visit] as const)
-  );
-
+  const visits = wizardState.visitas_seleccionadas;
+  const visitMap = new Map(visits.map((visit) => [visit.visitante_id, visit] as const));
   const basicSentences: string[] = [];
   const specialSentences: string[] = [];
   const sortedCards = sortCardsByWizardOrder(wizardState.cards);
 
-  for (const card of sortedCards.filter((item) => item.type === "documentacion")) {
+  const documentationCards = sortedCards.filter((item) => item.type === "documentacion");
+  documentationCards
+    .filter((card) => !card.visitante_id)
+    .forEach((card) => basicSentences.push(buildDocumentationSentence(card, null)));
+
+  const personDocumentationCards = documentationCards.filter((card) => card.visitante_id);
+  const documentationWholeCohort = pushWholeCohortSentences({
+    visits,
+    visitMap,
+    cards: personDocumentationCards,
+    buildSentence: buildDocumentationGroupSentence
+  });
+  basicSentences.push(...documentationWholeCohort.sentences);
+
+  personDocumentationCards.forEach((card) => {
+    if (documentationWholeCohort.handledCardIds.has(card.id)) {
+      return;
+    }
+
     const visit = card.visitante_id ? visitMap.get(card.visitante_id) ?? null : null;
     basicSentences.push(buildDocumentationSentence(card, visit));
-  }
+  });
 
-  const conditionGroups = new Map<string, WizardCard[]>();
-  for (const card of sortedCards.filter((item) => item.type === "condicion")) {
+  const conditionCards = sortedCards.filter((item) => item.type === "condicion");
+  const ignoredConditionValues = new Set([normalizeKey("Embarazo"), normalizeKey("ECO reciente")]);
+  conditionCards
+    .filter((card) => !card.visitante_id)
+    .forEach((card) => basicSentences.push(buildConditionSentence(card, null)));
+
+  const personConditionCards = conditionCards.filter((card) => card.visitante_id);
+  const conditionWholeCohort = pushWholeCohortSentences({
+    visits,
+    visitMap,
+    cards: personConditionCards,
+    buildSentence: buildConditionGroupSentence,
+    ignoreValues: ignoredConditionValues
+  });
+  basicSentences.push(...conditionWholeCohort.sentences);
+
+  const remainingConditionGroups = new Map<string, WizardCard[]>();
+  personConditionCards.forEach((card) => {
+    if (conditionWholeCohort.handledCardIds.has(card.id)) {
+      return;
+    }
+
     const key = card.visitante_id ?? GENERAL_TARGET_KEY;
-    const current = conditionGroups.get(key) ?? [];
+    const current = remainingConditionGroups.get(key) ?? [];
     current.push(card);
-    conditionGroups.set(key, current);
-  }
+    remainingConditionGroups.set(key, current);
+  });
 
-  for (const [groupKey, cards] of conditionGroups) {
+  for (const [groupKey, cards] of remainingConditionGroups) {
     const visit = groupKey === GENERAL_TARGET_KEY ? null : visitMap.get(groupKey) ?? null;
     const hasPregnancy = cards.some((item) => item.valor === "Embarazo");
     const hasEco = cards.some((item) => item.valor === "ECO reciente");
@@ -441,20 +650,49 @@ export function generateMenciones(wizardState: PassWizardState) {
   }
 
   const basicByVisit = new Map<string, string[]>();
-  for (const card of sortedCards.filter(
-    (item) => item.type === "articulo_basico" && item.visitante_id
-  )) {
-    const visit = card.visitante_id ? visitMap.get(card.visitante_id) ?? null : null;
-    if (!visit) {
+  sortedCards
+    .filter((item) => item.type === "articulo_basico" && item.visitante_id)
+    .forEach((card) => {
+      const visit = card.visitante_id ? visitMap.get(card.visitante_id) ?? null : null;
+      if (!visit) {
+        return;
+      }
+
+      const current = basicByVisit.get(visit.visitante_id) ?? [];
+      current.push(lowerFirst(card.valor));
+      basicByVisit.set(visit.visitante_id, current);
+    });
+
+  const handledBasicVisitIds = new Set<string>();
+  for (const cohort of ["minors", "adults"] as const) {
+    const cohortVisits = getCohortVisits(visits, cohort);
+    if (cohortVisits.length < 2) {
       continue;
     }
 
-    const current = basicByVisit.get(visit.visitante_id) ?? [];
-    current.push(lowerFirst(card.valor));
-    basicByVisit.set(visit.visitante_id, current);
+    const serializedSets = cohortVisits.map((visit) => serializeStringList(basicByVisit.get(visit.visitante_id) ?? []));
+    const firstSet = serializedSets[0];
+    if (!firstSet || firstSet === "[]") {
+      continue;
+    }
+
+    if (serializedSets.every((value) => value === firstSet)) {
+      basicSentences.push(
+        withPeriod(
+          `${getCohortLabel(cohort)} ingresan con ${joinSpanishList(
+            uniquePreserveOrder(basicByVisit.get(cohortVisits[0].visitante_id) ?? [])
+          )}`
+        )
+      );
+      cohortVisits.forEach((visit) => handledBasicVisitIds.add(visit.visitante_id));
+    }
   }
 
   for (const [visitId, values] of basicByVisit) {
+    if (handledBasicVisitIds.has(visitId)) {
+      continue;
+    }
+
     const visit = visitMap.get(visitId);
     if (!visit) {
       continue;
@@ -465,35 +703,56 @@ export function generateMenciones(wizardState: PassWizardState) {
     );
   }
 
+  const specialCards = sortedCards.filter((item) => item.type === "articulo_especial");
+  const generalSimpleSpecialCards = specialCards.filter(
+    (card) => !card.visitante_id && SIMPLE_SPECIAL_SET.has(card.valor)
+  );
+  generalSimpleSpecialCards.forEach((card) => specialSentences.push(buildSimpleSpecialSentence(card, null)));
+
+  const personSimpleSpecialCards = specialCards.filter(
+    (card) => card.visitante_id && SIMPLE_SPECIAL_SET.has(card.valor)
+  );
+  const simpleSpecialWholeCohort = pushWholeCohortSentences({
+    visits,
+    visitMap,
+    cards: personSimpleSpecialCards,
+    buildSentence: buildSimpleSpecialGroupSentence
+  });
+  specialSentences.push(...simpleSpecialWholeCohort.sentences);
+
+  personSimpleSpecialCards.forEach((card) => {
+    if (simpleSpecialWholeCohort.handledCardIds.has(card.id)) {
+      return;
+    }
+
+    const visit = card.visitante_id ? visitMap.get(card.visitante_id) ?? null : null;
+    specialSentences.push(buildSimpleSpecialSentence(card, visit));
+  });
+
   const groupedQuantitySpecials = new Map<
     string,
     Map<string, { card: WizardCard; quantity: number }>
   >();
 
-  for (const card of sortedCards.filter((item) => item.type === "articulo_especial")) {
-    const visit = card.visitante_id ? visitMap.get(card.visitante_id) ?? null : null;
+  specialCards
+    .filter((card) => !SIMPLE_SPECIAL_SET.has(card.valor))
+    .forEach((card) => {
+      const targetKey = card.visitante_id ?? GENERAL_TARGET_KEY;
+      const currentTargetItems = groupedQuantitySpecials.get(targetKey) ?? new Map();
+      const aggregateKey = `${normalizeKey(card.valor)}|${card.requiere_revision ? "1" : "0"}|${card.detalle.trim()}`;
+      const existing = currentTargetItems.get(aggregateKey);
 
-    if (SIMPLE_SPECIAL_SET.has(card.valor)) {
-      specialSentences.push(buildSimpleSpecialSentence(card, visit));
-      continue;
-    }
+      if (existing) {
+        existing.quantity += Math.max(1, Number(card.cantidad || 1));
+      } else {
+        currentTargetItems.set(aggregateKey, {
+          card,
+          quantity: Math.max(1, Number(card.cantidad || 1))
+        });
+      }
 
-    const targetKey = card.visitante_id ?? GENERAL_TARGET_KEY;
-    const currentTargetItems = groupedQuantitySpecials.get(targetKey) ?? new Map();
-    const aggregateKey = `${normalizeKey(card.valor)}|${card.requiere_revision ? "1" : "0"}|${card.detalle.trim()}`;
-    const existing = currentTargetItems.get(aggregateKey);
-
-    if (existing) {
-      existing.quantity += Math.max(1, Number(card.cantidad || 1));
-    } else {
-      currentTargetItems.set(aggregateKey, {
-        card,
-        quantity: Math.max(1, Number(card.cantidad || 1))
-      });
-    }
-
-    groupedQuantitySpecials.set(targetKey, currentTargetItems);
-  }
+      groupedQuantitySpecials.set(targetKey, currentTargetItems);
+    });
 
   const generalQuantitySpecials = groupedQuantitySpecials.get(GENERAL_TARGET_KEY);
   if (generalQuantitySpecials && generalQuantitySpecials.size > 0) {
@@ -508,8 +767,40 @@ export function generateMenciones(wizardState: PassWizardState) {
     );
   }
 
+  const handledQuantityVisitIds = new Set<string>();
+  for (const cohort of ["minors", "adults"] as const) {
+    const cohortVisits = getCohortVisits(visits, cohort);
+    if (cohortVisits.length < 2) {
+      continue;
+    }
+
+    const serializedMaps = cohortVisits.map((visit) =>
+      serializeQuantityEntries(groupedQuantitySpecials.get(visit.visitante_id) ?? new Map())
+    );
+    const firstMap = serializedMaps[0];
+    if (!firstMap || firstMap === "[]") {
+      continue;
+    }
+
+    if (serializedMaps.every((value) => value === firstMap)) {
+      const firstVisitItems = groupedQuantitySpecials.get(cohortVisits[0].visitante_id);
+      if (firstVisitItems && firstVisitItems.size > 0) {
+        specialSentences.push(
+          withPeriod(
+            `${getCohortLabel(cohort)} ingresan con ${joinSpanishList(
+              [...firstVisitItems.values()].map(({ card, quantity }) =>
+                buildQuantitySpecialPhrase(card, quantity)
+              )
+            )}`
+          )
+        );
+        cohortVisits.forEach((visit) => handledQuantityVisitIds.add(visit.visitante_id));
+      }
+    }
+  }
+
   for (const [visitId, items] of groupedQuantitySpecials) {
-    if (visitId === GENERAL_TARGET_KEY) {
+    if (visitId === GENERAL_TARGET_KEY || handledQuantityVisitIds.has(visitId)) {
       continue;
     }
 
