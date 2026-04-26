@@ -1659,6 +1659,27 @@ html[data-theme="dark"] .danger-zone-panel .section-collapse summary {
   min-width: 12rem;
 }
 
+.danger-zone-panel .audit-last-change-card {
+  display: grid;
+  gap: 0.35rem;
+  width: 100%;
+  padding: 0.85rem 1rem;
+  border: 1px solid rgba(127, 29, 29, 0.22);
+  border-radius: 18px;
+  background: linear-gradient(180deg, rgba(255, 241, 242, 0.98) 0%, rgba(255, 255, 255, 0.96) 100%);
+  color: #7f1d1d;
+}
+
+.danger-zone-panel .audit-last-change-card strong {
+  font-size: 0.9rem;
+}
+
+.danger-zone-panel .audit-last-change-card > span {
+  color: #9f1239;
+  font-size: 0.92rem;
+  font-weight: 700;
+}
+
 .danger-zone-panel .field,
 .danger-zone-panel .remote-search-field,
 .danger-zone-panel .inline-search-list,

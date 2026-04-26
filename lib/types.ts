@@ -70,6 +70,8 @@ export interface InternalSearchOption {
   apellidoMat: string;
   ubicacion: string;
   estatus: string;
+  latestChangeAt?: string | null;
+  latestChangeDetails?: string[];
 }
 
 export interface VisitorSearchOption {
@@ -82,6 +84,8 @@ export interface VisitorSearchOption {
   betada: boolean;
   fechaBetada?: string | null;
   notas?: string | null;
+  latestChangeAt?: string | null;
+  latestChangeDetails?: string[];
 }
 
 export interface InternalVisitorLink {

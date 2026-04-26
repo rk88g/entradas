@@ -161,6 +161,27 @@ function describeAuditChanges(log: ActionAuditRecord) {
   return ["-"];
 }
 
+function renderLatestChangeSummary(options: {
+  changedAt?: string | null;
+  details?: string[];
+  emptyLabel: string;
+}) {
+  const details = options.details?.filter(Boolean) ?? [];
+  const hasChange = Boolean(options.changedAt || details.length > 0);
+
+  return (
+    <div className="audit-last-change-card">
+      <strong>Ultima modificacion</strong>
+      <span>{options.changedAt ? formatDateTime(options.changedAt) : options.emptyLabel}</span>
+      <div className="audit-change-list">
+        {(hasChange ? details : [options.emptyLabel]).map((detail, index) => (
+          <span key={`${options.changedAt ?? "empty"}-${index}`}>{detail}</span>
+        ))}
+      </div>
+    </div>
+  );
+}
+
 export function AdminControlPanel({
   connectionLogs,
   actionLogs,
@@ -880,6 +901,13 @@ export function AdminControlPanel({
                   onSelect={setSelectedCorrectionInternal}
                   placeholder="Buscar interno por nombre o ubicacion"
                 />
+                {selectedCorrectionInternal
+                  ? renderLatestChangeSummary({
+                      changedAt: selectedCorrectionInternal.latestChangeAt,
+                      details: selectedCorrectionInternal.latestChangeDetails,
+                      emptyLabel: "Sin modificaciones registradas."
+                    })
+                  : null}
                 <div className="field">
                   <input
                     name="nombres"
@@ -945,6 +973,13 @@ export function AdminControlPanel({
                   onSelect={setSelectedCorrectionVisitor}
                   placeholder="Buscar visita por nombre"
                 />
+                {selectedCorrectionVisitor
+                  ? renderLatestChangeSummary({
+                      changedAt: selectedCorrectionVisitor.latestChangeAt,
+                      details: selectedCorrectionVisitor.latestChangeDetails,
+                      emptyLabel: "Sin modificaciones registradas."
+                    })
+                  : null}
                 <div className="field">
                   <input
                     name="nombreCompleto"

@@ -160,6 +160,153 @@ function buildAuditChangeDetails(
   return changes;
 }
 
+type EntityAuditSummary = {
+  changedAt: string;
+  details: string[];
+};
+
+async function getLatestInternalAuditMap(
+  internalIds: string[]
+): Promise<Map<string, EntityAuditSummary>> {
+  const ids = [...new Set(internalIds.filter(Boolean))];
+  if (ids.length === 0) {
+    return new Map();
+  }
+
+  const auditClient = isSupabaseAdminConfigured() ? createSupabaseAdminClient() : await createServerSupabaseClient();
+  const rows: Array<{
+    entity_id: string | null;
+    before_data: unknown;
+    after_data: unknown;
+    created_at: string;
+  }> = [];
+
+  for (const chunk of splitIntoChunks(ids)) {
+    const { data } = await auditClient
+      .from("action_audit_logs")
+      .select("entity_id, before_data, after_data, created_at")
+      .eq("entity_type", "interno")
+      .in("entity_id", chunk)
+      .order("created_at", { ascending: false });
+    rows.push(...(data ?? []));
+  }
+
+  const summaryMap = new Map<string, EntityAuditSummary>();
+
+  rows.forEach((item) => {
+    const entityId = String(item.entity_id ?? "").trim();
+    if (!entityId || summaryMap.has(entityId)) {
+      return;
+    }
+
+    const details = buildAuditChangeDetails(
+      parseAuditPayload(item.before_data),
+      parseAuditPayload(item.after_data),
+      [{ key: "ubicacion", label: "Ubicacion" }]
+    );
+
+    summaryMap.set(entityId, {
+      changedAt: item.created_at,
+      details: details.length > 0 ? details : ["Cambio registrado"]
+    });
+  });
+
+  return summaryMap;
+}
+
+async function getLatestVisitorAuditMap(
+  visitorIds: string[]
+): Promise<Map<string, EntityAuditSummary>> {
+  const ids = [...new Set(visitorIds.filter(Boolean))];
+  if (ids.length === 0) {
+    return new Map();
+  }
+
+  const auditClient = isSupabaseAdminConfigured() ? createSupabaseAdminClient() : await createServerSupabaseClient();
+  const auditRows: Array<{
+    visitorId: string;
+    createdAt: string;
+    details: string[];
+  }> = [];
+
+  for (const chunk of splitIntoChunks(ids)) {
+    const { data: visitorAuditData } = await auditClient
+      .from("action_audit_logs")
+      .select("entity_id, before_data, after_data, created_at")
+      .eq("entity_type", "visita")
+      .in("entity_id", chunk)
+      .order("created_at", { ascending: false });
+
+    (visitorAuditData ?? []).forEach((item) => {
+      const visitorId = String(item.entity_id ?? "").trim();
+      if (!visitorId) {
+        return;
+      }
+
+      const details = buildAuditChangeDetails(
+        parseAuditPayload(item.before_data),
+        parseAuditPayload(item.after_data),
+        [{ key: "edad", label: "Edad" }]
+      );
+
+      auditRows.push({
+        visitorId,
+        createdAt: item.created_at,
+        details: details.length > 0 ? details : ["Cambio registrado"]
+      });
+    });
+
+    const relationFilter = chunk.map((id) => `entity_id.like.%:${id}`).join(",");
+    if (!relationFilter) {
+      continue;
+    }
+
+    const { data: relationAuditData } = await auditClient
+      .from("action_audit_logs")
+      .select("entity_id, before_data, after_data, created_at")
+      .eq("entity_type", "interno_visita")
+      .or(relationFilter)
+      .order("created_at", { ascending: false });
+
+    (relationAuditData ?? []).forEach((item) => {
+      const entityId = String(item.entity_id ?? "").trim();
+      const visitorId = entityId.split(":").pop() ?? "";
+      if (!visitorId) {
+        return;
+      }
+
+      const details = buildAuditChangeDetails(
+        parseAuditPayload(item.before_data),
+        parseAuditPayload(item.after_data),
+        [{ key: "parentesco", label: "Parentesco" }]
+      );
+
+      auditRows.push({
+        visitorId,
+        createdAt: item.created_at,
+        details: details.length > 0 ? details : ["Cambio registrado"]
+      });
+    });
+  }
+
+  const summaryMap = new Map<string, EntityAuditSummary>();
+
+  auditRows
+    .sort((left, right) => right.createdAt.localeCompare(left.createdAt))
+    .forEach((item) => {
+      if (summaryMap.has(item.visitorId)) {
+        return;
+      }
+
+      summaryMap.set(item.visitorId, {
+        changedAt: item.createdAt,
+        details: item.details
+      });
+    });
+
+  return summaryMap;
+}
+
 function ensureRoleKey(value?: string | null): RoleKey {
   if (
     value === "super-admin" ||
@@ -1226,8 +1373,18 @@ export async function searchInternals(
     return [];
   }
 
-  return data
-    .map(mapInternalSearchOption)
+  const items = data.map(mapInternalSearchOption);
+  const auditMap = await getLatestInternalAuditMap(items.map((item) => item.id));
+
+  return items
+    .map((item) => {
+      const audit = auditMap.get(item.id);
+      return {
+        ...item,
+        latestChangeAt: audit?.changedAt ?? null,
+        latestChangeDetails: audit?.details ?? []
+      };
+    })
     .sort((a, b) => compareInternalLocations(a.ubicacion, b.ubicacion))
     .slice(0, limit);
 }
@@ -1273,11 +1430,13 @@ export async function searchVisitors(
 
   const internalIds = [...new Set([...currentRelations.values()])];
   const internalsMap = await getInternosMap(supabase, internalIds);
+  const auditMap = await getLatestVisitorAuditMap(visitorIds);
 
   return data.map((item) => {
     const currentInternal = currentRelations.get(item.id)
       ? internalsMap.get(currentRelations.get(item.id)!)
       : null;
+    const audit = auditMap.get(item.id);
 
       return {
         id: item.id,
@@ -1288,7 +1447,9 @@ export async function searchVisitors(
         currentInternalLocation: currentInternal?.ubicacion,
         betada: Boolean(item.betada),
         fechaBetada: item.fecha_betada ?? null,
-        notas: item.notas ?? null
+        notas: item.notas ?? null,
+        latestChangeAt: audit?.changedAt ?? null,
+        latestChangeDetails: audit?.details ?? []
       };
   });
 }
