@@ -8,36 +8,36 @@ import {
 export const DOCUMENT_OPTIONS = [
   "CURP",
   "Acta de nacimiento",
-  "Cartilla de vacunacion",
+  "Cartilla de vacunación",
   "Credencial escolar",
   "Credencial laboral",
   "Pasaporte",
   "INE vencida",
-  "INE en tramite",
+  "INE en trámite",
   "Sin INE",
   "Licencia",
   "Otro documento"
 ] as const;
 
 export const CONDITION_OPTIONS = [
-  "Acompanado por abuela",
-  "Acompanado por abuelo",
-  "Acompanado por mama",
-  "Acompanado por papa",
-  "Acompanado por hermano mayor",
-  "Acompanado por hermana mayor",
-  "Acompanado por tio/tia",
-  "Acompanado por tutor",
+  "Acompañado por abuela",
+  "Acompañado por abuelo",
+  "Acompañado por mamá",
+  "Acompañado por papá",
+  "Acompañado por hermano mayor",
+  "Acompañado por hermana mayor",
+  "Acompañado por tío/tía",
+  "Acompañado por tutor",
   "Silla de ruedas",
   "Discapacidad",
   "Muletas",
   "Embarazo",
   "ECO reciente",
-  "Faja medica",
+  "Faja médica",
   "Yeso / venda",
-  "Cirugia reciente",
+  "Cirugía reciente",
   "Medicamento",
-  "Visita foranea",
+  "Visita foránea",
   "Horario especial",
   "Diferente horario",
   "Se queda de noche",
@@ -50,10 +50,10 @@ export const BASIC_ARTICLE_CATALOG = [
     items: [
       "Comida preparada",
       "Despensa",
-      "Carnes/proteinas",
+      "Carnes/proteínas",
       "Frutas/verduras",
       "Pan/tortillas",
-      "Lacteos",
+      "Lácteos",
       "Botanas/dulces",
       "Bebidas",
       "Condimentos"
@@ -65,8 +65,8 @@ export const BASIC_ARTICLE_CATALOG = [
       "Aseo personal",
       "Papel/toallitas",
       "Limpieza ropa",
-      "Limpieza domestica",
-      "Cuidado basico"
+      "Limpieza doméstica",
+      "Cuidado básico"
     ]
   },
   {
@@ -80,21 +80,21 @@ export const BASIC_ARTICLE_CATALOG = [
     ]
   },
   {
-    group: "Bebe",
+    group: "Bebé",
     items: [
-      "Panalera",
-      "Panales",
+      "Pañalera",
+      "Pañales",
       "Carriola",
       "Leche/biberones",
-      "Ropa bebe",
-      "Accesorios bebe"
+      "Ropa bebé",
+      "Accesorios bebé"
     ]
   },
   {
     group: "Personales",
     items: [
       "Bolsa/mochila",
-      "Cosmeticos",
+      "Cosméticos",
       "Accesorios",
       "Recipientes",
       "Carrito"
@@ -106,44 +106,44 @@ export const SPECIAL_ARTICLE_CATALOG = [
   {
     group: "Especiales",
     items: [
-      "33 economico",
+      "33 económico",
       "Diferente horario",
-      "Autorizacion especial",
+      "Autorización especial",
       "Clave o folio",
-      "Pieza electrica",
+      "Pieza eléctrica",
       "Celular",
       "Cargador",
-      "Audifonos",
+      "Audífonos",
       "Bocina",
       "Radio",
       "Tablet",
       "Producto en polvo",
       "Objeto grande",
-      "Objeto no comun",
-      "Revision especial"
+      "Objeto no común",
+      "Revisión especial"
     ]
   }
 ] as const;
 
 export const SIMPLE_SPECIAL_OPTIONS = [
-  "33 economico",
+  "33 económico",
   "Diferente horario",
-  "Autorizacion especial",
+  "Autorización especial",
   "Clave o folio",
-  "Revision especial"
+  "Revisión especial"
 ] as const;
 
 export const QUANTITY_SPECIAL_OPTIONS = [
-  "Pieza electrica",
+  "Pieza eléctrica",
   "Celular",
   "Cargador",
-  "Audifonos",
+  "Audífonos",
   "Bocina",
   "Radio",
   "Tablet",
   "Producto en polvo",
   "Objeto grande",
-  "Objeto no comun"
+  "Objeto no común"
 ] as const;
 
 const GENERAL_TARGET_KEY = "__general__";
@@ -154,14 +154,14 @@ const CONDITION_WITH_ACCESSORY = new Set([
   "Silla de ruedas",
   "Discapacidad",
   "Muletas",
-  "Faja medica",
+  "Faja médica",
   "Yeso / venda",
-  "Cirugia reciente",
+  "Cirugía reciente",
   "Medicamento"
 ]);
 
 const CONDITION_WITH_STATUS = new Set([
-  "Visita foranea",
+  "Visita foránea",
   "Horario especial",
   "Diferente horario",
   "Permiso especial"
@@ -170,11 +170,11 @@ const CONDITION_WITH_STATUS = new Set([
 const SPECIAL_ARTICLE_ALIASES: Record<string, string[]> = {
   celular: ["celular"],
   cargador: ["cargador"],
-  audifonos: ["audifonos"],
+  audifonos: ["audífonos", "audifonos"],
   bocina: ["bocina", "sonido"],
   radio: ["radio", "sonido"],
   tablet: ["tablet"],
-  "pieza electrica": ["pieza electrica"],
+  "pieza electrica": ["pieza eléctrica", "pieza electrica"],
   "otro aparato": ["otro aparato"]
 };
 
@@ -260,25 +260,25 @@ function buildDocumentationSentence(card: WizardCard, visit: PassWizardVisit | n
     return withPeriod(`${visit.visitante_nombre} ingresa con INE vencida`);
   }
 
-  if (card.valor === "INE en tramite") {
-    return withPeriod(`${visit.visitante_nombre} ingresa con INE en tramite`);
+  if (card.valor === "INE en trámite") {
+    return withPeriod(`${visit.visitante_nombre} ingresa con INE en trámite`);
   }
 
   return withPeriod(`${makeNamedSubject(visit)} ingresa con ${card.valor}`);
 }
 
 function buildCompanionSentence(card: WizardCard, visit: PassWizardVisit | null) {
-  const companion = lowerFirst(card.valor.replace(/^Acompanado por\s+/u, ""));
+  const companion = lowerFirst(card.valor.replace(/^Acompañado por\s+/u, ""));
   if (!visit) {
-    return withPeriod(`Ingresan acompanados por su ${companion}`);
+    return withPeriod(`Ingresan acompañados por su ${companion}`);
   }
 
   const subject = isMinor(visit) ? makeMinorLead(visit) : visit.visitante_nombre;
-  return withPeriod(`${subject} ingresa acompanado por su ${companion}`);
+  return withPeriod(`${subject} ingresa acompañado por su ${companion}`);
 }
 
 function buildConditionSentence(card: WizardCard, visit: PassWizardVisit | null) {
-  if (card.valor.startsWith("Acompanado por ")) {
+  if (card.valor.startsWith("Acompañado por ")) {
     return buildCompanionSentence(card, visit);
   }
 
@@ -314,12 +314,12 @@ function buildPregnancySentence(visit: PassWizardVisit | null) {
 }
 
 function buildSimpleSpecialSentence(card: WizardCard, visit: PassWizardVisit | null) {
-  if (card.valor === "33 economico") {
+  if (card.valor === "33 económico") {
     if (visit) {
-      return withPeriod(`${visit.visitante_nombre} ingresa con 33 economico`);
+      return withPeriod(`${visit.visitante_nombre} ingresa con 33 económico`);
     }
 
-    return withPeriod("Ingresa 33 economico");
+    return withPeriod("Ingresa 33 económico");
   }
 
   if (!visit) {
@@ -331,7 +331,7 @@ function buildSimpleSpecialSentence(card: WizardCard, visit: PassWizardVisit | n
 
 function buildQuantitySpecialPhrase(card: WizardCard, quantity: number) {
   const detail = card.detalle.trim() ? ` (${card.detalle.trim()})` : "";
-  const review = card.requiere_revision ? " para revision" : "";
+  const review = card.requiere_revision ? " para revisión" : "";
   return `${Math.max(1, quantity || 1)} ${lowerFirst(card.valor)}${review}${detail}`;
 }
 
@@ -527,8 +527,8 @@ export function generateMenciones(wizardState: PassWizardState) {
     );
   }
 
-  const menciones_basicas_generadas = basicSentences.filter(Boolean).join(" ").trim();
-  const menciones_especiales_generadas = specialSentences.filter(Boolean).join(" ").trim();
+  const menciones_basicas_generadas = basicSentences.filter(Boolean).join("\n").trim();
+  const menciones_especiales_generadas = specialSentences.filter(Boolean).join("\n").trim();
   const menciones_basicas_final = buildFinalText(
     menciones_basicas_generadas,
     wizardState.menciones_basicas_manual

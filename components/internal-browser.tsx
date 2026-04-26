@@ -164,9 +164,9 @@ function getMaskedInternalLabel(roleKey: RoleKey, internalId: string, value: str
 
 const PASS_WIZARD_STEPS = [
   { key: "visitas", label: "Visitas" },
-  { key: "documentacion", label: "DocumentaciÃ³n" },
+  { key: "documentacion", label: "Documentación" },
   { key: "condiciones", label: "Condiciones" },
-  { key: "articulos", label: "ArtÃ­culos" },
+  { key: "articulos", label: "Artículos" },
   { key: "especiales", label: "Especiales y vista previa" }
 ] as const;
 
@@ -206,7 +206,7 @@ function getWizardAgeTypeLabel(age: number) {
 }
 
 function formatWizardVisitChip(visit: PassWizardVisit, shouldMask: boolean) {
-  return `${maskWizardVisitorName(visit.visitante_nombre, shouldMask)} Â· ${getWizardAgeTypeLabel(visit.edad)} Â· ${visit.edad} aÃ±os`;
+  return `${maskWizardVisitorName(visit.visitante_nombre, shouldMask)} · ${getWizardAgeTypeLabel(visit.edad)} · ${visit.edad} años`;
 }
 
 function getWizardCompactOwnerLabel(name: string | null | undefined, shouldMask: boolean) {
@@ -225,18 +225,18 @@ function getWizardCardLabel(card: WizardCard, shouldMask: boolean) {
     pieces.push(`x${card.cantidad}`);
   }
   if (card.requiere_revision) {
-    pieces.push("RevisiÃ³n");
+    pieces.push("Revisión");
   }
   if (card.detalle.trim()) {
     pieces.push(card.detalle.trim());
   }
 
-  const title = pieces.join(" Â· ");
+  const title = pieces.join(" · ");
   if (!card.visitante_nombre) {
     return title;
   }
 
-  return `${maskWizardVisitorName(card.visitante_nombre, shouldMask)} Â· ${title}`;
+  return `${maskWizardVisitorName(card.visitante_nombre, shouldMask)} · ${title}`;
 }
 
 export function InternalBrowser({
@@ -676,7 +676,7 @@ export function InternalBrowser({
       type: "documentacion",
       visitante_id: visit.visitante_id,
       visitante_nombre: visit.visitante_nombre,
-      categoria: "DocumentaciÃ³n",
+      categoria: "Documentación",
       valor: docValue.trim(),
       cantidad: 1,
       requiere_revision: false,
@@ -727,7 +727,7 @@ export function InternalBrowser({
       type: "articulo_basico",
       visitante_id: visit?.visitante_id ?? null,
       visitante_nombre: visit?.visitante_nombre ?? null,
-      categoria: "ArtÃ­culos bÃ¡sicos",
+      categoria: "Artículos básicos",
       valor: basicArticleValue.trim(),
       cantidad: 1,
       requiere_revision: false,
@@ -752,7 +752,7 @@ export function InternalBrowser({
       type: "articulo_especial",
       visitante_id: visit?.visitante_id ?? null,
       visitante_nombre: visit?.visitante_nombre ?? null,
-      categoria: "ArtÃ­culos especiales",
+      categoria: "Artículos especiales",
       valor: specialArticleValue.trim(),
       cantidad: Math.max(1, Number(specialArticleQuantity || 1)),
       requiere_revision: specialArticleReview,
@@ -899,8 +899,8 @@ export function InternalBrowser({
       card.cantidad > 1
         ? `${card.valor} x${card.cantidad}`
         : card.valor;
-    const detail = card.detalle.trim() ? ` Â· ${card.detalle.trim()}` : "";
-    return `${owner} Â· ${value}${detail}`;
+    const detail = card.detalle.trim() ? ` · ${card.detalle.trim()}` : "";
+    return `${owner} · ${value}${detail}`;
   }
 
   function restoreWizardPreview(target: "basicas" | "especiales") {
@@ -1178,7 +1178,7 @@ export function InternalBrowser({
               <div className="record-title">
                 <strong className="section-title">{getMaskedInternalLabel(roleKey, selected!.id, selected.fullName)}</strong>
                 <span>
-                  Ubicacion {getMaskedInternalLabel(roleKey, selected!.id, selected.ubicacion)} Â· {maskValue(selected.edad, canViewSensitiveData && !selectedIsSensitive)} aÃ±os
+                  Ubicación {getMaskedInternalLabel(roleKey, selected!.id, selected.ubicacion)} · {maskValue(selected.edad, canViewSensitiveData && !selectedIsSensitive)} años
                 </span>
               </div>
               <div className="actions-row">
@@ -1249,24 +1249,24 @@ export function InternalBrowser({
                 />
               </div>
               <article className="data-card visitor-column-card">
-                <strong style={{ display: "block", marginBottom: "0.7rem" }}>No vendran</strong>
+                <strong style={{ display: "block", marginBottom: "0.7rem" }}>No vendrán</strong>
                 <div className="visitor-choice-grid visitor-column-list">
                   {filteredAvailableVisitors.length === 0 ? <span className="muted visitor-column-empty">Sin registros.</span> : filteredAvailableVisitors.map((item) => (
                     <button key={item.id} type="button" className="visitor-choice-item available" onClick={() => toggleVisitor(item.visitaId)}>
                       <strong>{maskPrivateText(item.visitor.fullName, selectedIsSensitive)}</strong>
-                      <span className="muted">{maskValue(item.visitor.edad, canViewSensitiveData && !selectedIsSensitive)} aÃ±os</span>
+                      <span className="muted">{maskValue(item.visitor.edad, canViewSensitiveData && !selectedIsSensitive)} años</span>
                     </button>
                   ))}
                 </div>
               </article>
 
               <article className="data-card visitor-column-card">
-                <strong style={{ display: "block", marginBottom: "0.7rem" }}>Vendran</strong>
+                <strong style={{ display: "block", marginBottom: "0.7rem" }}>Vendrán</strong>
                 <div className="visitor-choice-grid visitor-column-list">
                   {filteredSelectedVisitors.length === 0 ? <span className="muted visitor-column-empty">Sin registros.</span> : filteredSelectedVisitors.map((item) => (
                     <button key={item.id} type="button" className="visitor-choice-item selected" onClick={() => toggleVisitor(item.visitaId)}>
                       <strong>{maskPrivateText(item.visitor.fullName, selectedIsSensitive)}</strong>
-                      <span className="muted">{maskValue(item.visitor.edad, canViewSensitiveData && !selectedIsSensitive)} aÃ±os</span>
+                      <span className="muted">{maskValue(item.visitor.edad, canViewSensitiveData && !selectedIsSensitive)} años</span>
                     </button>
                   ))}
                 </div>
@@ -1457,7 +1457,7 @@ export function InternalBrowser({
 
                   <section className="two-column-section visitor-columns-section" style={{ gridColumn: "1 / -1" }}>
                     <article className="data-card visitor-column-card">
-                      <strong style={{ display: "block", marginBottom: "0.7rem" }}>No vendran</strong>
+                      <strong style={{ display: "block", marginBottom: "0.7rem" }}>No vendrán</strong>
                       <div className="visitor-choice-grid visitor-column-list">
                         {filteredAvailableVisitors.length === 0 ? (
                           <span className="muted visitor-column-empty">Sin registros.</span>
@@ -1480,7 +1480,7 @@ export function InternalBrowser({
                     </article>
 
                     <article className="data-card visitor-column-card">
-                      <strong style={{ display: "block", marginBottom: "0.7rem" }}>Vendran</strong>
+                      <strong style={{ display: "block", marginBottom: "0.7rem" }}>Vendrán</strong>
                       <div className="visitor-choice-grid visitor-column-list">
                         {filteredSelectedVisitors.length === 0 ? (
                           <span className="muted visitor-column-empty">Sin registros.</span>
@@ -1512,7 +1512,7 @@ export function InternalBrowser({
                     <section className="wizard-quick-board" style={{ gridColumn: "1 / -1" }}>
                       <div className="wizard-target-panel">
                         <div className="wizard-target-header">
-                          <strong>Captura rapida del pase</strong>
+                          <strong>Captura rápida del pase</strong>
                           <span className="muted">Selecciona persona activa, toca chips y revisa la vista previa antes de guardar.</span>
                         </div>
                         <div className="wizard-target-chip-row">
@@ -1542,7 +1542,7 @@ export function InternalBrowser({
 
                       <section className="wizard-chip-section">
                         <div className="wizard-chip-header">
-                          <strong>Documentacion</strong>
+                          <strong>Documentación</strong>
                         </div>
                         <div className="wizard-chip-row">
                           {DOCUMENT_OPTIONS.map((item) => (
@@ -1550,7 +1550,7 @@ export function InternalBrowser({
                               key={item}
                               type="button"
                               className={`wizard-option-chip${hasWizardCardSelection("documentacion", item, "basicas") ? " selected" : ""}`}
-                              onClick={() => toggleQuickWizardCard("documentacion", "Documentacion", item, "basicas")}
+                              onClick={() => toggleQuickWizardCard("documentacion", "Documentación", item, "basicas")}
                             >
                               {item}
                             </button>
@@ -1578,7 +1578,7 @@ export function InternalBrowser({
 
                       <section className="wizard-chip-section">
                         <div className="wizard-chip-header">
-                          <strong>Articulos</strong>
+                          <strong>Artículos</strong>
                         </div>
                         <div className="wizard-chip-group-grid">
                           {BASIC_ARTICLE_CATALOG.map((group) => (
@@ -1711,7 +1711,7 @@ export function InternalBrowser({
                           <strong>Seleccionado</strong>
                         </div>
                         {wizardState.cards.length === 0 ? (
-                          <span className="muted">Sin selecciones todavia.</span>
+                          <span className="muted">Sin selecciones todavía.</span>
                         ) : (
                           <div className="wizard-selected-chip-row">
                             {wizardState.cards.map((card) => (
@@ -1815,7 +1815,7 @@ export function InternalBrowser({
                   ) : (
                     <div className="record-pill" style={{ gridColumn: "1 / -1" }}>
                       <strong>Vista previa restringida</strong>
-                      <span>Tu rol puede seleccionar visitas y guardar el pase, pero no generar menciones automaticas.</span>
+                      <span>Tu rol puede seleccionar visitas y guardar el pase, pero no generar menciones automáticas.</span>
                     </div>
                   )}
 
@@ -1952,7 +1952,7 @@ export function InternalBrowser({
                       content: !selectedHistory || selectedHistory.devices.length === 0 ? <span className="muted">Sin aparatos.</span> : selectedHistory.devices.map((item) => (
                         <div key={item.id} className="record-pill">
                           <strong>{item.deviceTypeName}</strong>
-                          <span>{item.moduleKey} Â· {item.quantity}</span>
+                          <span>{item.moduleKey} · {item.quantity}</span>
                           <small>{[item.brand, item.model].filter(Boolean).join(" / ") || "Sin detalle"}</small>
                         </div>
                       ))
@@ -1965,7 +1965,7 @@ export function InternalBrowser({
                         <div key={item.id} className="record-pill">
                           <strong>{item.workplaceName}</strong>
                           <span>{item.title}</span>
-                          <small>{item.workplaceType} Â· ${item.salary.toFixed(2)}</small>
+                          <small>{item.workplaceType} · ${item.salary.toFixed(2)}</small>
                         </div>
                       ))
                     },
@@ -1987,7 +1987,7 @@ export function InternalBrowser({
                       content: !selectedHistory || selectedHistory.weeklyPayments.length === 0 ? <span className="muted">Sin pagos.</span> : selectedHistory.weeklyPayments.map((item) => (
                         <div key={item.id} className="record-pill">
                           <strong>{item.deviceTypeName}</strong>
-                          <span>{compactMoney(item.amount)} Â· {item.status}</span>
+                          <span>{compactMoney(item.amount)} · {item.status}</span>
                         </div>
                       ))
                     },
@@ -2011,7 +2011,7 @@ export function InternalBrowser({
                           {selectedHistory.fines.map((item) => (
                             <div key={item.id} className="record-pill">
                               <strong>{item.concept}</strong>
-                              <span>{compactMoney(item.amount)} Â· {item.status}</span>
+                              <span>{compactMoney(item.amount)} · {item.status}</span>
                             </div>
                           ))}
                           {selectedHistory.seizures.map((item) => (
@@ -2069,7 +2069,7 @@ export function InternalBrowser({
                           onClick={() => toggleHistorySection(section.key)}
                         >
                           <span>{section.title}</span>
-                          <span>{section.count} {isOpen ? "âˆ’" : "+"}</span>
+                          <span>{section.count} {isOpen ? "−" : "+"}</span>
                         </button>
                         {isOpen ? (
                           <div className="record-stack" style={{ marginTop: "0.9rem" }}>

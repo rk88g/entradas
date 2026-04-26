@@ -1,6 +1,6 @@
 "use client";
 
-import { usePathname, useRouter } from "next/navigation";
+import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { signOutAction } from "@/app/auth/actions";
 import { LogoutButton } from "@/components/logout-button";
@@ -47,7 +47,6 @@ export function AppShell({
 }) {
   const IDLE_TIMEOUT_MS = 30 * 60 * 1000;
   const pathname = usePathname();
-  const router = useRouter();
   const [open, setOpen] = useState(false);
   const [loadingHref, setLoadingHref] = useState<string | null>(null);
   const [supportCount, setSupportCount] = useState(supportUnreadCount);
@@ -198,15 +197,15 @@ export function AppShell({
     };
   }, [pathname, user.roleKey]);
 
-  function handleNavigate(href: string) {
+  function handleNavigate(event: React.MouseEvent<HTMLAnchorElement>, href: string) {
     if (href === pathname) {
+      event.preventDefault();
       setOpen(false);
       return;
     }
 
     setLoadingHref(href);
     setOpen(false);
-    router.push(href);
   }
 
   function handleScrollToTop() {
@@ -235,18 +234,18 @@ export function AppShell({
                 {visibleNavItems.map((item) => {
                   const active = pathname === item.href;
                   return (
-                    <button
-                      type="button"
+                    <a
+                      href={item.href}
                       key={item.href}
                       className={`nav-link ${active ? "active" : ""} ${"danger" in item && item.danger ? "danger-link" : ""}`}
-                      onClick={() => handleNavigate(item.href)}
+                      onClick={(event) => handleNavigate(event, item.href)}
                     >
                       <span className="icon-pill">{item.icon}</span>
                       <span className="nav-link-label">{item.label}</span>
                       {item.href === "/sistema/tickets" && supportCount > 0 ? (
                         <span className="nav-count-badge">{supportCount}</span>
                       ) : null}
-                    </button>
+                    </a>
                   );
                 })}
               </nav>

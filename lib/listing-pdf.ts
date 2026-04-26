@@ -542,7 +542,7 @@ function drawFooter(page: PDFPage, regularFont: PDFFont) {
   let top = PAGE_HEIGHT - MARGINS.bottom - 20;
   drawTextLine(
     page,
-    "#70-TODO LO NO AGREGADO EN LA PETICION DE SU PASE NO TENDRA AUTORIZACION PARA ENTRAR.",
+    "#70-TODO LO NO AGREGADO EN LA PETICIÓN DE SU PASE NO TENDRÁ AUTORIZACIÓN PARA ENTRAR.",
     MARGINS.left,
     top,
     footerSize,
@@ -552,7 +552,7 @@ function drawFooter(page: PDFPage, regularFont: PDFFont) {
   top += footerSize + 1.5;
   drawTextLine(
     page,
-    "#70-TODO LO QUE VENGA EN PETICION ESPECIAL / ENTREGAR A ADUANA PARA SU REVISION.",
+    "#70-TODO LO QUE VENGA EN PETICIÓN ESPECIAL / ENTREGAR A ADUANA PARA SU REVISIÓN.",
     MARGINS.left,
     top,
     footerSize,
@@ -613,7 +613,7 @@ function drawMainListingCard(options: {
   drawTextLine(page, pass.internoNombre, innerX + 36, cursorTop, LISTADO_TEXT_SIZE, regularFont);
 
   cursorTop += 14;
-  drawTextLine(page, "Ubicacion:", innerX, cursorTop, LISTADO_TEXT_SIZE, boldFont);
+  drawTextLine(page, "Ubicación:", innerX, cursorTop, LISTADO_TEXT_SIZE, boldFont);
   drawTextLine(page, pass.internoUbicacion, innerX + 68, cursorTop, LISTADO_TEXT_SIZE, regularFont);
 
   cursorTop += 15;
@@ -701,7 +701,7 @@ function drawMainListingCard(options: {
 
   if (basicLines.length > 0) {
     cursorTop += sectionTopGap;
-    drawTextLine(page, "Peticion:", innerX, cursorTop, LISTADO_TEXT_SIZE, boldFont);
+    drawTextLine(page, "Petición:", innerX, cursorTop, LISTADO_TEXT_SIZE, boldFont);
     cursorTop += sectionAfterTitleGap;
     basicLines.forEach((item) => {
       cursorTop = drawWrappedBlock({
@@ -720,7 +720,7 @@ function drawMainListingCard(options: {
 
   if (specialLines.length > 0) {
     cursorTop += sectionTopGap;
-    drawTextLine(page, "Peticion especial:", innerX, cursorTop, LISTADO_TEXT_SIZE, boldFont, COLORS.danger);
+    drawTextLine(page, "Petición especial:", innerX, cursorTop, LISTADO_TEXT_SIZE, boldFont, COLORS.danger);
     cursorTop += sectionAfterTitleGap;
     specialLines.forEach((item) => {
       cursorTop = drawWrappedBlock({
@@ -794,7 +794,7 @@ function drawSecondaryCard(options: {
   drawTextLine(page, "PPL:", innerX, cursorTop, SECONDARY_LISTING_TEXT_SIZE, boldFont);
   drawTextLine(page, internalName, innerX + 31, cursorTop, SECONDARY_LISTING_TEXT_SIZE, regularFont);
   cursorTop += 13;
-  drawTextLine(page, "Ubicacion:", innerX, cursorTop, SECONDARY_LISTING_TEXT_SIZE, boldFont);
+  drawTextLine(page, "Ubicación:", innerX, cursorTop, SECONDARY_LISTING_TEXT_SIZE, boldFont);
   drawTextLine(page, location, innerX + 62, cursorTop, SECONDARY_LISTING_TEXT_SIZE, regularFont);
   cursorTop += 14;
   const availableBodyHeight = Math.max(0, top + cardHeight - 8 - cursorTop);
@@ -988,9 +988,9 @@ function drawMentionsMode(pdf: PDFDocument, listings: ListingRecord[], regularFo
       ...(!pass.especiales?.trim() && formatDeviceSummary(pass) ? [formatDeviceSummary(pass) as string] : [])
     ];
     const bodyLines = [
-      ...(basic.length > 0 ? [{ text: "Mencion", color: COLORS.danger, bold: true }] : []),
+      ...(basic.length > 0 ? [{ text: "Mención", color: COLORS.danger, bold: true }] : []),
       ...basic.map((item) => ({ text: item, color: COLORS.warning })),
-      ...(mergedSpecialLines.length > 0 ? [{ text: "Mencion especial", color: COLORS.danger, bold: true }] : []),
+      ...(mergedSpecialLines.length > 0 ? [{ text: "Mención especial", color: COLORS.danger, bold: true }] : []),
       ...mergedSpecialLines.map((item) => ({ text: item, color: COLORS.danger }))
     ];
     return {
