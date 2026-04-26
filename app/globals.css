@@ -1804,65 +1804,172 @@ html[data-theme="dark"] .admin-tab.active {
   line-height: 1.25;
 }
 
-.wizard-step-strip {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 0.6rem;
+.wizard-quick-board {
+  display: grid;
+  gap: 1rem;
 }
 
-.wizard-step-chip {
-  border: 1px solid var(--line);
-  background: rgba(255, 255, 255, 0.88);
+.wizard-target-panel,
+.wizard-chip-section {
+  display: grid;
+  gap: 0.7rem;
+  padding: 0.95rem 1rem;
+  border-radius: 20px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  background: rgba(255, 255, 255, 0.78);
+}
+
+.wizard-target-header,
+.wizard-chip-header {
+  display: grid;
+  gap: 0.18rem;
+}
+
+.wizard-target-chip-row,
+.wizard-chip-row,
+.wizard-selected-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+}
+
+.wizard-target-chip,
+.wizard-option-chip,
+.wizard-selected-chip {
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  background: rgba(255, 255, 255, 0.96);
   color: var(--ink);
   border-radius: 999px;
-  padding: 0.6rem 0.95rem;
   font: inherit;
+}
+
+.wizard-target-chip,
+.wizard-option-chip {
+  padding: 0.65rem 0.95rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 140ms ease, box-shadow 140ms ease, border-color 140ms ease;
+}
+
+.wizard-target-chip:hover,
+.wizard-option-chip:hover {
+  transform: translateY(-1px);
+}
+
+.wizard-target-chip.active {
+  border-color: rgba(10, 28, 54, 0.92);
+  background: rgba(10, 28, 54, 0.92);
+  color: #fff;
+  box-shadow: 0 12px 26px rgba(10, 28, 54, 0.18);
+}
+
+.wizard-option-chip.selected {
+  border-color: rgba(217, 119, 6, 0.45);
+  background: rgba(255, 247, 237, 0.96);
+  box-shadow: inset 0 0 0 1px rgba(217, 119, 6, 0.14);
+}
+
+.wizard-option-chip-special.selected {
+  border-color: rgba(194, 48, 48, 0.45);
+  background: rgba(254, 242, 242, 0.96);
+  box-shadow: inset 0 0 0 1px rgba(194, 48, 48, 0.12);
+}
+
+.wizard-active-target-copy {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  align-items: center;
+  color: var(--muted);
+}
+
+.wizard-chip-group-grid {
+  display: grid;
+  gap: 0.8rem;
+}
+
+.wizard-chip-group {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.wizard-chip-group-label {
+  color: var(--muted);
+  font-size: 0.83rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.wizard-inline-special {
+  display: grid;
+  gap: 0.75rem;
+  padding: 0.9rem 1rem;
+  border-radius: 18px;
+  border: 1px solid rgba(194, 48, 48, 0.22);
+  background: rgba(254, 242, 242, 0.94);
+}
+
+.wizard-inline-special-copy {
+  display: grid;
+  gap: 0.15rem;
+}
+
+.wizard-inline-special-copy span {
+  color: var(--muted);
+}
+
+.wizard-inline-special-controls {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.wizard-inline-counter {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.wizard-inline-counter-ui {
+  display: inline-grid;
+  grid-template-columns: auto minmax(70px, 90px) auto;
+  gap: 0.45rem;
+  align-items: center;
+}
+
+.wizard-inline-counter-ui input {
+  text-align: center;
+}
+
+.wizard-inline-detail {
+  width: 100%;
+}
+
+.wizard-inline-actions {
+  justify-content: flex-start;
+}
+
+.wizard-selected-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.55rem 0.85rem;
   font-weight: 700;
   cursor: pointer;
 }
 
-.wizard-step-chip.active {
-  border-color: rgba(10, 28, 54, 0.86);
-  background: rgba(10, 28, 54, 0.9);
-  color: #fff;
+.wizard-selected-chip-basicas {
+  border-color: rgba(217, 119, 6, 0.34);
+  background: rgba(255, 247, 237, 0.96);
 }
 
-.wizard-card-grid {
+.wizard-selected-chip-especiales {
+  border-color: rgba(194, 48, 48, 0.3);
+  background: rgba(254, 242, 242, 0.96);
+}
+
+.wizard-preview-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
-  gap: 0.7rem;
-}
-
-.wizard-card {
-  display: flex;
-  gap: 0.7rem;
-  align-items: flex-start;
-  justify-content: space-between;
-  padding: 0.85rem 1rem;
-  border-radius: 18px;
-  border: 1px solid var(--line);
-  background: rgba(255, 255, 255, 0.88);
-}
-
-.wizard-card-basicas {
-  box-shadow: inset 0 0 0 1px rgba(217, 119, 6, 0.08);
-}
-
-.wizard-card-especiales {
-  box-shadow: inset 0 0 0 1px rgba(194, 48, 48, 0.08);
-}
-
-.wizard-card-copy {
-  display: grid;
-  gap: 0.2rem;
-}
-
-.wizard-card-copy small {
-  color: var(--muted);
-}
-
-.wizard-card-remove {
-  white-space: nowrap;
+  gap: 0.9rem;
 }
 
 .ticket-badge {

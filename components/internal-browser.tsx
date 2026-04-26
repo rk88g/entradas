@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useActionState, useEffect, useMemo, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
@@ -27,6 +27,8 @@ import {
   BASIC_ARTICLE_CATALOG,
   CONDITION_OPTIONS,
   DOCUMENT_OPTIONS,
+  QUANTITY_SPECIAL_OPTIONS,
+  SIMPLE_SPECIAL_OPTIONS,
   SPECIAL_ARTICLE_CATALOG,
   buildPassArticleQuantitiesFromCards,
   createEmptyWizardState,
@@ -162,9 +164,9 @@ function getMaskedInternalLabel(roleKey: RoleKey, internalId: string, value: str
 
 const PASS_WIZARD_STEPS = [
   { key: "visitas", label: "Visitas" },
-  { key: "documentacion", label: "Documentación" },
+  { key: "documentacion", label: "DocumentaciÃ³n" },
   { key: "condiciones", label: "Condiciones" },
-  { key: "articulos", label: "Artículos" },
+  { key: "articulos", label: "ArtÃ­culos" },
   { key: "especiales", label: "Especiales y vista previa" }
 ] as const;
 
@@ -187,24 +189,54 @@ function maskWizardVisitorName(value: string, shouldMask: boolean) {
   return maskPrivateText(value, shouldMask);
 }
 
+function getWizardAgeTypeLabel(age: number) {
+  if (age < 12) {
+    return "Menor";
+  }
+
+  if (age < 18) {
+    return "Adolescente";
+  }
+
+  if (age < 60) {
+    return "Adulto";
+  }
+
+  return "Adulto mayor";
+}
+
+function formatWizardVisitChip(visit: PassWizardVisit, shouldMask: boolean) {
+  return `${maskWizardVisitorName(visit.visitante_nombre, shouldMask)} Â· ${getWizardAgeTypeLabel(visit.edad)} Â· ${visit.edad} aÃ±os`;
+}
+
+function getWizardCompactOwnerLabel(name: string | null | undefined, shouldMask: boolean) {
+  if (!name) {
+    return "General";
+  }
+
+  const masked = maskWizardVisitorName(name, shouldMask).trim();
+  const [firstChunk] = masked.split(/\s+/);
+  return firstChunk || masked;
+}
+
 function getWizardCardLabel(card: WizardCard, shouldMask: boolean) {
   const pieces = [card.valor];
   if (card.cantidad > 1) {
     pieces.push(`x${card.cantidad}`);
   }
   if (card.requiere_revision) {
-    pieces.push("Revisión");
+    pieces.push("RevisiÃ³n");
   }
   if (card.detalle.trim()) {
     pieces.push(card.detalle.trim());
   }
 
-  const title = pieces.join(" · ");
+  const title = pieces.join(" Â· ");
   if (!card.visitante_nombre) {
     return title;
   }
 
-  return `${maskWizardVisitorName(card.visitante_nombre, shouldMask)} · ${title}`;
+  return `${maskWizardVisitorName(card.visitante_nombre, shouldMask)} Â· ${title}`;
 }
 
 export function InternalBrowser({
@@ -261,6 +293,7 @@ export function InternalBrowser({
   const [wizardStepIndex, setWizardStepIndex] = useState(0);
   const [wizardState, setWizardState] = useState<PassWizardState>(createEmptyWizardState());
   const [wizardAutoSync, setWizardAutoSync] = useState({ basicas: true, especiales: true });
+  const [activeWizardTargetId, setActiveWizardTargetId] = useState(WIZARD_GENERAL_TARGET);
   const [docVisitorId, setDocVisitorId] = useState("");
   const [docValue, setDocValue] = useState("");
   const [conditionVisitorId, setConditionVisitorId] = useState(WIZARD_GENERAL_TARGET);
@@ -361,6 +394,13 @@ export function InternalBrowser({
     [passArticles, wizardState.cards]
   );
   const selectedWizardVisitOptions = wizardState.visitas_seleccionadas;
+  const activeWizardVisit =
+    activeWizardTargetId === WIZARD_GENERAL_TARGET
+      ? null
+      : selectedWizardVisitOptions.find((item) => item.visitante_id === activeWizardTargetId) ?? null;
+  const activeWizardTargetLabel = activeWizardVisit
+    ? formatWizardVisitChip(activeWizardVisit, selectedIsSensitive)
+    : "General";
   const filteredDocumentCards = wizardState.cards.filter((item) => item.type === "documentacion");
   const filteredConditionCards = wizardState.cards.filter((item) => item.type === "condicion");
   const filteredBasicArticleCards = wizardState.cards.filter((item) => item.type === "articulo_basico");
@@ -415,6 +455,7 @@ export function InternalBrowser({
   }
 
   function resetWizardAuxiliaryInputs() {
+    setActiveWizardTargetId(WIZARD_GENERAL_TARGET);
     setDocVisitorId("");
     setDocValue("");
     setConditionVisitorId(WIZARD_GENERAL_TARGET);
@@ -484,6 +525,10 @@ export function InternalBrowser({
   useEffect(() => {
     const validIds = new Set(selectedWizardVisits.map((item) => item.visitante_id));
 
+    if (activeWizardTargetId !== WIZARD_GENERAL_TARGET && !validIds.has(activeWizardTargetId)) {
+      setActiveWizardTargetId(WIZARD_GENERAL_TARGET);
+    }
+
     if (docVisitorId && !validIds.has(docVisitorId)) {
       setDocVisitorId("");
     }
@@ -499,7 +544,7 @@ export function InternalBrowser({
     if (specialArticleVisitorId !== WIZARD_GENERAL_TARGET && !validIds.has(specialArticleVisitorId)) {
       setSpecialArticleVisitorId(WIZARD_GENERAL_TARGET);
     }
-  }, [selectedWizardVisits, docVisitorId, conditionVisitorId, basicArticleVisitorId, specialArticleVisitorId]);
+  }, [selectedWizardVisits, activeWizardTargetId, docVisitorId, conditionVisitorId, basicArticleVisitorId, specialArticleVisitorId]);
 
   useEffect(() => {
     if (visitorState.success) {
@@ -631,7 +676,7 @@ export function InternalBrowser({
       type: "documentacion",
       visitante_id: visit.visitante_id,
       visitante_nombre: visit.visitante_nombre,
-      categoria: "Documentación",
+      categoria: "DocumentaciÃ³n",
       valor: docValue.trim(),
       cantidad: 1,
       requiere_revision: false,
@@ -682,7 +727,7 @@ export function InternalBrowser({
       type: "articulo_basico",
       visitante_id: visit?.visitante_id ?? null,
       visitante_nombre: visit?.visitante_nombre ?? null,
-      categoria: "Artículos básicos",
+      categoria: "ArtÃ­culos bÃ¡sicos",
       valor: basicArticleValue.trim(),
       cantidad: 1,
       requiere_revision: false,
@@ -707,7 +752,7 @@ export function InternalBrowser({
       type: "articulo_especial",
       visitante_id: visit?.visitante_id ?? null,
       visitante_nombre: visit?.visitante_nombre ?? null,
-      categoria: "Artículos especiales",
+      categoria: "ArtÃ­culos especiales",
       valor: specialArticleValue.trim(),
       cantidad: Math.max(1, Number(specialArticleQuantity || 1)),
       requiere_revision: specialArticleReview,
@@ -718,6 +763,144 @@ export function InternalBrowser({
     setSpecialArticleQuantity("1");
     setSpecialArticleReview(true);
     setSpecialArticleDetail("");
+  }
+
+  function getActiveWizardTargetVisit() {
+    if (activeWizardTargetId === WIZARD_GENERAL_TARGET) {
+      return null;
+    }
+
+    return selectedWizardVisitOptions.find((item) => item.visitante_id === activeWizardTargetId) ?? null;
+  }
+
+  function hasWizardCardSelection(
+    type: WizardCard["type"],
+    value: string,
+    target: WizardCard["target"],
+    visitorId: string | null = activeWizardTargetId === WIZARD_GENERAL_TARGET ? null : activeWizardTargetId
+  ) {
+    return wizardState.cards.some(
+      (card) =>
+        card.type === type &&
+        card.valor === value &&
+        card.target === target &&
+        (card.visitante_id ?? null) === visitorId
+    );
+  }
+
+  function toggleQuickWizardCard(
+    type: WizardCard["type"],
+    categoria: string,
+    valor: string,
+    target: WizardCard["target"],
+    options?: {
+      cantidad?: number;
+      detalle?: string;
+      requiereRevision?: boolean;
+    }
+  ) {
+    const visit = getActiveWizardTargetVisit();
+    const cantidad = Math.max(1, Number(options?.cantidad ?? 1));
+    const detalle = options?.detalle?.trim() ?? "";
+    const requiereRevision = options?.requiereRevision ?? false;
+
+    updateWizardState((current) => {
+      const existingIndex = current.cards.findIndex(
+        (card) =>
+          card.type === type &&
+          card.valor === valor &&
+          card.target === target &&
+          (card.visitante_id ?? null) === (visit?.visitante_id ?? null) &&
+          card.detalle === detalle &&
+          card.cantidad === cantidad &&
+          card.requiere_revision === requiereRevision
+      );
+
+      if (existingIndex >= 0) {
+        return {
+          ...current,
+          cards: current.cards.filter((_, index) => index !== existingIndex)
+        };
+      }
+
+      return {
+        ...current,
+        cards: [
+          ...current.cards.filter(
+            (card) =>
+              !(
+                card.type === type &&
+                card.valor === valor &&
+                card.target === target &&
+                (card.visitante_id ?? null) === (visit?.visitante_id ?? null) &&
+                type === "articulo_especial"
+              )
+          ),
+          {
+            id: buildWizardCardId(),
+            type,
+            visitante_id: visit?.visitante_id ?? null,
+            visitante_nombre: visit?.visitante_nombre ?? null,
+            categoria,
+            valor,
+            cantidad,
+            requiere_revision: requiereRevision,
+            detalle,
+            target
+          }
+        ]
+      };
+    });
+  }
+
+  function openQuantitySpecialEditor(value: string) {
+    const visit = getActiveWizardTargetVisit();
+    const existing = wizardState.cards.find(
+      (card) =>
+        card.type === "articulo_especial" &&
+        card.valor === value &&
+        card.target === "especiales" &&
+        (card.visitante_id ?? null) === (visit?.visitante_id ?? null)
+    );
+
+    if (specialArticleValue === value) {
+      setSpecialArticleValue("");
+      setSpecialArticleQuantity("1");
+      setSpecialArticleDetail("");
+      setSpecialArticleReview(true);
+      return;
+    }
+
+    setSpecialArticleValue(value);
+    setSpecialArticleQuantity(String(existing?.cantidad ?? 1));
+    setSpecialArticleDetail(existing?.detalle ?? "");
+    setSpecialArticleReview(existing?.requiere_revision ?? true);
+  }
+
+  function confirmQuantitySpecialCard() {
+    if (!specialArticleValue.trim()) {
+      return;
+    }
+
+    toggleQuickWizardCard("articulo_especial", "Especiales", specialArticleValue.trim(), "especiales", {
+      cantidad: Math.max(1, Number(specialArticleQuantity || 1)),
+      detalle: specialArticleDetail,
+      requiereRevision: specialArticleReview
+    });
+    setSpecialArticleValue("");
+    setSpecialArticleQuantity("1");
+    setSpecialArticleDetail("");
+    setSpecialArticleReview(true);
+  }
+
+  function getWizardSelectionChipLabel(card: WizardCard) {
+    const owner = getWizardCompactOwnerLabel(card.visitante_nombre ?? null, selectedIsSensitive);
+    const value =
+      card.cantidad > 1
+        ? `${card.valor} x${card.cantidad}`
+        : card.valor;
+    const detail = card.detalle.trim() ? ` Â· ${card.detalle.trim()}` : "";
+    return `${owner} Â· ${value}${detail}`;
   }
 
   function restoreWizardPreview(target: "basicas" | "especiales") {
@@ -995,7 +1178,7 @@ export function InternalBrowser({
               <div className="record-title">
                 <strong className="section-title">{getMaskedInternalLabel(roleKey, selected!.id, selected.fullName)}</strong>
                 <span>
-                  Ubicacion {getMaskedInternalLabel(roleKey, selected!.id, selected.ubicacion)} · {maskValue(selected.edad, canViewSensitiveData && !selectedIsSensitive)} años
+                  Ubicacion {getMaskedInternalLabel(roleKey, selected!.id, selected.ubicacion)} Â· {maskValue(selected.edad, canViewSensitiveData && !selectedIsSensitive)} aÃ±os
                 </span>
               </div>
               <div className="actions-row">
@@ -1071,7 +1254,7 @@ export function InternalBrowser({
                   {filteredAvailableVisitors.length === 0 ? <span className="muted visitor-column-empty">Sin registros.</span> : filteredAvailableVisitors.map((item) => (
                     <button key={item.id} type="button" className="visitor-choice-item available" onClick={() => toggleVisitor(item.visitaId)}>
                       <strong>{maskPrivateText(item.visitor.fullName, selectedIsSensitive)}</strong>
-                      <span className="muted">{maskValue(item.visitor.edad, canViewSensitiveData && !selectedIsSensitive)} años</span>
+                      <span className="muted">{maskValue(item.visitor.edad, canViewSensitiveData && !selectedIsSensitive)} aÃ±os</span>
                     </button>
                   ))}
                 </div>
@@ -1083,7 +1266,7 @@ export function InternalBrowser({
                   {filteredSelectedVisitors.length === 0 ? <span className="muted visitor-column-empty">Sin registros.</span> : filteredSelectedVisitors.map((item) => (
                     <button key={item.id} type="button" className="visitor-choice-item selected" onClick={() => toggleVisitor(item.visitaId)}>
                       <strong>{maskPrivateText(item.visitor.fullName, selectedIsSensitive)}</strong>
-                      <span className="muted">{maskValue(item.visitor.edad, canViewSensitiveData && !selectedIsSensitive)} años</span>
+                      <span className="muted">{maskValue(item.visitor.edad, canViewSensitiveData && !selectedIsSensitive)} aÃ±os</span>
                     </button>
                   ))}
                 </div>
@@ -1226,429 +1409,418 @@ export function InternalBrowser({
                     />
                   ))}
 
-                  <div className="wizard-step-strip" style={{ gridColumn: "1 / -1" }}>
-                    {wizardSteps.map((step, index) => (
-                      <button
-                        key={step.key}
-                        type="button"
-                        className={`wizard-step-chip${index === wizardStepIndex ? " active" : ""}`}
-                        onClick={() => setWizardStepIndex(index)}
-                      >
-                        {index + 1}. {step.label}
-                      </button>
-                    ))}
+                  <div className="field">
+                    <label htmlFor="fecha_visita_modal">Fecha del pase</label>
+                    <select
+                      id="fecha_visita_modal"
+                      value={selectedDateValue}
+                      onChange={(event) => setSelectedDateValue(event.target.value)}
+                    >
+                      {availableDates.map((date) => (
+                        <option key={date.id} value={date.fechaCompleta}>
+                          {formatLongDateWithWeekday(date.fechaCompleta)}
+                        </option>
+                      ))}
+                    </select>
                   </div>
 
-                  {currentWizardStep === "visitas" ? (
-                    <>
-                      <div className="field">
-                        <label htmlFor="fecha_visita_modal">Fecha del pase</label>
-                        <select
-                          id="fecha_visita_modal"
-                          value={selectedDateValue}
-                          onChange={(event) => setSelectedDateValue(event.target.value)}
-                        >
-                          {availableDates.map((date) => (
-                            <option key={date.id} value={date.fechaCompleta}>
-                              {formatLongDateWithWeekday(date.fechaCompleta)}
-                            </option>
+                  {roleKey === "super-admin" && selectedPass ? (
+                    <label className="duplicate-pass-approval">
+                      <input
+                        type="checkbox"
+                        className="duplicate-pass-approval-input"
+                        checked={allowDuplicatePass}
+                        onChange={(event) => setAllowDuplicatePass(event.target.checked)}
+                      />
+                      <span className="duplicate-pass-approval-box" aria-hidden="true" />
+                      <span className="duplicate-pass-approval-copy">
+                        <strong>Autorizar pase duplicado</strong>
+                        <small>Generar otro pase para este interno en la misma fecha.</small>
+                      </span>
+                    </label>
+                  ) : null}
+
+                  <div className="field visitor-search-field" style={{ gridColumn: "1 / -1" }}>
+                    <input
+                      value={visitorQuery}
+                      onChange={(event) => setVisitorQuery(event.target.value)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Escape") {
+                          event.preventDefault();
+                          setVisitorQuery("");
+                        }
+                      }}
+                      placeholder="Buscar visita del interno"
+                      autoComplete="off"
+                    />
+                  </div>
+
+                  <section className="two-column-section visitor-columns-section" style={{ gridColumn: "1 / -1" }}>
+                    <article className="data-card visitor-column-card">
+                      <strong style={{ display: "block", marginBottom: "0.7rem" }}>No vendran</strong>
+                      <div className="visitor-choice-grid visitor-column-list">
+                        {filteredAvailableVisitors.length === 0 ? (
+                          <span className="muted visitor-column-empty">Sin registros.</span>
+                        ) : (
+                          filteredAvailableVisitors.map((item) => (
+                            <button
+                              key={item.id}
+                              type="button"
+                              className="visitor-choice-item available"
+                              onClick={() => toggleVisitor(item.visitaId)}
+                            >
+                              <strong>{maskPrivateText(item.visitor.fullName, selectedIsSensitive)}</strong>
+                              <span className="muted">
+                                {maskValue(item.visitor.edad, canViewSensitiveData && !selectedIsSensitive)} años
+                              </span>
+                            </button>
+                          ))
+                        )}
+                      </div>
+                    </article>
+
+                    <article className="data-card visitor-column-card">
+                      <strong style={{ display: "block", marginBottom: "0.7rem" }}>Vendran</strong>
+                      <div className="visitor-choice-grid visitor-column-list">
+                        {filteredSelectedVisitors.length === 0 ? (
+                          <span className="muted visitor-column-empty">Sin registros.</span>
+                        ) : (
+                          filteredSelectedVisitors.map((item) => (
+                            <button
+                              key={item.id}
+                              type="button"
+                              className="visitor-choice-item selected"
+                              onClick={() => toggleVisitor(item.visitaId)}
+                            >
+                              <strong>{maskPrivateText(item.visitor.fullName, selectedIsSensitive)}</strong>
+                              <span className="muted">
+                                {maskValue(item.visitor.edad, canViewSensitiveData && !selectedIsSensitive)} años
+                              </span>
+                            </button>
+                          ))
+                        )}
+                      </div>
+                    </article>
+                  </section>
+
+                  <div className="record-pill" style={{ gridColumn: "1 / -1" }}>
+                    <strong>{selectedVisitors.length} visitas seleccionadas</strong>
+                    <span>{selectedAdults.length} adultos · {Math.max(0, selectedVisitors.length - selectedAdults.length)} menores</span>
+                  </div>
+
+                  {canCaptureWizardMentions ? (
+                    <section className="wizard-quick-board" style={{ gridColumn: "1 / -1" }}>
+                      <div className="wizard-target-panel">
+                        <div className="wizard-target-header">
+                          <strong>Captura rapida del pase</strong>
+                          <span className="muted">Selecciona persona activa, toca chips y revisa la vista previa antes de guardar.</span>
+                        </div>
+                        <div className="wizard-target-chip-row">
+                          <button
+                            type="button"
+                            className={`wizard-target-chip${activeWizardTargetId === WIZARD_GENERAL_TARGET ? " active" : ""}`}
+                            onClick={() => setActiveWizardTargetId(WIZARD_GENERAL_TARGET)}
+                          >
+                            General
+                          </button>
+                          {selectedWizardVisitOptions.map((visit) => (
+                            <button
+                              key={visit.visitante_id}
+                              type="button"
+                              className={`wizard-target-chip${activeWizardTargetId === visit.visitante_id ? " active" : ""}`}
+                              onClick={() => setActiveWizardTargetId(visit.visitante_id)}
+                            >
+                              {formatWizardVisitChip(visit, selectedIsSensitive)}
+                            </button>
                           ))}
-                        </select>
+                        </div>
+                        <div className="wizard-active-target-copy">
+                          <strong>Aplicando a:</strong>
+                          <span>{activeWizardTargetLabel}</span>
+                        </div>
                       </div>
 
-                      {roleKey === "super-admin" && selectedPass ? (
-                        <label className="duplicate-pass-approval">
-                          <input
-                            type="checkbox"
-                            className="duplicate-pass-approval-input"
-                            checked={allowDuplicatePass}
-                            onChange={(event) => setAllowDuplicatePass(event.target.checked)}
-                          />
-                          <span className="duplicate-pass-approval-box" aria-hidden="true" />
-                          <span className="duplicate-pass-approval-copy">
-                            <strong>Autorizar pase duplicado</strong>
-                            <small>Generar otro pase para este interno en la misma fecha.</small>
-                          </span>
-                        </label>
-                      ) : null}
-
-                      <div className="field visitor-search-field" style={{ gridColumn: "1 / -1" }}>
-                        <input
-                          value={visitorQuery}
-                          onChange={(event) => setVisitorQuery(event.target.value)}
-                          onKeyDown={(event) => {
-                            if (event.key === "Escape") {
-                              event.preventDefault();
-                              setVisitorQuery("");
-                            }
-                          }}
-                          placeholder="Buscar visita del interno"
-                          autoComplete="off"
-                        />
-                      </div>
-
-                      <section className="two-column-section visitor-columns-section" style={{ gridColumn: "1 / -1" }}>
-                        <article className="data-card visitor-column-card">
-                          <strong style={{ display: "block", marginBottom: "0.7rem" }}>No vendrán</strong>
-                          <div className="visitor-choice-grid visitor-column-list">
-                            {filteredAvailableVisitors.length === 0 ? (
-                              <span className="muted visitor-column-empty">Sin registros.</span>
-                            ) : (
-                              filteredAvailableVisitors.map((item) => (
-                                <button
-                                  key={item.id}
-                                  type="button"
-                                  className="visitor-choice-item available"
-                                  onClick={() => toggleVisitor(item.visitaId)}
-                                >
-                                  <strong>{maskPrivateText(item.visitor.fullName, selectedIsSensitive)}</strong>
-                                  <span className="muted">
-                                    {maskValue(item.visitor.edad, canViewSensitiveData && !selectedIsSensitive)} años
-                                  </span>
-                                </button>
-                              ))
-                            )}
-                          </div>
-                        </article>
-
-                        <article className="data-card visitor-column-card">
-                          <strong style={{ display: "block", marginBottom: "0.7rem" }}>Vendrán</strong>
-                          <div className="visitor-choice-grid visitor-column-list">
-                            {filteredSelectedVisitors.length === 0 ? (
-                              <span className="muted visitor-column-empty">Sin registros.</span>
-                            ) : (
-                              filteredSelectedVisitors.map((item) => (
-                                <button
-                                  key={item.id}
-                                  type="button"
-                                  className="visitor-choice-item selected"
-                                  onClick={() => toggleVisitor(item.visitaId)}
-                                >
-                                  <strong>{maskPrivateText(item.visitor.fullName, selectedIsSensitive)}</strong>
-                                  <span className="muted">
-                                    {maskValue(item.visitor.edad, canViewSensitiveData && !selectedIsSensitive)} años
-                                  </span>
-                                </button>
-                              ))
-                            )}
-                          </div>
-                        </article>
+                      <section className="wizard-chip-section">
+                        <div className="wizard-chip-header">
+                          <strong>Documentacion</strong>
+                        </div>
+                        <div className="wizard-chip-row">
+                          {DOCUMENT_OPTIONS.map((item) => (
+                            <button
+                              key={item}
+                              type="button"
+                              className={`wizard-option-chip${hasWizardCardSelection("documentacion", item, "basicas") ? " selected" : ""}`}
+                              onClick={() => toggleQuickWizardCard("documentacion", "Documentacion", item, "basicas")}
+                            >
+                              {item}
+                            </button>
+                          ))}
+                        </div>
                       </section>
 
-                      <div className="record-pill" style={{ gridColumn: "1 / -1" }}>
-                        <strong>{selectedVisitors.length} visitas seleccionadas</strong>
-                        <span>{selectedAdults.length} adultos · {Math.max(0, selectedVisitors.length - selectedAdults.length)} menores</span>
-                      </div>
-
-                      {!canCaptureWizardMentions ? (
-                        <div className="record-pill" style={{ gridColumn: "1 / -1" }}>
-                          <strong>Tu rol puede guardar el pase</strong>
-                          <span>Las menciones automáticas quedan reservadas para control y super-admin.</span>
+                      <section className="wizard-chip-section">
+                        <div className="wizard-chip-header">
+                          <strong>Condiciones</strong>
                         </div>
-                      ) : null}
-                    </>
-                  ) : null}
-
-                  {currentWizardStep === "documentacion" && canCaptureWizardMentions ? (
-                    <>
-                      <div className="field">
-                        <label>Visita</label>
-                        <select value={docVisitorId} onChange={(event) => setDocVisitorId(event.target.value)}>
-                          <option value="">Selecciona visita</option>
-                          {selectedWizardVisitOptions.map((visit) => (
-                            <option key={visit.visitante_id} value={visit.visitante_id}>
-                              {maskWizardVisitorName(visit.visitante_nombre, selectedIsSensitive)}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                      <div className="field">
-                        <label>Documento</label>
-                        <select value={docValue} onChange={(event) => setDocValue(event.target.value)}>
-                          <option value="">Selecciona documento</option>
-                          {DOCUMENT_OPTIONS.map((item) => (
-                            <option key={item} value={item}>{item}</option>
-                          ))}
-                        </select>
-                      </div>
-                      <div className="actions-row" style={{ gridColumn: "1 / -1" }}>
-                        <button type="button" className="button-soft" onClick={handleAddDocumentCard} disabled={!docVisitorId || !docValue}>
-                          Agregar tarjeta
-                        </button>
-                      </div>
-                      <div style={{ gridColumn: "1 / -1" }}>
-                        {renderWizardCards(filteredDocumentCards, "Sin tarjetas de documentación.")}
-                      </div>
-                    </>
-                  ) : null}
-
-                  {currentWizardStep === "condiciones" && canCaptureWizardMentions ? (
-                    <>
-                      <div className="field">
-                        <label>Aplica a</label>
-                        <select value={conditionVisitorId} onChange={(event) => setConditionVisitorId(event.target.value)}>
-                          <option value={WIZARD_GENERAL_TARGET}>General</option>
-                          {selectedWizardVisitOptions.map((visit) => (
-                            <option key={visit.visitante_id} value={visit.visitante_id}>
-                              {maskWizardVisitorName(visit.visitante_nombre, selectedIsSensitive)}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                      <div className="field">
-                        <label>Condición</label>
-                        <select value={conditionValue} onChange={(event) => setConditionValue(event.target.value)}>
-                          <option value="">Selecciona condición</option>
+                        <div className="wizard-chip-row">
                           {CONDITION_OPTIONS.map((item) => (
-                            <option key={item} value={item}>{item}</option>
-                          ))}
-                        </select>
-                      </div>
-                      <div className="field" style={{ gridColumn: "1 / -1" }}>
-                        <input
-                          value={conditionDetail}
-                          onChange={(event) => setConditionDetail(event.target.value)}
-                          placeholder="Detalle opcional"
-                          autoComplete="off"
-                        />
-                      </div>
-                      <div className="actions-row" style={{ gridColumn: "1 / -1" }}>
-                        <button type="button" className="button-soft" onClick={handleAddConditionCard} disabled={!conditionValue}>
-                          Agregar tarjeta
-                        </button>
-                      </div>
-                      <div style={{ gridColumn: "1 / -1" }}>
-                        {renderWizardCards(filteredConditionCards, "Sin tarjetas de condiciones.")}
-                      </div>
-                    </>
-                  ) : null}
-
-                  {currentWizardStep === "articulos" && canCaptureWizardMentions ? (
-                    <>
-                      <div className="field">
-                        <label>Aplica a</label>
-                        <select value={basicArticleVisitorId} onChange={(event) => setBasicArticleVisitorId(event.target.value)}>
-                          <option value={WIZARD_GENERAL_TARGET}>General</option>
-                          {selectedWizardVisitOptions.map((visit) => (
-                            <option key={visit.visitante_id} value={visit.visitante_id}>
-                              {maskWizardVisitorName(visit.visitante_nombre, selectedIsSensitive)}
-                            </option>
-                          ))}
-                        </select>
-                      </div>
-                      <div className="field">
-                        <label>Artículo básico</label>
-                        <select value={basicArticleValue} onChange={(event) => setBasicArticleValue(event.target.value)}>
-                          <option value="">Selecciona artículo</option>
-                          {BASIC_ARTICLE_CATALOG.map((group) => (
-                            <optgroup key={group.group} label={group.group}>
-                              {group.items.map((item) => (
-                                <option key={item} value={item}>{item}</option>
-                              ))}
-                            </optgroup>
-                          ))}
-                        </select>
-                      </div>
-                      <div className="actions-row" style={{ gridColumn: "1 / -1" }}>
-                        <button type="button" className="button-soft" onClick={handleAddBasicArticleCard} disabled={!basicArticleValue}>
-                          Agregar tarjeta
-                        </button>
-                      </div>
-                      <div style={{ gridColumn: "1 / -1" }}>
-                        {renderWizardCards(filteredBasicArticleCards, "Sin artículos básicos.")}
-                      </div>
-                    </>
-                  ) : null}
-
-                  {currentWizardStep === "especiales" ? (
-                    <>
-                      {canCaptureWizardMentions ? (
-                        <>
-                          <div className="field">
-                            <label>Aplica a</label>
-                            <select value={specialArticleVisitorId} onChange={(event) => setSpecialArticleVisitorId(event.target.value)}>
-                              <option value={WIZARD_GENERAL_TARGET}>General</option>
-                              {selectedWizardVisitOptions.map((visit) => (
-                                <option key={visit.visitante_id} value={visit.visitante_id}>
-                                  {maskWizardVisitorName(visit.visitante_nombre, selectedIsSensitive)}
-                                </option>
-                              ))}
-                            </select>
-                          </div>
-                          <div className="field">
-                            <label>Artículo especial</label>
-                            <select
-                              value={specialArticleValue}
-                              onChange={(event) => setSpecialArticleValue(event.target.value)}
-                            >
-                              <option value="">Selecciona artículo</option>
-                              {SPECIAL_ARTICLE_CATALOG.map((group) => (
-                                <optgroup key={group.group} label={group.group}>
-                                  {group.items.map((item) => (
-                                    <option key={item} value={item}>{item}</option>
-                                  ))}
-                                </optgroup>
-                              ))}
-                            </select>
-                          </div>
-                          <div className="field">
-                            <label>Cantidad</label>
-                            <input
-                              type="number"
-                              min="1"
-                              value={specialArticleQuantity}
-                              onChange={(event) => setSpecialArticleQuantity(event.target.value)}
-                              autoComplete="off"
-                            />
-                          </div>
-                          <label className="duplicate-pass-approval">
-                            <input
-                              type="checkbox"
-                              className="duplicate-pass-approval-input"
-                              checked={specialArticleReview}
-                              onChange={(event) => setSpecialArticleReview(event.target.checked)}
-                            />
-                            <span className="duplicate-pass-approval-box" aria-hidden="true" />
-                            <span className="duplicate-pass-approval-copy">
-                              <strong>Requiere revisión</strong>
-                              <small>Úsalo para marcar aparatos u objetos especiales.</small>
-                            </span>
-                          </label>
-                          <div className="field" style={{ gridColumn: "1 / -1" }}>
-                            <input
-                              value={specialArticleDetail}
-                              onChange={(event) => setSpecialArticleDetail(event.target.value)}
-                              placeholder="Detalle opcional"
-                              autoComplete="off"
-                            />
-                          </div>
-                          <div className="actions-row" style={{ gridColumn: "1 / -1" }}>
                             <button
+                              key={item}
                               type="button"
-                              className="button-soft"
-                              onClick={handleAddSpecialCard}
-                              disabled={!specialArticleValue}
+                              className={`wizard-option-chip${hasWizardCardSelection("condicion", item, "basicas") ? " selected" : ""}`}
+                              onClick={() => toggleQuickWizardCard("condicion", "Condiciones", item, "basicas")}
                             >
-                              Agregar tarjeta
+                              {item}
+                            </button>
+                          ))}
+                        </div>
+                      </section>
+
+                      <section className="wizard-chip-section">
+                        <div className="wizard-chip-header">
+                          <strong>Articulos</strong>
+                        </div>
+                        <div className="wizard-chip-group-grid">
+                          {BASIC_ARTICLE_CATALOG.map((group) => (
+                            <div key={group.group} className="wizard-chip-group">
+                              <span className="wizard-chip-group-label">{group.group}</span>
+                              <div className="wizard-chip-row">
+                                {group.items.map((item) => (
+                                  <button
+                                    key={item}
+                                    type="button"
+                                    className={`wizard-option-chip${hasWizardCardSelection("articulo_basico", item, "basicas") ? " selected" : ""}`}
+                                    onClick={() => toggleQuickWizardCard("articulo_basico", group.group, item, "basicas")}
+                                  >
+                                    {item}
+                                  </button>
+                                ))}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+                      </section>
+
+                      <section className="wizard-chip-section">
+                        <div className="wizard-chip-header">
+                          <strong>Especiales</strong>
+                        </div>
+                        <div className="wizard-chip-group-grid">
+                          {SPECIAL_ARTICLE_CATALOG.map((group) => (
+                            <div key={group.group} className="wizard-chip-group">
+                              <div className="wizard-chip-row">
+                                {group.items.map((item) => {
+                                  const isQuantity = QUANTITY_SPECIAL_OPTIONS.includes(item as (typeof QUANTITY_SPECIAL_OPTIONS)[number]);
+                                  const isSelected = hasWizardCardSelection("articulo_especial", item, "especiales");
+                                  return (
+                                    <button
+                                      key={item}
+                                      type="button"
+                                      className={`wizard-option-chip wizard-option-chip-special${isSelected ? " selected" : ""}`}
+                                      onClick={() => {
+                                        if (isQuantity) {
+                                          openQuantitySpecialEditor(item);
+                                          return;
+                                        }
+
+                                        toggleQuickWizardCard("articulo_especial", "Especiales", item, "especiales", {
+                                          cantidad: 1,
+                                          detalle: "",
+                                          requiereRevision: false
+                                        });
+                                      }}
+                                    >
+                                      {item}
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          ))}
+                        </div>
+
+                        {specialArticleValue ? (
+                          <div className="wizard-inline-special">
+                            <div className="wizard-inline-special-copy">
+                              <strong>{specialArticleValue}</strong>
+                              <span>Agregar especial para {activeWizardTargetLabel}</span>
+                            </div>
+                            <div className="wizard-inline-special-controls">
+                              <label className="wizard-inline-counter">
+                                <span>Cantidad</span>
+                                <div className="wizard-inline-counter-ui">
+                                  <button
+                                    type="button"
+                                    className="button-soft"
+                                    onClick={() =>
+                                      setSpecialArticleQuantity((current) => String(Math.max(1, Number(current || 1) - 1)))
+                                    }
+                                  >
+                                    -
+                                  </button>
+                                  <input
+                                    type="number"
+                                    min="1"
+                                    value={specialArticleQuantity}
+                                    onChange={(event) => setSpecialArticleQuantity(event.target.value)}
+                                    autoComplete="off"
+                                  />
+                                  <button
+                                    type="button"
+                                    className="button-soft"
+                                    onClick={() =>
+                                      setSpecialArticleQuantity((current) => String(Math.max(1, Number(current || 1) + 1)))
+                                    }
+                                  >
+                                    +
+                                  </button>
+                                </div>
+                              </label>
+                              <div className="field wizard-inline-detail">
+                                <input
+                                  value={specialArticleDetail}
+                                  onChange={(event) => setSpecialArticleDetail(event.target.value)}
+                                  placeholder="Detalle opcional"
+                                  autoComplete="off"
+                                />
+                              </div>
+                              <div className="actions-row wizard-inline-actions">
+                                <button type="button" className="button-soft" onClick={confirmQuantitySpecialCard}>
+                                  Agregar
+                                </button>
+                                <button
+                                  type="button"
+                                  className="button-soft"
+                                  onClick={() => {
+                                    setSpecialArticleValue("");
+                                    setSpecialArticleQuantity("1");
+                                    setSpecialArticleDetail("");
+                                    setSpecialArticleReview(true);
+                                  }}
+                                >
+                                  Cancelar
+                                </button>
+                              </div>
+                            </div>
+                          </div>
+                        ) : null}
+                      </section>
+
+                      <section className="wizard-chip-section">
+                        <div className="wizard-chip-header">
+                          <strong>Seleccionado</strong>
+                        </div>
+                        {wizardState.cards.length === 0 ? (
+                          <span className="muted">Sin selecciones todavia.</span>
+                        ) : (
+                          <div className="wizard-selected-chip-row">
+                            {wizardState.cards.map((card) => (
+                              <button
+                                key={card.id}
+                                type="button"
+                                className={`wizard-selected-chip wizard-selected-chip-${card.target}`}
+                                onClick={() => removeWizardCard(card.id)}
+                              >
+                                <span>{getWizardSelectionChipLabel(card)}</span>
+                                <strong>×</strong>
+                              </button>
+                            ))}
+                          </div>
+                        )}
+                      </section>
+
+                      <section className="wizard-preview-grid">
+                        <div className="field" style={{ gridColumn: "1 / -1" }}>
+                          <label>Menciones basicas generadas</label>
+                          <textarea value={wizardState.menciones_basicas_generadas} readOnly />
+                        </div>
+                        <div className="field" style={{ gridColumn: "1 / -1" }}>
+                          <label>Menciones especiales generadas</label>
+                          <textarea value={wizardState.menciones_especiales_generadas} readOnly />
+                        </div>
+                        <div className="field">
+                          <label>Basicas manuales</label>
+                          <textarea
+                            value={wizardState.menciones_basicas_manual}
+                            onChange={(event) =>
+                              updateWizardState((current) => ({
+                                ...current,
+                                menciones_basicas_manual: event.target.value
+                              }))
+                            }
+                            placeholder="Texto adicional para basicas"
+                            autoComplete="off"
+                            style={{ borderColor: "#d97706", boxShadow: "0 0 0 3px rgba(217,119,6,0.10)" }}
+                          />
+                        </div>
+                        <div className="field">
+                          <label>Especiales manuales</label>
+                          <textarea
+                            value={wizardState.menciones_especiales_manual}
+                            onChange={(event) =>
+                              updateWizardState((current) => ({
+                                ...current,
+                                menciones_especiales_manual: event.target.value
+                              }))
+                            }
+                            placeholder="Texto adicional para especiales"
+                            autoComplete="off"
+                            style={{ borderColor: "#c23030", boxShadow: "0 0 0 3px rgba(194,48,48,0.10)" }}
+                          />
+                        </div>
+                        <div className="field" style={{ gridColumn: "1 / -1" }}>
+                          <div className="actions-row" style={{ justifyContent: "space-between", marginBottom: "0.4rem" }}>
+                            <label style={{ marginBottom: 0 }}>Menciones basicas finales</label>
+                            <button type="button" className="button-soft" onClick={() => restoreWizardPreview("basicas")}>
+                              Restaurar vista previa
                             </button>
                           </div>
-                          <div style={{ gridColumn: "1 / -1" }}>
-                            {renderWizardCards(filteredSpecialCards, "Sin artículos especiales.")}
-                          </div>
-
-                          <div className="field" style={{ gridColumn: "1 / -1" }}>
-                            <label>Peticiones básicas manuales</label>
-                            <textarea
-                              value={wizardState.menciones_basicas_manual}
-                              onChange={(event) =>
-                                updateWizardState((current) => ({
-                                  ...current,
-                                  menciones_basicas_manual: event.target.value
-                                }))
-                              }
-                              placeholder="Texto adicional para básicas"
-                              autoComplete="off"
-                              style={{ borderColor: "#d97706", boxShadow: "0 0 0 3px rgba(217,119,6,0.10)" }}
-                            />
-                          </div>
-                          <div className="field" style={{ gridColumn: "1 / -1" }}>
-                            <label>Peticiones especiales manuales</label>
-                            <textarea
-                              value={wizardState.menciones_especiales_manual}
-                              onChange={(event) =>
-                                updateWizardState((current) => ({
-                                  ...current,
-                                  menciones_especiales_manual: event.target.value
-                                }))
-                              }
-                              placeholder="Texto adicional para especiales"
-                              autoComplete="off"
-                              style={{ borderColor: "#c23030", boxShadow: "0 0 0 3px rgba(194,48,48,0.10)" }}
-                            />
-                          </div>
-
-                          <div className="field" style={{ gridColumn: "1 / -1" }}>
-                            <label>Generado básicas</label>
-                            <textarea value={wizardState.menciones_basicas_generadas} readOnly />
-                          </div>
-                          <div className="field" style={{ gridColumn: "1 / -1" }}>
-                            <label>Generado especiales</label>
-                            <textarea value={wizardState.menciones_especiales_generadas} readOnly />
-                          </div>
-
-                          <div className="field" style={{ gridColumn: "1 / -1" }}>
-                            <div className="actions-row" style={{ justifyContent: "space-between", marginBottom: "0.4rem" }}>
-                              <label style={{ marginBottom: 0 }}>Menciones básicas finales</label>
-                              <button type="button" className="button-soft" onClick={() => restoreWizardPreview("basicas")}>
-                                Restaurar vista previa
-                              </button>
-                            </div>
-                            <textarea
-                              value={wizardState.menciones_basicas_final}
-                              onChange={(event) => {
-                                setWizardAutoSync((current) => ({ ...current, basicas: false }));
-                                setWizardState((current) => ({
-                                  ...current,
-                                  menciones_basicas_final: event.target.value
-                                }));
-                              }}
-                              placeholder="Vista final de menciones básicas"
-                              autoComplete="off"
-                              style={{ borderColor: "#d97706", boxShadow: "0 0 0 3px rgba(217,119,6,0.10)" }}
-                            />
-                          </div>
-                          <div className="field" style={{ gridColumn: "1 / -1" }}>
-                            <div className="actions-row" style={{ justifyContent: "space-between", marginBottom: "0.4rem" }}>
-                              <label style={{ marginBottom: 0 }}>Menciones especiales finales</label>
-                              <button type="button" className="button-soft" onClick={() => restoreWizardPreview("especiales")}>
-                                Restaurar vista previa
-                              </button>
-                            </div>
-                            <textarea
-                              value={wizardState.menciones_especiales_final}
-                              onChange={(event) => {
-                                setWizardAutoSync((current) => ({ ...current, especiales: false }));
-                                setWizardState((current) => ({
-                                  ...current,
-                                  menciones_especiales_final: event.target.value
-                                }));
-                              }}
-                              placeholder="Vista final de menciones especiales"
-                              autoComplete="off"
-                              style={{ borderColor: "#c23030", boxShadow: "0 0 0 3px rgba(194,48,48,0.10)" }}
-                            />
-                          </div>
-                        </>
-                      ) : (
-                        <div className="record-pill" style={{ gridColumn: "1 / -1" }}>
-                          <strong>Vista previa restringida</strong>
-                          <span>Tu rol puede seleccionar visitas y guardar el pase, pero no generar menciones automáticas.</span>
+                          <textarea
+                            value={wizardState.menciones_basicas_final}
+                            onChange={(event) => {
+                              setWizardAutoSync((current) => ({ ...current, basicas: false }));
+                              setWizardState((current) => ({
+                                ...current,
+                                menciones_basicas_final: event.target.value
+                              }));
+                            }}
+                            placeholder="Vista final de menciones basicas"
+                            autoComplete="off"
+                            style={{ borderColor: "#d97706", boxShadow: "0 0 0 3px rgba(217,119,6,0.10)" }}
+                          />
                         </div>
-                      )}
-                    </>
-                  ) : null}
-
-                  <div className="actions-row" style={{ gridColumn: "1 / -1", justifyContent: "space-between", marginTop: "0.4rem" }}>
-                    <div className="actions-row">
-                      <button
-                        type="button"
-                        className="button-soft"
-                        onClick={() => setWizardStepIndex((current) => Math.max(0, current - 1))}
-                        disabled={wizardStepIndex === 0}
-                      >
-                        Anterior
-                      </button>
-                      <button
-                        type="button"
-                        className="button-soft"
-                        onClick={() => setWizardStepIndex((current) => Math.min(wizardSteps.length - 1, current + 1))}
-                        disabled={wizardStepIndex >= wizardSteps.length - 1}
-                      >
-                        Siguiente
-                      </button>
+                        <div className="field" style={{ gridColumn: "1 / -1" }}>
+                          <div className="actions-row" style={{ justifyContent: "space-between", marginBottom: "0.4rem" }}>
+                            <label style={{ marginBottom: 0 }}>Menciones especiales finales</label>
+                            <button type="button" className="button-soft" onClick={() => restoreWizardPreview("especiales")}>
+                              Restaurar vista previa
+                            </button>
+                          </div>
+                          <textarea
+                            value={wizardState.menciones_especiales_final}
+                            onChange={(event) => {
+                              setWizardAutoSync((current) => ({ ...current, especiales: false }));
+                              setWizardState((current) => ({
+                                ...current,
+                                menciones_especiales_final: event.target.value
+                              }));
+                            }}
+                            placeholder="Vista final de menciones especiales"
+                            autoComplete="off"
+                            style={{ borderColor: "#c23030", boxShadow: "0 0 0 3px rgba(194,48,48,0.10)" }}
+                          />
+                        </div>
+                      </section>
+                    </section>
+                  ) : (
+                    <div className="record-pill" style={{ gridColumn: "1 / -1" }}>
+                      <strong>Vista previa restringida</strong>
+                      <span>Tu rol puede seleccionar visitas y guardar el pase, pero no generar menciones automaticas.</span>
                     </div>
+                  )}
 
-                    {canRenderPassButton && currentWizardStep === wizardSteps[wizardSteps.length - 1]?.key ? (
+                  <div className="actions-row" style={{ gridColumn: "1 / -1", justifyContent: "flex-end", marginTop: "0.4rem" }}>
+                    {canRenderPassButton ? (
                       <LoadingButton pending={passPending} label="CREAR PASE" loadingLabel="Loading..." className="button" />
                     ) : null}
                   </div>
@@ -1780,7 +1952,7 @@ export function InternalBrowser({
                       content: !selectedHistory || selectedHistory.devices.length === 0 ? <span className="muted">Sin aparatos.</span> : selectedHistory.devices.map((item) => (
                         <div key={item.id} className="record-pill">
                           <strong>{item.deviceTypeName}</strong>
-                          <span>{item.moduleKey} · {item.quantity}</span>
+                          <span>{item.moduleKey} Â· {item.quantity}</span>
                           <small>{[item.brand, item.model].filter(Boolean).join(" / ") || "Sin detalle"}</small>
                         </div>
                       ))
@@ -1793,7 +1965,7 @@ export function InternalBrowser({
                         <div key={item.id} className="record-pill">
                           <strong>{item.workplaceName}</strong>
                           <span>{item.title}</span>
-                          <small>{item.workplaceType} · ${item.salary.toFixed(2)}</small>
+                          <small>{item.workplaceType} Â· ${item.salary.toFixed(2)}</small>
                         </div>
                       ))
                     },
@@ -1815,7 +1987,7 @@ export function InternalBrowser({
                       content: !selectedHistory || selectedHistory.weeklyPayments.length === 0 ? <span className="muted">Sin pagos.</span> : selectedHistory.weeklyPayments.map((item) => (
                         <div key={item.id} className="record-pill">
                           <strong>{item.deviceTypeName}</strong>
-                          <span>{compactMoney(item.amount)} · {item.status}</span>
+                          <span>{compactMoney(item.amount)} Â· {item.status}</span>
                         </div>
                       ))
                     },
@@ -1839,7 +2011,7 @@ export function InternalBrowser({
                           {selectedHistory.fines.map((item) => (
                             <div key={item.id} className="record-pill">
                               <strong>{item.concept}</strong>
-                              <span>{compactMoney(item.amount)} · {item.status}</span>
+                              <span>{compactMoney(item.amount)} Â· {item.status}</span>
                             </div>
                           ))}
                           {selectedHistory.seizures.map((item) => (
@@ -1897,7 +2069,7 @@ export function InternalBrowser({
                           onClick={() => toggleHistorySection(section.key)}
                         >
                           <span>{section.title}</span>
-                          <span>{section.count} {isOpen ? "−" : "+"}</span>
+                          <span>{section.count} {isOpen ? "âˆ’" : "+"}</span>
                         </button>
                         {isOpen ? (
                           <div className="record-stack" style={{ marginTop: "0.9rem" }}>
@@ -1952,3 +2124,4 @@ export function InternalBrowser({
     </>
   );
 }
+
