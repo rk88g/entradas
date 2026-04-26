@@ -1,7 +1,7 @@
-"use client";
+﻿"use client";
 
 import { useEffect, useState } from "react";
-import { usePathname, useRouter, useSearchParams } from "next/navigation";
+import { usePathname, useSearchParams } from "next/navigation";
 import { InternalProfile, VisitorRecord } from "@/lib/types";
 import { formatLongDate, getVisitorAvailabilityLabel } from "@/lib/utils";
 
@@ -16,6 +16,11 @@ function formatCurrentInternalLabel(name?: string | null, location?: string | nu
   return normalizedLocation ? `${normalizedName} [${normalizedLocation}]` : normalizedName;
 }
 
+function navigateToSearchTarget(pathname: string, params: URLSearchParams) {
+  const target = params.size ? `${pathname}?${params.toString()}` : pathname;
+  window.location.assign(target);
+}
+
 export function ComparatorPanel({
   internals,
   visitors,
@@ -27,7 +32,6 @@ export function ComparatorPanel({
   internalQuery: string;
   visitorQuery: string;
 }) {
-  const router = useRouter();
   const pathname = usePathname();
   const searchParams = useSearchParams();
   const [internalQueryInput, setInternalQueryInput] = useState(internalQuery);
@@ -77,7 +81,7 @@ export function ComparatorPanel({
       params.delete("vq");
     }
 
-    router.replace(params.size ? `${pathname}?${params.toString()}` : pathname, { scroll: false });
+    navigateToSearchTarget(pathname, params);
   }
 
   return (
@@ -322,3 +326,4 @@ export function ComparatorPanel({
     </section>
   );
 }
+

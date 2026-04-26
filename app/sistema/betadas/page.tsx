@@ -21,7 +21,8 @@ export default async function BetadasPage({
     query,
     page,
     pageSize: 100,
-    availability: "unavailable"
+    availability: "unavailable",
+    includeHistory: false
   });
 
   return (

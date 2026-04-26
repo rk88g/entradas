@@ -2,7 +2,7 @@ import fontkit from "@pdf-lib/fontkit";
 import { readFile } from "fs/promises";
 import { PDFDocument, PDFFont, PDFPage, StandardFonts, rgb } from "pdf-lib";
 import { ListingRecord, PassVisitor } from "@/lib/types";
-import { formatLongDate, sortListingsForPrint } from "@/lib/utils";
+import { formatLongDate, sanitizeText, sortListingsForPrint } from "@/lib/utils";
 
 export type ListingPdfMode = "listado" | "sexos" | "numeros" | "menciones";
 
@@ -74,7 +74,7 @@ function getListingVisitors(pass: ListingRecord) {
 }
 
 function splitMentions(menciones?: string) {
-  const lines = (menciones ?? "")
+  const lines = sanitizeText(menciones ?? "")
     .split(/\r?\n/)
     .map((item) => item.trim())
     .filter(Boolean);
@@ -98,14 +98,14 @@ function formatDeviceSummary(pass: ListingRecord) {
     return null;
   }
 
-  return pass.deviceItems.map((item) => `${item.name} [${item.quantity}]`).join(", ");
+  return pass.deviceItems.map((item) => `${sanitizeText(item.name)} [${item.quantity}]`).join(", ");
 }
 
 function formatVisitorLine(visitor: PassVisitor) {
   if (visitor.edad >= 12 && visitor.edad <= 17) {
-    return `${visitor.nombre} ${visitor.edad} años`;
+    return `${sanitizeText(visitor.nombre)} ${visitor.edad} años`;
   }
-  return visitor.nombre;
+  return sanitizeText(visitor.nombre);
 }
 
 function filterListingsForPdf(
@@ -144,7 +144,7 @@ function chunkItems<T>(items: T[], size: number) {
 }
 
 function wrapText(text: string, font: PDFFont, size: number, maxWidth: number) {
-  const clean = text.replace(/\s+/g, " ").trim();
+  const clean = sanitizeText(text).replace(/\s+/g, " ").trim();
   if (!clean) {
     return [];
   }
@@ -213,7 +213,7 @@ function drawTextLine(
   font: PDFFont,
   color = COLORS.text
 ) {
-  page.drawText(text, {
+  page.drawText(sanitizeText(text), {
     x,
     y: PAGE_HEIGHT - top - size,
     size,
@@ -542,7 +542,7 @@ function drawFooter(page: PDFPage, regularFont: PDFFont) {
   let top = PAGE_HEIGHT - MARGINS.bottom - 20;
   drawTextLine(
     page,
-    "#70-TODO LO NO AGREGADO EN LA PETICION DE SU PASE NO TENDRA AUTORIZACION PARA ENTRAR.",
+    "#70-TODO LO NO AGREGADO EN LA PETICIÓN DE SU PASE NO TENDRÁ AUTORIZACIÓN PARA ENTRAR.",
     MARGINS.left,
     top,
     footerSize,
@@ -552,7 +552,7 @@ function drawFooter(page: PDFPage, regularFont: PDFFont) {
   top += footerSize + 1.5;
   drawTextLine(
     page,
-    "#70-TODO LO QUE VENGA EN PETICION ESPECIAL / ENTREGAR A ADUANA PARA SU REVISION.",
+    "#70-TODO LO QUE VENGA EN PETICIÓN ESPECIAL / ENTREGAR A ADUANA PARA SU REVISIÓN.",
     MARGINS.left,
     top,
     footerSize,
@@ -588,13 +588,13 @@ function drawMainListingCard(options: {
   const { visibleVisitors, underTwelveCount } = getListingVisitors(pass);
   const { basic, special } = splitMentions(pass.menciones);
   const extraSpecials = splitMentions(pass.especiales);
-  const basicLines = basic.slice(0, 2);
-  const specialLines = [
+  const basicSummary = basic.join(" ").trim();
+  const specialSummary = [
     ...extraSpecials.basic,
     ...extraSpecials.special,
     ...special,
     ...(!pass.especiales?.trim() && formatDeviceSummary(pass) ? [formatDeviceSummary(pass) as string] : [])
-  ].slice(0, 2);
+  ].join(" ").trim();
 
   const compactGap = 0.7;
   const titleText = "REGISTRO PASE PARA TERRAZA";
@@ -613,7 +613,7 @@ function drawMainListingCard(options: {
   drawTextLine(page, pass.internoNombre, innerX + 36, cursorTop, LISTADO_TEXT_SIZE, regularFont);
 
   cursorTop += 14;
-  drawTextLine(page, "Ubicacion:", innerX, cursorTop, LISTADO_TEXT_SIZE, boldFont);
+  drawTextLine(page, "Ubicación:", innerX, cursorTop, LISTADO_TEXT_SIZE, boldFont);
   drawTextLine(page, pass.internoUbicacion, innerX + 68, cursorTop, LISTADO_TEXT_SIZE, regularFont);
 
   cursorTop += 15;
@@ -634,29 +634,27 @@ function drawMainListingCard(options: {
   const sectionAfterTitleGap = 10;
   let reservedBottomHeight = 0;
 
-  if (basicLines.length > 0) {
+  if (basicSummary) {
     reservedBottomHeight += sectionTopGap + sectionAfterTitleGap;
-    basicLines.forEach((item) => {
-      reservedBottomHeight += measureWrappedBlockHeight({
-        font: regularFont,
-        text: item,
-        width: innerWidth,
-        size: LISTADO_TEXT_SIZE,
-        lineGap: compactGap
-      });
+    reservedBottomHeight += measureWrappedBlockHeight({
+      font: regularFont,
+      text: basicSummary,
+      width: innerWidth,
+      size: LISTADO_TEXT_SIZE,
+      maxLines: 1,
+      lineGap: compactGap
     });
   }
 
-  if (specialLines.length > 0) {
+  if (specialSummary) {
     reservedBottomHeight += sectionTopGap + sectionAfterTitleGap;
-    specialLines.forEach((item) => {
-      reservedBottomHeight += measureWrappedBlockHeight({
-        font: boldFont,
-        text: item,
-        width: innerWidth,
-        size: LISTADO_TEXT_SIZE,
-        lineGap: compactGap
-      });
+    reservedBottomHeight += measureWrappedBlockHeight({
+      font: boldFont,
+      text: specialSummary,
+      width: innerWidth,
+      size: LISTADO_TEXT_SIZE,
+      maxLines: 1,
+      lineGap: compactGap
     });
   }
 
@@ -699,59 +697,89 @@ function drawMainListingCard(options: {
       ? Math.max(visitorBlockBottom, innerBottom - reservedBottomHeight)
       : visitorBlockBottom;
 
-  if (basicLines.length > 0) {
+  if (basicSummary) {
     cursorTop += sectionTopGap;
-    drawTextLine(page, "Peticion:", innerX, cursorTop, LISTADO_TEXT_SIZE, boldFont);
+    drawTextLine(page, "Petición:", innerX, cursorTop, LISTADO_TEXT_SIZE, boldFont);
     cursorTop += sectionAfterTitleGap;
-    basicLines.forEach((item) => {
-      cursorTop = drawWrappedBlock({
-        page,
-        font: regularFont,
-        text: item,
-        x: innerX,
-        top: cursorTop,
-        width: innerWidth,
-        size: LISTADO_TEXT_SIZE,
-        color: COLORS.warning,
-        lineGap: compactGap
-      });
+    cursorTop = drawWrappedBlock({
+      page,
+      font: regularFont,
+      text: basicSummary,
+      x: innerX,
+      top: cursorTop,
+      width: innerWidth,
+      size: LISTADO_TEXT_SIZE,
+      color: COLORS.warning,
+      lineGap: compactGap,
+      maxLines: 1,
+      forceEllipsisOnLastLine: true
     });
   }
 
-  if (specialLines.length > 0) {
+  if (specialSummary) {
     cursorTop += sectionTopGap;
-    drawTextLine(page, "Peticion especial:", innerX, cursorTop, LISTADO_TEXT_SIZE, boldFont, COLORS.danger);
+    drawTextLine(page, "Petición especial:", innerX, cursorTop, LISTADO_TEXT_SIZE, boldFont, COLORS.danger);
     cursorTop += sectionAfterTitleGap;
-    specialLines.forEach((item) => {
-      cursorTop = drawWrappedBlock({
-        page,
-        font: boldFont,
-        text: item,
-        x: innerX,
-        top: cursorTop,
-        width: innerWidth,
-        size: LISTADO_TEXT_SIZE,
-        color: COLORS.danger,
-        lineGap: compactGap
-      });
+    cursorTop = drawWrappedBlock({
+      page,
+      font: boldFont,
+      text: specialSummary,
+      x: innerX,
+      top: cursorTop,
+      width: innerWidth,
+      size: LISTADO_TEXT_SIZE,
+      color: COLORS.danger,
+      lineGap: compactGap,
+      maxLines: 1,
+      forceEllipsisOnLastLine: true
     });
   }
 }
 
 function getSexSections(pass: ListingRecord) {
   const { visibleVisitors, underTwelveCount } = getVisibleVisitors(pass);
-  const hasMen = visibleVisitors.some((visitor) => visitor.sexo === "hombre");
-  const hasWomen = visibleVisitors.some((visitor) => visitor.sexo !== "hombre");
-  const men = visibleVisitors.filter(
-    (visitor) => visitor.sexo === "hombre" || (hasMen && visitor.edad >= 16 && visitor.edad < 18)
+  const adultMen = visibleVisitors.filter((visitor) => visitor.sexo === "hombre" && visitor.edad >= 18);
+  const adultWomen = visibleVisitors.filter((visitor) => visitor.sexo !== "hombre" && visitor.edad >= 18);
+  const olderMinorBoys = visibleVisitors.filter(
+    (visitor) => visitor.sexo === "hombre" && visitor.edad > 12 && visitor.edad < 18
   );
-  const womenAndTeens = visibleVisitors.filter((visitor) => !men.some((item) => item.visitorId === visitor.visitorId));
-  const menChildrenCount = underTwelveCount > 0 && men.length > 0 && !hasWomen ? underTwelveCount : 0;
-  const womenChildrenCount = underTwelveCount > 0 ? (menChildrenCount > 0 ? 0 : underTwelveCount) : 0;
+  const otherVisibleMinors = visibleVisitors.filter(
+    (visitor) => visitor.edad < 18 && !olderMinorBoys.some((item) => item.visitorId === visitor.visitorId)
+  );
+
+  let men = [...adultMen];
+  let women = [...adultWomen];
+  let menChildrenCount = 0;
+  let womenChildrenCount = 0;
+
+  if (adultMen.length > 0 && adultWomen.length > 0) {
+    men = [...adultMen, ...olderMinorBoys];
+    women = [...adultWomen, ...otherVisibleMinors];
+    womenChildrenCount = underTwelveCount;
+  } else if (adultMen.length > 0) {
+    men = [...adultMen, ...visibleVisitors.filter((visitor) => visitor.edad < 18)];
+    women = [];
+    menChildrenCount = underTwelveCount;
+  } else if (adultWomen.length > 0) {
+    men = [];
+    women = [...adultWomen, ...visibleVisitors.filter((visitor) => visitor.edad < 18)];
+    womenChildrenCount = underTwelveCount;
+  } else {
+    const hasVisibleWomen = visibleVisitors.some((visitor) => visitor.sexo !== "hombre");
+    if (hasVisibleWomen) {
+      men = [...olderMinorBoys];
+      women = visibleVisitors.filter((visitor) => !men.some((item) => item.visitorId === visitor.visitorId));
+      womenChildrenCount = underTwelveCount;
+    } else {
+      men = [...visibleVisitors];
+      women = [];
+      menChildrenCount = underTwelveCount;
+    }
+  }
 
   return [
     { key: "men", label: "HOMBRES", visitors: men, childrenCount: menChildrenCount },
-    { key: "women", label: "MUJERES Y MENORES", visitors: womenAndTeens, childrenCount: womenChildrenCount }
+    { key: "women", label: "MUJERES", visitors: women, childrenCount: womenChildrenCount }
   ].filter((section) => section.visitors.length > 0 || section.childrenCount > 0);
 }
 
@@ -794,7 +822,7 @@ function drawSecondaryCard(options: {
   drawTextLine(page, "PPL:", innerX, cursorTop, SECONDARY_LISTING_TEXT_SIZE, boldFont);
   drawTextLine(page, internalName, innerX + 31, cursorTop, SECONDARY_LISTING_TEXT_SIZE, regularFont);
   cursorTop += 13;
-  drawTextLine(page, "Ubicacion:", innerX, cursorTop, SECONDARY_LISTING_TEXT_SIZE, boldFont);
+  drawTextLine(page, "Ubicación:", innerX, cursorTop, SECONDARY_LISTING_TEXT_SIZE, boldFont);
   drawTextLine(page, location, innerX + 62, cursorTop, SECONDARY_LISTING_TEXT_SIZE, regularFont);
   cursorTop += 14;
   const availableBodyHeight = Math.max(0, top + cardHeight - 8 - cursorTop);
@@ -867,6 +895,7 @@ function drawNumbersRow(options: {
   const leftWidth = 58;
   const rightWidth = 64;
   const middleWidth = width - leftWidth - rightWidth - 24;
+  const passNumberText = String(pass.numeroPase ?? "-");
 
   page.drawRectangle({
     x,
@@ -888,25 +917,34 @@ function drawNumbersRow(options: {
     size: PASS_NUMBER_TEXT_SIZE,
     maxLines: 1
   });
-  drawWrappedBlock({
-    page,
-    font: boldFont,
-    text: `${pass.internoNombre}    [${pass.numeroPase ?? "-"}]`,
-    x: x + leftWidth + 4,
-    top: textTop,
-    width: middleWidth,
-    size: PASS_NUMBER_TEXT_SIZE,
-    maxLines: 2
-  });
-  drawTextLine(
-    page,
-    String(pass.numeroPase ?? "-"),
-    x + width - rightWidth + 18,
-    top + rowHeight / 2 - 18,
-    PASS_NUMBER_SIZE,
-    boldFont
-  );
-}
+    drawWrappedBlock({
+      page,
+      font: boldFont,
+      text: `${pass.internoNombre}    [${passNumberText}]`,
+      x: x + leftWidth + 4,
+      top: textTop,
+      width: middleWidth,
+      size: PASS_NUMBER_TEXT_SIZE,
+      maxLines: 2
+    });
+    let passNumberSize = PASS_NUMBER_SIZE;
+    const maxPassNumberWidth = rightWidth - 8;
+
+    while (passNumberSize > 22 && boldFont.widthOfTextAtSize(passNumberText, passNumberSize) > maxPassNumberWidth) {
+      passNumberSize -= 1;
+    }
+
+    const passNumberWidth = boldFont.widthOfTextAtSize(passNumberText, passNumberSize);
+    const passNumberX = x + width - 6 - passNumberWidth;
+    drawTextLine(
+      page,
+      passNumberText,
+      passNumberX,
+      top + rowHeight / 2 - passNumberSize / 2 - 4,
+      passNumberSize,
+      boldFont
+    );
+  }
 
 function drawListadoMode(pdf: PDFDocument, listings: ListingRecord[], regularFont: PDFFont, boldFont: PDFFont) {
   const footerHeight = 22;
@@ -978,9 +1016,9 @@ function drawMentionsMode(pdf: PDFDocument, listings: ListingRecord[], regularFo
       ...(!pass.especiales?.trim() && formatDeviceSummary(pass) ? [formatDeviceSummary(pass) as string] : [])
     ];
     const bodyLines = [
-      ...(basic.length > 0 ? [{ text: "Mencion", color: COLORS.danger, bold: true }] : []),
+      ...(basic.length > 0 ? [{ text: "Mención", color: COLORS.danger, bold: true }] : []),
       ...basic.map((item) => ({ text: item, color: COLORS.warning })),
-      ...(mergedSpecialLines.length > 0 ? [{ text: "Mencion especial", color: COLORS.danger, bold: true }] : []),
+      ...(mergedSpecialLines.length > 0 ? [{ text: "Mención especial", color: COLORS.danger, bold: true }] : []),
       ...mergedSpecialLines.map((item) => ({ text: item, color: COLORS.danger }))
     ];
     return {
@@ -1055,3 +1093,4 @@ export async function generateListingPdf(options: {
 
   return pdf.save();
 }
+

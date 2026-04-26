@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useDeferredValue, useEffect, useState } from "react";
 import { VisitorSearchOption } from "@/lib/types";
@@ -126,7 +126,7 @@ export function RemoteVisitorSearchField({
               <strong>{option.fullName}</strong>
               <span className="muted">
                 {option.currentInternalName
-                  ? `${option.currentInternalName} · ${option.currentInternalLocation ?? "Sin ubicacion"}`
+                  ? `${option.currentInternalName} · ${option.currentInternalLocation ?? "Sin ubicación"}`
                   : "Sin interno activo"}
               </span>
             </button>
@@ -139,7 +139,7 @@ export function RemoteVisitorSearchField({
             <strong>{selected.fullName}</strong>
             <span>
               {selected.currentInternalName
-                ? `${selected.currentInternalName} · ${selected.currentInternalLocation ?? "Sin ubicacion"}`
+                ? `${selected.currentInternalName} · ${selected.currentInternalLocation ?? "Sin ubicación"}`
                 : "Sin interno activo"}
             </span>
           </div>
@@ -151,3 +151,4 @@ export function RemoteVisitorSearchField({
     </div>
   );
 }
+

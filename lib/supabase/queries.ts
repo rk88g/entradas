@@ -431,8 +431,22 @@ function mapVisitorRecord(
     };
 }
 
-async function getVisitorHistoryData(supabase: SupabaseClient, visitorIds?: string[]) {
+async function getVisitorHistoryData(
+  supabase: SupabaseClient,
+  visitorIds?: string[],
+  options?: {
+    includeDetailedHistory?: boolean;
+  }
+) {
   const normalizedVisitorIds = [...new Set((visitorIds ?? []).filter(Boolean))];
+  const includeDetailedHistory = options?.includeDetailedHistory ?? true;
+  const historyMap = new Map<string, string[]>();
+  const detailedHistoryMap = new Map<string, VisitorHistoryEntry[]>();
+
+  if (!includeDetailedHistory) {
+    return { historyMap, detailedHistoryMap };
+  }
+
   const auditClient = isSupabaseAdminConfigured() ? createSupabaseAdminClient() : supabase;
   const fetchVisitHistory = async () => {
     if (normalizedVisitorIds.length > 0) {
@@ -571,8 +585,6 @@ async function getVisitorHistoryData(supabase: SupabaseClient, visitorIds?: stri
           })
         )
       ).flat();
-  const historyMap = new Map<string, string[]>();
-  const detailedHistoryMap = new Map<string, VisitorHistoryEntry[]>();
   const internalNameMap = new Map(
     (internals ?? []).map((item) => [
       item.id,
@@ -735,13 +747,22 @@ async function getInternosMap(
 
 async function getVisitorsMap(
   supabase: SupabaseClient,
-  visitorIds: string[]
+  visitorIds: string[],
+  options?: {
+    includeHistory?: boolean;
+  }
 ): Promise<Map<string, VisitorRecord>> {
   if (visitorIds.length === 0) {
     return new Map();
   }
 
-  const { historyMap, detailedHistoryMap } = await getVisitorHistoryData(supabase, visitorIds);
+  const includeHistory = options?.includeHistory ?? true;
+  const { historyMap, detailedHistoryMap } = includeHistory
+    ? await getVisitorHistoryData(supabase, visitorIds)
+    : {
+        historyMap: new Map<string, string[]>(),
+        detailedHistoryMap: new Map<string, VisitorHistoryEntry[]>()
+      };
   const rows: Array<{
     id: string;
     nombreCompleto: string;
@@ -882,7 +903,7 @@ async function buildListingsForRows(
   }
 
   const visitorIds = [...new Set((listadoVisitasRows ?? []).map((item) => item.visita_id))];
-  const visitorsMap = await getVisitorsMap(supabase, visitorIds);
+  const visitorsMap = await getVisitorsMap(supabase, visitorIds, { includeHistory: false });
   const relationMap = new Map<string, typeof listadoVisitasRows>();
   const deviceMap = new Map<string, Array<{
     id: string;
@@ -996,7 +1017,7 @@ export async function getPassEditData(passId: string): Promise<PassEditData | nu
   }
 
   const linkedVisitorIds = [...new Set((relationRows ?? []).map((item) => item.visita_id))];
-  const visitorsMap = await getVisitorsMap(supabase, linkedVisitorIds);
+  const visitorsMap = await getVisitorsMap(supabase, linkedVisitorIds, { includeHistory: false });
   const linkedVisitors = sortVisitorsByAge(
     linkedVisitorIds
       .map((visitorId) => {
@@ -1352,6 +1373,7 @@ export async function getVisitasPage(options?: {
   page?: number;
   pageSize?: number;
   availability?: "all" | "active" | "unavailable";
+  includeHistory?: boolean;
 }): Promise<PaginatedResult<VisitorRecord>> {
   const supabase = await createServerSupabaseClient();
   const query = options?.query?.trim() ?? "";
@@ -1361,6 +1383,7 @@ export async function getVisitasPage(options?: {
   const to = from + pageSize - 1;
   const normalized = query.toLowerCase();
   const availability = options?.availability ?? "all";
+  const includeHistory = options?.includeHistory ?? true;
 
   let matchingVisitorIds: string[] | null = null;
 
@@ -1439,7 +1462,12 @@ export async function getVisitasPage(options?: {
   }
 
   const visitorIds = data.map((item) => item.id);
-  const { historyMap, detailedHistoryMap } = await getVisitorHistoryData(supabase, visitorIds);
+  const { historyMap, detailedHistoryMap } = includeHistory
+    ? await getVisitorHistoryData(supabase, visitorIds)
+    : {
+        historyMap: new Map<string, string[]>(),
+        detailedHistoryMap: new Map<string, VisitorHistoryEntry[]>()
+      };
   const relationRows: Array<{ visita_id: string; interno_id: string }> = [];
 
   for (const chunk of splitIntoChunks(visitorIds)) {
@@ -1530,6 +1558,43 @@ export async function getBetadas(): Promise<BetadaRecord[]> {
     activo: Boolean(item.activo),
     createdAt: item.created_at
   }));
+}
+
+export async function getVisitorRecordById(visitorId: string): Promise<VisitorRecord | null> {
+  const normalizedVisitorId = visitorId.trim();
+  if (!normalizedVisitorId) {
+    return null;
+  }
+
+  const supabase = await createServerSupabaseClient();
+  const { data, error } = await supabase
+    .from("visitas")
+    .select("id, nombreCompleto, fecha_nacimiento, fecha_betada, edad, menor, sexo, parentesco, betada, telefono, notas, created_at, updated_at")
+    .eq("id", normalizedVisitorId)
+    .maybeSingle();
+
+  if (error || !data) {
+    return null;
+  }
+
+  const visitorsMap = await getVisitorsMap(supabase, [normalizedVisitorId]);
+  const visitor = visitorsMap.get(normalizedVisitorId) ?? mapVisitorRecord(data);
+  const { data: relationRows } = await supabase
+    .from("interno_visitas")
+    .select("visita_id, interno_id")
+    .eq("visita_id", normalizedVisitorId);
+
+  const relationInternalIds = [...new Set((relationRows ?? []).map((item) => item.interno_id))];
+  const relationInternalsMap = await getInternosMap(supabase, relationInternalIds);
+  const currentRelation = (relationRows ?? []).find((item) => relationInternalsMap.has(item.interno_id));
+  const currentInternal = currentRelation ? relationInternalsMap.get(currentRelation.interno_id) : undefined;
+
+  return {
+    ...visitor,
+    currentInternalId: currentRelation?.interno_id,
+    currentInternalName: currentInternal?.fullName,
+    currentInternalLocation: currentInternal?.ubicacion
+  };
 }
 
 export async function getFechas(): Promise<DateRecord[]> {
@@ -1632,6 +1697,7 @@ export async function getDateByValue(dateValue: string): Promise<DateRecord | nu
 export async function getListado(filters?: {
   fechaVisita?: string;
   area?: "618" | "INTIMA";
+  internalIds?: string[];
 }): Promise<ListingRecord[]> {
   const supabase = await createServerSupabaseClient();
   let query = supabase
@@ -1648,6 +1714,10 @@ export async function getListado(filters?: {
 
   if (filters?.area) {
     query = query.eq("apartado", filters.area);
+  }
+
+  if (filters?.internalIds?.length) {
+    query = query.in("interno_id", [...new Set(filters.internalIds)]);
   }
 
   const { data, error } = await query;
@@ -1681,8 +1751,8 @@ export async function getInternalProfiles(options?: {
 
   const internalIds = internos.map((item) => item.id);
   const [nextDatePasses, openDatePasses] = await Promise.all([
-    nextDate ? getListado({ fechaVisita: nextDate.fechaCompleta }) : Promise.resolve([]),
-    openDate ? getListado({ fechaVisita: openDate.fechaCompleta }) : Promise.resolve([])
+    nextDate ? getListado({ fechaVisita: nextDate.fechaCompleta, internalIds }) : Promise.resolve([]),
+    openDate ? getListado({ fechaVisita: openDate.fechaCompleta, internalIds }) : Promise.resolve([])
   ]);
 
   const [
@@ -1735,7 +1805,7 @@ export async function getInternalProfiles(options?: {
               return { data: rows, error: null };
             })()
           : Promise.resolve({ data: [], error: null }),
-        includeHistory ? getListado() : Promise.resolve([]),
+        includeHistory ? getListado({ internalIds }) : Promise.resolve([]),
         includeHistory && internalIds.length
           ? supabase
               .from("internal_devices")
@@ -1842,7 +1912,7 @@ export async function getInternalProfiles(options?: {
   }
 
   const visitorIds = [...new Set((relationRows ?? []).map((item) => item.visita_id))];
-  const visitorsMap = await getVisitorsMap(supabase, visitorIds);
+  const visitorsMap = await getVisitorsMap(supabase, visitorIds, { includeHistory: false });
   const relationMap = new Map<string, InternalVisitorLink[]>();
 
   (relationRows ?? []).forEach((item) => {

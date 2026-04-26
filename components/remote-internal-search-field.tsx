@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useDeferredValue, useEffect, useMemo, useState } from "react";
 import { InternalSearchOption } from "@/lib/types";
@@ -18,7 +18,7 @@ export function RemoteInternalSearchField({
   name,
   selected,
   onSelect,
-  placeholder = "Buscar interno por nombre o ubicacion",
+  placeholder = "Buscar interno por nombre o ubicación",
   disabled = false,
   excludeIds = [],
   emptySelectionLabel = "Vacante",
@@ -125,7 +125,7 @@ export function RemoteInternalSearchField({
           </button>
         ) : null}
         {!deferredQuery.trim() ? (
-          <div className="inline-search-empty">Escribe parte del nombre o la ubicacion.</div>
+          <div className="inline-search-empty">Escribe parte del nombre o la ubicación.</div>
         ) : loading ? (
           <div className="inline-search-empty">Loading...</div>
         ) : error ? (
@@ -166,3 +166,4 @@ export function RemoteInternalSearchField({
     </div>
   );
 }
+

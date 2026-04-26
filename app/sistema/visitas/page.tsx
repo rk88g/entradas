@@ -34,7 +34,8 @@ export default async function VisitasPage({
     query,
     page,
     pageSize: 100,
-    availability
+    availability,
+    includeHistory: false
   });
   return (
     <VisitorManager

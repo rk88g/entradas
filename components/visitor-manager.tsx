@@ -1,4 +1,4 @@
-"use client";
+﻿"use client";
 
 import { useActionState, useEffect, useRef, useState } from "react";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
@@ -30,6 +30,11 @@ function formatCurrentInternalLabel(name?: string | null, location?: string | nu
   }
 
   return normalizedLocation ? `${normalizedName} [${normalizedLocation}]` : normalizedName;
+}
+
+function navigateToSearchTarget(pathname: string, params: URLSearchParams) {
+  const target = params.size ? `${pathname}?${params.toString()}` : pathname;
+  window.location.assign(target);
 }
 
 function getEstimatedBirthDateFromAge(ageValue: string) {
@@ -76,13 +81,17 @@ export function VisitorManager({
   const [selectedCreateInternal, setSelectedCreateInternal] = useState<InternalSearchOption | null>(null);
   const [searchLoading, setSearchLoading] = useState(false);
   const [screenLoading, setScreenLoading] = useState(false);
+  const [detailLoading, setDetailLoading] = useState(false);
+  const [visitorDetailsCache, setVisitorDetailsCache] = useState<Record<string, VisitorRecord>>({});
   const [birthInputMode, setBirthInputMode] = useState<"fecha" | "edad">("edad");
   const [ageInput, setAgeInput] = useState("");
   const [createState, createAction, createPending] = useActionState(createVisitorAction, mutationInitialState);
   const [reassignState, reassignAction, reassignPending] = useActionState(reassignVisitorAction, mutationInitialState);
   const createFormRef = useRef<HTMLFormElement>(null);
 
-  const selectedVisitor = visitors.find((visitor) => visitor.id === selectedVisitorId) ?? null;
+  const selectedVisitorSummary = visitors.find((visitor) => visitor.id === selectedVisitorId) ?? null;
+  const selectedVisitor = (selectedVisitorId ? visitorDetailsCache[selectedVisitorId] : null) ?? selectedVisitorSummary ?? null;
+  const selectedVisitorHasDetail = Boolean(selectedVisitorId && visitorDetailsCache[selectedVisitorId]);
   const canReassign = roleKey === "super-admin";
   const canManageAvailability = roleKey === "super-admin" || roleKey === "control";
   const canUseFallbackParentesco = canManageAvailability;
@@ -99,6 +108,7 @@ export function VisitorManager({
       setSelectedCreateInternal(null);
       setBirthInputMode("fecha");
       setAgeInput("");
+      setVisitorDetailsCache({});
       router.refresh();
     }
   }, [createState.success, router]);
@@ -106,6 +116,7 @@ export function VisitorManager({
   useEffect(() => {
     if (reassignState.success) {
       setSelectedReassignInternal(null);
+      setVisitorDetailsCache({});
       router.refresh();
     }
   }, [reassignState.success, router]);
@@ -113,13 +124,62 @@ export function VisitorManager({
   useEffect(() => {
     setQueryInput(query);
     setSearchLoading(false);
-  }, [query, page, totalPages]);
+    setSelectedVisitorId((current) =>
+      current && visitors.some((visitor) => visitor.id === current) ? current : (visitors[0]?.id ?? null)
+    );
+  }, [query, page, totalPages, visitors]);
 
   useEffect(() => {
     if (!createPending && !reassignPending) {
       setScreenLoading(false);
     }
   }, [createPending, reassignPending]);
+
+  useEffect(() => {
+    if (!selectedVisitorId || visitorDetailsCache[selectedVisitorId]) {
+      setDetailLoading(false);
+      return;
+    }
+
+    const visitorId = selectedVisitorId;
+    const controller = new AbortController();
+    let active = true;
+
+    async function fetchVisitorDetail() {
+      try {
+        setDetailLoading(true);
+        const response = await fetch(`/api/visitors/${visitorId}`, {
+          cache: "no-store",
+          signal: controller.signal
+        });
+
+        if (!response.ok) {
+          return;
+        }
+
+        const payload = (await response.json()) as VisitorRecord;
+        if (!active) {
+          return;
+        }
+
+        setVisitorDetailsCache((current) => ({
+          ...current,
+          [visitorId]: payload
+        }));
+      } finally {
+        if (active) {
+          setDetailLoading(false);
+        }
+      }
+    }
+
+    void fetchVisitorDetail();
+
+    return () => {
+      active = false;
+      controller.abort();
+    };
+  }, [selectedVisitorId, visitorDetailsCache]);
 
   function toggleSection(sectionKey: string) {
     setSectionsOpen((current) => ({
@@ -148,7 +208,7 @@ export function VisitorManager({
       params.set("page", String(nextPage));
     }
 
-    router.replace(params.size ? `${pathname}?${params.toString()}` : pathname, { scroll: false });
+    navigateToSearchTarget(pathname, params);
   }
 
   function applySearch(rawValue: string) {
@@ -166,7 +226,7 @@ export function VisitorManager({
       params.delete("q");
     }
     params.delete("page");
-    router.replace(params.size ? `${pathname}?${params.toString()}` : pathname, { scroll: false });
+    navigateToSearchTarget(pathname, params);
   }
 
   function openSupportTicketForVisitor() {
@@ -191,7 +251,7 @@ export function VisitorManager({
 
   return (
     <section className="module-grid module-grid-single">
-      <FullscreenLoading active={searchLoading || screenLoading || createPending || reassignPending} />
+      <FullscreenLoading active={screenLoading || createPending || reassignPending} />
       <article className="data-card">
         <div className="actions-row" style={{ justifyContent: "space-between", alignItems: "center", marginBottom: "0.8rem" }}>
           <strong className="section-title">{title}</strong>
@@ -308,6 +368,10 @@ export function VisitorManager({
               </button>
             </div>
 
+            {detailLoading && !selectedVisitorHasDetail ? (
+              <span className="muted">Loading detalle de la visita...</span>
+            ) : null}
+
             <article className="data-card section-collapse">
               <button type="button" className="button-soft collapse-trigger" onClick={() => toggleSection("perfil")}>
                 <span>Perfil de visita</span>
@@ -346,7 +410,7 @@ export function VisitorManager({
                       selectedVisitor.historial.map((entry) => (
                         <div key={entry.id} className="record-pill">
                           <strong>{maskPrivateText(entry.internalName, selectedVisitorIsSensitive)}</strong>
-                          <span>{entry.type === "reasignacion" ? "Reasignacion" : "Visita"} · {formatHistoryDate(entry.date)}</span>
+                          <span>{entry.type === "reasignacion" ? "Reasignación" : "Visita"} · {formatHistoryDate(entry.date)}</span>
                         </div>
                       ))
                     )}
@@ -399,7 +463,7 @@ export function VisitorManager({
                           name="interno_id"
                           selected={selectedReassignInternal}
                           onSelect={setSelectedReassignInternal}
-                          placeholder="Buscar interno por nombre o ubicacion"
+                          placeholder="Buscar interno por nombre o ubicación"
                           excludeIds={selectedVisitor.currentInternalId ? [selectedVisitor.currentInternalId] : []}
                         />
                       </div>
@@ -436,7 +500,7 @@ export function VisitorManager({
                     name="interno_id"
                     selected={selectedCreateInternal}
                     onSelect={setSelectedCreateInternal}
-                    placeholder="Buscar interno por nombre o ubicacion"
+                    placeholder="Buscar interno por nombre o ubicación"
                   />
 
                   <div className="field" style={{ gridColumn: "1 / -1" }}><input name="nombreCompleto" placeholder="Nombre completo" autoComplete="off" required /></div>
@@ -509,3 +573,4 @@ export function VisitorManager({
     </section>
   );
 }
+

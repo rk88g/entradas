@@ -1804,6 +1804,314 @@ html[data-theme="dark"] .admin-tab.active {
   line-height: 1.25;
 }
 
+.wizard-quick-board {
+  display: grid;
+  gap: 1rem;
+}
+
+.wizard-target-panel,
+.wizard-chip-section {
+  display: grid;
+  gap: 0.7rem;
+  padding: 0.95rem 1rem;
+  border-radius: 20px;
+  border: 1px solid rgba(15, 23, 42, 0.08);
+  background: rgba(255, 255, 255, 0.78);
+}
+
+.wizard-step-nav {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+}
+
+.wizard-step-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.55rem;
+  padding: 0.7rem 1rem;
+  border-radius: 999px;
+  border: 1px solid rgba(15, 23, 42, 0.14);
+  background: rgba(255, 255, 255, 0.94);
+  color: var(--ink);
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.wizard-step-pill-index {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.65rem;
+  height: 1.65rem;
+  border-radius: 999px;
+  background: rgba(15, 23, 42, 0.08);
+  font-size: 0.83rem;
+  font-weight: 900;
+}
+
+.wizard-step-pill.active {
+  border-color: rgba(10, 28, 54, 0.92);
+  background: rgba(10, 28, 54, 0.92);
+  color: #fff;
+  box-shadow: 0 12px 26px rgba(10, 28, 54, 0.18);
+}
+
+.wizard-step-pill.active .wizard-step-pill-index {
+  background: rgba(255, 255, 255, 0.18);
+  color: #fff;
+}
+
+.wizard-step-pill.done {
+  border-color: rgba(21, 128, 61, 0.28);
+  background: rgba(240, 253, 244, 0.96);
+  color: #166534;
+}
+
+.wizard-step-pill.done .wizard-step-pill-index {
+  background: rgba(22, 101, 52, 0.1);
+  color: #166534;
+}
+
+.wizard-target-header,
+.wizard-chip-header {
+  display: grid;
+  gap: 0.18rem;
+}
+
+.wizard-target-chip-row,
+.wizard-chip-row,
+.wizard-selected-chip-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.55rem;
+}
+
+.wizard-target-chip,
+.wizard-option-chip,
+.wizard-selected-chip {
+  position: relative;
+  border: 1px solid rgba(15, 23, 42, 0.12);
+  background: rgba(255, 255, 255, 0.96);
+  color: var(--ink);
+  border-radius: 999px;
+  font: inherit;
+}
+
+.wizard-target-chip,
+.wizard-option-chip {
+  padding: 0.65rem 0.95rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: transform 140ms ease, box-shadow 140ms ease, border-color 140ms ease;
+}
+
+.wizard-target-chip:hover,
+.wizard-option-chip:hover {
+  transform: translateY(-1px);
+}
+
+.wizard-target-chip.active {
+  border-color: rgba(10, 28, 54, 0.92);
+  background: rgba(10, 28, 54, 0.92);
+  color: #fff;
+  box-shadow: 0 12px 26px rgba(10, 28, 54, 0.18);
+}
+
+.wizard-option-chip.selected {
+  border-width: 2px;
+  border-color: #d97706;
+  background: linear-gradient(180deg, #fff7ed 0%, #ffedd5 100%);
+  color: #9a3412;
+  box-shadow:
+    0 0 0 3px rgba(217, 119, 6, 0.16),
+    0 12px 28px rgba(217, 119, 6, 0.18);
+  transform: translateY(-1px);
+}
+
+.wizard-option-chip.selected::after {
+  content: "✓";
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.2rem;
+  height: 1.2rem;
+  margin-left: 0.45rem;
+  border-radius: 999px;
+  background: rgba(217, 119, 6, 0.14);
+  color: #9a3412;
+  font-size: 0.82rem;
+  font-weight: 900;
+}
+
+.wizard-option-chip-special.selected {
+  border-width: 2px;
+  border-color: #c23030;
+  background: linear-gradient(180deg, #fff1f2 0%, #ffe4e6 100%);
+  color: #9f1239;
+  box-shadow:
+    0 0 0 3px rgba(194, 48, 48, 0.14),
+    0 12px 28px rgba(194, 48, 48, 0.16);
+  transform: translateY(-1px);
+}
+
+.wizard-option-chip-special.selected::after {
+  content: "✓";
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.2rem;
+  height: 1.2rem;
+  margin-left: 0.45rem;
+  border-radius: 999px;
+  background: rgba(194, 48, 48, 0.14);
+  color: #9f1239;
+  font-size: 0.82rem;
+  font-weight: 900;
+}
+
+.wizard-active-target-copy {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.45rem;
+  align-items: center;
+  color: var(--muted);
+}
+
+.wizard-chip-group-grid {
+  display: grid;
+  gap: 0.8rem;
+}
+
+.wizard-chip-group {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.wizard-chip-group-label {
+  color: var(--muted);
+  font-size: 0.83rem;
+  font-weight: 800;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.wizard-inline-special {
+  display: grid;
+  gap: 0.75rem;
+  padding: 0.9rem 1rem;
+  border-radius: 18px;
+  border: 1px solid rgba(194, 48, 48, 0.22);
+  background: rgba(254, 242, 242, 0.94);
+}
+
+.wizard-inline-special-copy {
+  display: grid;
+  gap: 0.15rem;
+}
+
+.wizard-inline-special-copy span {
+  color: var(--muted);
+}
+
+.wizard-inline-special-controls {
+  display: grid;
+  gap: 0.65rem;
+}
+
+.wizard-inline-counter {
+  display: grid;
+  gap: 0.45rem;
+}
+
+.wizard-inline-counter-ui {
+  display: inline-grid;
+  grid-template-columns: auto minmax(70px, 90px) auto;
+  gap: 0.45rem;
+  align-items: center;
+}
+
+.wizard-inline-counter-ui input {
+  text-align: center;
+}
+
+.wizard-inline-detail {
+  width: 100%;
+}
+
+.wizard-inline-actions {
+  justify-content: flex-start;
+}
+
+.wizard-selected-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.55rem 0.85rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.wizard-selected-chip-basicas {
+  border-color: rgba(217, 119, 6, 0.34);
+  background: rgba(255, 247, 237, 0.96);
+}
+
+.wizard-selected-chip-especiales {
+  border-color: rgba(194, 48, 48, 0.3);
+  background: rgba(254, 242, 242, 0.96);
+}
+
+.wizard-preview-grid {
+  display: grid;
+  gap: 0.9rem;
+}
+
+.wizard-step-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.8rem;
+  margin-top: 0.4rem;
+}
+
+.wizard-pass-preview-card {
+  gap: 0.55rem;
+}
+
+.wizard-pass-preview-card .apoyo-pass-line {
+  white-space: pre-wrap;
+}
+
+.wizard-pass-approval {
+  display: inline-flex;
+  align-items: flex-start;
+  gap: 0.7rem;
+  font-weight: 700;
+  color: var(--ink);
+}
+
+.wizard-pass-approval-warning {
+  margin-bottom: 0.85rem;
+}
+
+.wizard-pass-approval input {
+  margin-top: 0;
+}
+
+.wizard-pass-approval .switch-ui {
+  margin-top: 0.05rem;
+  flex-shrink: 0;
+}
+
+.wizard-pass-approval span:last-child {
+  display: inline-block;
+  max-width: 34rem;
+  line-height: 1.35;
+}
+
 .ticket-badge {
   display: inline-flex;
   align-items: center;
