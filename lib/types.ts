@@ -196,6 +196,50 @@ export interface PassDeviceItem {
   quantity: number;
 }
 
+export type WizardCardType =
+  | "documentacion"
+  | "condicion"
+  | "articulo_basico"
+  | "articulo_especial";
+
+export type WizardCardTarget = "basicas" | "especiales";
+
+export interface PassWizardVisit {
+  visitante_id: string;
+  visitante_nombre: string;
+  parentesco: string;
+  edad: number;
+  menor: boolean;
+  sexo: VisitorSex;
+}
+
+export interface WizardCard {
+  id: string;
+  type: WizardCardType;
+  visitante_id?: string | null;
+  visitante_nombre?: string | null;
+  categoria: string;
+  valor: string;
+  cantidad: number;
+  requiere_revision: boolean;
+  detalle: string;
+  target: WizardCardTarget;
+}
+
+export interface PassWizardState {
+  fecha_visita: string;
+  interno_id: string;
+  ubicacion: string;
+  visitas_seleccionadas: PassWizardVisit[];
+  cards: WizardCard[];
+  menciones_basicas_generadas: string;
+  menciones_especiales_generadas: string;
+  menciones_basicas_manual: string;
+  menciones_especiales_manual: string;
+  menciones_basicas_final: string;
+  menciones_especiales_final: string;
+}
+
 export interface BetadaRecord {
   id: string;
   fullName: string;

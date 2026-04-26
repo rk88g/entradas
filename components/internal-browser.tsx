@@ -12,7 +12,26 @@ import { FullscreenLoading } from "@/components/fullscreen-loading";
 import { LoadingButton } from "@/components/loading-button";
 import { MutationBanner } from "@/components/mutation-banner";
 import { StatusBadge } from "@/components/status-badge";
-import { DateRecord, InternalHistoryPayload, InternalProfile, ModuleDeviceType, MutationState, RoleKey } from "@/lib/types";
+import {
+  DateRecord,
+  InternalHistoryPayload,
+  InternalProfile,
+  ModuleDeviceType,
+  MutationState,
+  PassWizardState,
+  PassWizardVisit,
+  RoleKey,
+  WizardCard
+} from "@/lib/types";
+import {
+  BASIC_ARTICLE_CATALOG,
+  CONDITION_OPTIONS,
+  DOCUMENT_OPTIONS,
+  SPECIAL_ARTICLE_CATALOG,
+  buildPassArticleQuantitiesFromCards,
+  createEmptyWizardState,
+  generateMenciones
+} from "@/lib/pass-wizard";
 import {
   canManageMentions,
   formatLongDate,
@@ -141,6 +160,53 @@ function getMaskedInternalLabel(roleKey: RoleKey, internalId: string, value: str
   return maskPrivateText(value, shouldMaskSensitiveInternal(roleKey, internalId));
 }
 
+const PASS_WIZARD_STEPS = [
+  { key: "visitas", label: "Visitas" },
+  { key: "documentacion", label: "Documentación" },
+  { key: "condiciones", label: "Condiciones" },
+  { key: "articulos", label: "Artículos" },
+  { key: "especiales", label: "Especiales y vista previa" }
+] as const;
+
+const PASS_WIZARD_READ_ONLY_STEPS = [
+  { key: "visitas", label: "Visitas" },
+  { key: "especiales", label: "Vista previa" }
+] as const;
+
+const WIZARD_GENERAL_TARGET = "__general__";
+
+function buildWizardCardId() {
+  if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
+    return crypto.randomUUID();
+  }
+
+  return `wizard-${Date.now()}-${Math.floor(Math.random() * 100000)}`;
+}
+
+function maskWizardVisitorName(value: string, shouldMask: boolean) {
+  return maskPrivateText(value, shouldMask);
+}
+
+function getWizardCardLabel(card: WizardCard, shouldMask: boolean) {
+  const pieces = [card.valor];
+  if (card.cantidad > 1) {
+    pieces.push(`x${card.cantidad}`);
+  }
+  if (card.requiere_revision) {
+    pieces.push("Revisión");
+  }
+  if (card.detalle.trim()) {
+    pieces.push(card.detalle.trim());
+  }
+
+  const title = pieces.join(" · ");
+  if (!card.visitante_nombre) {
+    return title;
+  }
+
+  return `${maskWizardVisitorName(card.visitante_nombre, shouldMask)} · ${title}`;
+}
+
 export function InternalBrowser({
   profiles,
   query,
@@ -192,6 +258,21 @@ export function InternalBrowser({
   const [visitorBirthDateInput, setVisitorBirthDateInput] = useState("");
   const [visitorSexInput, setVisitorSexInput] = useState("");
   const [visitorParentescoInput, setVisitorParentescoInput] = useState("");
+  const [wizardStepIndex, setWizardStepIndex] = useState(0);
+  const [wizardState, setWizardState] = useState<PassWizardState>(createEmptyWizardState());
+  const [wizardAutoSync, setWizardAutoSync] = useState({ basicas: true, especiales: true });
+  const [docVisitorId, setDocVisitorId] = useState("");
+  const [docValue, setDocValue] = useState("");
+  const [conditionVisitorId, setConditionVisitorId] = useState(WIZARD_GENERAL_TARGET);
+  const [conditionValue, setConditionValue] = useState("");
+  const [conditionDetail, setConditionDetail] = useState("");
+  const [basicArticleVisitorId, setBasicArticleVisitorId] = useState(WIZARD_GENERAL_TARGET);
+  const [basicArticleValue, setBasicArticleValue] = useState("");
+  const [specialArticleVisitorId, setSpecialArticleVisitorId] = useState(WIZARD_GENERAL_TARGET);
+  const [specialArticleValue, setSpecialArticleValue] = useState("");
+  const [specialArticleQuantity, setSpecialArticleQuantity] = useState("1");
+  const [specialArticleReview, setSpecialArticleReview] = useState(true);
+  const [specialArticleDetail, setSpecialArticleDetail] = useState("");
   const [createState, createAction, createPending] = useActionState(createInternalAction, mutationInitialState);
   const [passState, passAction, passPending] = useActionState(createPassAction, mutationInitialState);
   const [visitorState, visitorAction, visitorPending] = useActionState(createVisitorAction, mutationInitialState);
@@ -258,6 +339,32 @@ export function InternalBrowser({
   const canSubmitPass =
     Boolean(selected) &&
     !passSubmitIssue;
+  const canCaptureWizardMentions = canManageMentions(roleKey);
+  const wizardSteps = canCaptureWizardMentions ? PASS_WIZARD_STEPS : PASS_WIZARD_READ_ONLY_STEPS;
+  const currentWizardStep = wizardSteps[Math.min(wizardStepIndex, wizardSteps.length - 1)]?.key ?? "visitas";
+  const selectedWizardVisits = useMemo<PassWizardVisit[]>(
+    () =>
+      selectedVisitors
+        .map((item) => ({
+          visitante_id: item.visitaId,
+          visitante_nombre: item.visitor.fullName,
+          parentesco: item.parentesco,
+          edad: item.visitor.edad,
+          menor: item.visitor.menor,
+          sexo: item.visitor.sexo
+        }))
+        .sort((left, right) => right.edad - left.edad),
+    [selectedVisitors]
+  );
+  const wizardArticlePayload = useMemo(
+    () => buildPassArticleQuantitiesFromCards(wizardState.cards, passArticles),
+    [passArticles, wizardState.cards]
+  );
+  const selectedWizardVisitOptions = wizardState.visitas_seleccionadas;
+  const filteredDocumentCards = wizardState.cards.filter((item) => item.type === "documentacion");
+  const filteredConditionCards = wizardState.cards.filter((item) => item.type === "condicion");
+  const filteredBasicArticleCards = wizardState.cards.filter((item) => item.type === "articulo_basico");
+  const filteredSpecialCards = wizardState.cards.filter((item) => item.type === "articulo_especial");
   const hasVisitorBirthValue =
     visitorBirthInputMode === "edad"
       ? Boolean(visitorAgeInput.trim()) && Boolean(getEstimatedBirthDateFromAge(visitorAgeInput))
@@ -277,6 +384,51 @@ export function InternalBrowser({
         passState.success
     );
 
+  function rebuildWizardState(
+    nextBase: PassWizardState,
+    sync = wizardAutoSync
+  ) {
+    const generated = generateMenciones(nextBase);
+    const nextState: PassWizardState = {
+      ...nextBase,
+      menciones_basicas_generadas: generated.menciones_basicas_generadas,
+      menciones_especiales_generadas: generated.menciones_especiales_generadas,
+      menciones_basicas_final: sync.basicas
+        ? generated.menciones_basicas_final
+        : nextBase.menciones_basicas_final,
+      menciones_especiales_final: sync.especiales
+        ? generated.menciones_especiales_final
+        : nextBase.menciones_especiales_final
+    };
+
+    return nextState;
+  }
+
+  function updateWizardState(
+    updater: (current: PassWizardState) => PassWizardState,
+    sync = wizardAutoSync
+  ) {
+    setWizardState((current) => {
+      const next = rebuildWizardState(updater(current), sync);
+      return JSON.stringify(current) === JSON.stringify(next) ? current : next;
+    });
+  }
+
+  function resetWizardAuxiliaryInputs() {
+    setDocVisitorId("");
+    setDocValue("");
+    setConditionVisitorId(WIZARD_GENERAL_TARGET);
+    setConditionValue("");
+    setConditionDetail("");
+    setBasicArticleVisitorId(WIZARD_GENERAL_TARGET);
+    setBasicArticleValue("");
+    setSpecialArticleVisitorId(WIZARD_GENERAL_TARGET);
+    setSpecialArticleValue("");
+    setSpecialArticleQuantity("1");
+    setSpecialArticleReview(true);
+    setSpecialArticleDetail("");
+  }
+
   useEffect(() => {
     if (!passState.success) {
       return;
@@ -293,6 +445,10 @@ export function InternalBrowser({
     }
     pendingPassContextRef.current = null;
     setSelectedVisitorIds([]);
+    setWizardStepIndex(0);
+    setWizardAutoSync({ basicas: true, especiales: true });
+    setWizardState(createEmptyWizardState());
+    resetWizardAuxiliaryInputs();
     router.refresh();
   }, [passState.success, passBannerStateKey, router]);
 
@@ -307,6 +463,43 @@ export function InternalBrowser({
       setPassLocalError(null);
     }
   }, [passSubmitIssue]);
+
+  useEffect(() => {
+    if (!selected) {
+      setWizardState(createEmptyWizardState());
+      return;
+    }
+
+    const allowedVisitorIds = new Set(selectedWizardVisits.map((item) => item.visitante_id));
+    updateWizardState((current) => ({
+      ...current,
+      fecha_visita: selectedDateValue,
+      interno_id: selected.id,
+      ubicacion: selected.ubicacion,
+      visitas_seleccionadas: selectedWizardVisits,
+      cards: current.cards.filter((card) => !card.visitante_id || allowedVisitorIds.has(card.visitante_id))
+    }));
+  }, [selected?.id, selected?.ubicacion, selectedDateValue, selectedWizardVisits]);
+
+  useEffect(() => {
+    const validIds = new Set(selectedWizardVisits.map((item) => item.visitante_id));
+
+    if (docVisitorId && !validIds.has(docVisitorId)) {
+      setDocVisitorId("");
+    }
+
+    if (conditionVisitorId !== WIZARD_GENERAL_TARGET && !validIds.has(conditionVisitorId)) {
+      setConditionVisitorId(WIZARD_GENERAL_TARGET);
+    }
+
+    if (basicArticleVisitorId !== WIZARD_GENERAL_TARGET && !validIds.has(basicArticleVisitorId)) {
+      setBasicArticleVisitorId(WIZARD_GENERAL_TARGET);
+    }
+
+    if (specialArticleVisitorId !== WIZARD_GENERAL_TARGET && !validIds.has(specialArticleVisitorId)) {
+      setSpecialArticleVisitorId(WIZARD_GENERAL_TARGET);
+    }
+  }, [selectedWizardVisits, docVisitorId, conditionVisitorId, basicArticleVisitorId, specialArticleVisitorId]);
 
   useEffect(() => {
     if (visitorState.success) {
@@ -371,23 +564,35 @@ export function InternalBrowser({
     }
   }, [modalInternalId, availableDates, selectedDateValue, roleKey, openDate, nextDate]);
 
+  useEffect(() => {
+    if (wizardStepIndex <= wizardSteps.length - 1) {
+      return;
+    }
+
+    setWizardStepIndex(Math.max(0, wizardSteps.length - 1));
+  }, [wizardStepIndex, wizardSteps.length]);
+
   function openInternalModal(profile: InternalProfile) {
     setModalInternalId(profile.id);
     setSelectedVisitorIds([]);
     setSelectedDateValue(getDefaultDateValue(roleKey, openDate, nextDate, availableDates));
-      setVisitorQuery("");
+    setVisitorQuery("");
     setAllowDuplicatePass(false);
     setPassLocalError(null);
     setHistoryOpen(false);
-      setHistorySections({});
-      setFormSeed((current) => current + 1);
-      setVisitorBirthInputMode("edad");
-      setVisitorNameInput("");
-      setVisitorAgeInput("");
-      setVisitorBirthDateInput("");
-      setVisitorSexInput("");
-      setVisitorParentescoInput("");
-      setModalBannerResetKey((current) => current + 1);
+    setHistorySections({});
+    setFormSeed((current) => current + 1);
+    setVisitorBirthInputMode("edad");
+    setVisitorNameInput("");
+    setVisitorAgeInput("");
+    setVisitorBirthDateInput("");
+    setVisitorSexInput("");
+    setVisitorParentescoInput("");
+    setWizardStepIndex(0);
+    setWizardAutoSync({ basicas: true, especiales: true });
+    setWizardState(createEmptyWizardState());
+    resetWizardAuxiliaryInputs();
+    setModalBannerResetKey((current) => current + 1);
     setRecentCreatedPass(null);
     pendingPassContextRef.current = null;
     handledPassSuccessKeyRef.current = null;
@@ -399,6 +604,129 @@ export function InternalBrowser({
         ? current.filter((item) => item !== visitaId)
         : [...current, visitaId]
     );
+  }
+
+  function appendWizardCard(card: WizardCard) {
+    updateWizardState((current) => ({
+      ...current,
+      cards: [...current.cards, card]
+    }));
+  }
+
+  function removeWizardCard(cardId: string) {
+    updateWizardState((current) => ({
+      ...current,
+      cards: current.cards.filter((card) => card.id !== cardId)
+    }));
+  }
+
+  function handleAddDocumentCard() {
+    const visit = selectedWizardVisitOptions.find((item) => item.visitante_id === docVisitorId);
+    if (!visit || !docValue.trim()) {
+      return;
+    }
+
+    appendWizardCard({
+      id: buildWizardCardId(),
+      type: "documentacion",
+      visitante_id: visit.visitante_id,
+      visitante_nombre: visit.visitante_nombre,
+      categoria: "Documentación",
+      valor: docValue.trim(),
+      cantidad: 1,
+      requiere_revision: false,
+      detalle: "",
+      target: "basicas"
+    });
+    setDocValue("");
+  }
+
+  function handleAddConditionCard() {
+    if (!conditionValue.trim()) {
+      return;
+    }
+
+    const visit =
+      conditionVisitorId === WIZARD_GENERAL_TARGET
+        ? null
+        : selectedWizardVisitOptions.find((item) => item.visitante_id === conditionVisitorId) ?? null;
+
+    appendWizardCard({
+      id: buildWizardCardId(),
+      type: "condicion",
+      visitante_id: visit?.visitante_id ?? null,
+      visitante_nombre: visit?.visitante_nombre ?? null,
+      categoria: "Condiciones",
+      valor: conditionValue.trim(),
+      cantidad: 1,
+      requiere_revision: false,
+      detalle: conditionDetail.trim(),
+      target: "basicas"
+    });
+    setConditionValue("");
+    setConditionDetail("");
+  }
+
+  function handleAddBasicArticleCard() {
+    if (!basicArticleValue.trim()) {
+      return;
+    }
+
+    const visit =
+      basicArticleVisitorId === WIZARD_GENERAL_TARGET
+        ? null
+        : selectedWizardVisitOptions.find((item) => item.visitante_id === basicArticleVisitorId) ?? null;
+
+    appendWizardCard({
+      id: buildWizardCardId(),
+      type: "articulo_basico",
+      visitante_id: visit?.visitante_id ?? null,
+      visitante_nombre: visit?.visitante_nombre ?? null,
+      categoria: "Artículos básicos",
+      valor: basicArticleValue.trim(),
+      cantidad: 1,
+      requiere_revision: false,
+      detalle: "",
+      target: "basicas"
+    });
+    setBasicArticleValue("");
+  }
+
+  function handleAddSpecialCard() {
+    if (!specialArticleValue.trim()) {
+      return;
+    }
+
+    const visit =
+      specialArticleVisitorId === WIZARD_GENERAL_TARGET
+        ? null
+        : selectedWizardVisitOptions.find((item) => item.visitante_id === specialArticleVisitorId) ?? null;
+
+    appendWizardCard({
+      id: buildWizardCardId(),
+      type: "articulo_especial",
+      visitante_id: visit?.visitante_id ?? null,
+      visitante_nombre: visit?.visitante_nombre ?? null,
+      categoria: "Artículos especiales",
+      valor: specialArticleValue.trim(),
+      cantidad: Math.max(1, Number(specialArticleQuantity || 1)),
+      requiere_revision: specialArticleReview,
+      detalle: specialArticleDetail.trim(),
+      target: "especiales"
+    });
+    setSpecialArticleValue("");
+    setSpecialArticleQuantity("1");
+    setSpecialArticleReview(true);
+    setSpecialArticleDetail("");
+  }
+
+  function restoreWizardPreview(target: "basicas" | "especiales") {
+    const nextSync = {
+      basicas: target === "basicas" ? true : wizardAutoSync.basicas,
+      especiales: target === "especiales" ? true : wizardAutoSync.especiales
+    };
+    setWizardAutoSync(nextSync);
+    updateWizardState((current) => current, nextSync);
   }
 
   useEffect(() => {
@@ -503,6 +831,32 @@ export function InternalBrowser({
 
     setModalInternalId(null);
     router.push(`/sistema/tickets?${params.toString()}`);
+  }
+
+  function renderWizardCards(cards: WizardCard[], emptyMessage: string) {
+    if (cards.length === 0) {
+      return <span className="muted">{emptyMessage}</span>;
+    }
+
+    return (
+      <div className="wizard-card-grid">
+        {cards.map((card) => (
+          <div key={card.id} className={`wizard-card wizard-card-${card.target}`}>
+            <div className="wizard-card-copy">
+              <strong>{getWizardCardLabel(card, selectedIsSensitive)}</strong>
+              <small>{card.categoria}</small>
+            </div>
+            <button
+              type="button"
+              className="button-soft wizard-card-remove"
+              onClick={() => removeWizardCard(card.id)}
+            >
+              Quitar
+            </button>
+          </div>
+        ))}
+      </div>
+    );
   }
 
   return (
@@ -639,9 +993,9 @@ export function InternalBrowser({
           >
             <div className="profile-top">
               <div className="record-title">
-                <strong className="section-title">{getMaskedInternalLabel(roleKey, selected.id, selected.fullName)}</strong>
+                <strong className="section-title">{getMaskedInternalLabel(roleKey, selected!.id, selected.fullName)}</strong>
                 <span>
-                  Ubicacion {getMaskedInternalLabel(roleKey, selected.id, selected.ubicacion)} · {maskValue(selected.edad, canViewSensitiveData && !selectedIsSensitive)} años
+                  Ubicacion {getMaskedInternalLabel(roleKey, selected!.id, selected.ubicacion)} · {maskValue(selected.edad, canViewSensitiveData && !selectedIsSensitive)} años
                 </span>
               </div>
               <div className="actions-row">
@@ -696,7 +1050,7 @@ export function InternalBrowser({
                 <MutationBanner state={{ success: null, error: "Debes incluir al menos un adulto en el pase." }} />
               ) : null}
 
-              <section className="two-column-section visitor-columns-section">
+              {false ? <section className="two-column-section visitor-columns-section">
               <div className="field visitor-search-field" style={{ gridColumn: "1 / -1" }}>
                 <input
                   value={visitorQuery}
@@ -734,7 +1088,7 @@ export function InternalBrowser({
                   ))}
                 </div>
               </article>
-              </section>
+              </section> : null}
 
 
               <article className="data-card">
@@ -745,7 +1099,7 @@ export function InternalBrowser({
                   stateKey={visitorBannerStateKey}
                 />
                 <form
-                  key={`visitor-form-${selected.id}-${formSeed}`}
+                  key={`visitor-form-${selected!.id}-${formSeed}`}
                   ref={visitorFormRef}
                   action={visitorAction}
                   className="field-grid"
@@ -755,7 +1109,7 @@ export function InternalBrowser({
                     setScreenLoading(true);
                   }}
                   >
-                    <input type="hidden" name="interno_id" value={selected.id} />
+                    <input type="hidden" name="interno_id" value={selected!.id} />
                     <div className="field" style={{ gridColumn: "1 / -1" }}><input name="nombreCompleto" placeholder="Nombre completo" autoComplete="off" required value={visitorNameInput} onChange={(event) => setVisitorNameInput(event.target.value)} /></div>
                     <div className="field">
                       <select
@@ -823,7 +1177,7 @@ export function InternalBrowser({
               </article>
 
               <article className="data-card">
-                <strong style={{ display: "block", marginBottom: "0.7rem" }}>Crear pase</strong>
+                <strong style={{ display: "block", marginBottom: "0.7rem" }}>Wizard de pase</strong>
                 {passLocalError ? <MutationBanner state={{ success: null, error: passLocalError }} stateKey={`local-pass-${passLocalError}`} /> : null}
                 <MutationBanner
                   state={passState}
@@ -831,7 +1185,7 @@ export function InternalBrowser({
                   stateKey={passBannerStateKey}
                 />
                 <form
-                  key={`pass-form-${selected.id}-${formSeed}`}
+                  key={`pass-form-wizard-${selected!.id}-${formSeed}`}
                   action={passAction}
                   className="field-grid"
                   autoComplete="off"
@@ -847,14 +1201,493 @@ export function InternalBrowser({
                     setPassBannerStateKey((current) => current + 1);
                     pendingPassContextRef.current = selected
                       ? {
-                          internoId: selected.id,
+                          internoId: selected!.id,
                           fechaVisita: selectedDateValue
                         }
                       : null;
                     setScreenLoading(true);
                   }}
                 >
-                      <input type="hidden" name="interno_id" value={selected.id} />
+                  <input type="hidden" name="interno_id" value={selected!.id} />
+                  <input type="hidden" name="fecha_visita" value={selectedDateValue} />
+                  <input type="hidden" name="allow_duplicate_pass" value={allowDuplicatePass ? "true" : "false"} />
+                  <input type="hidden" name="wizard_mode" value="true" />
+                  <input type="hidden" name="menciones" value={wizardState.menciones_basicas_final} />
+                  <input type="hidden" name="especiales" value={wizardState.menciones_especiales_final} />
+                  {selectedVisitorIds.map((visitorId) => (
+                    <input key={visitorId} type="hidden" name="visitor_ids" value={visitorId} />
+                  ))}
+                  {wizardArticlePayload.map((item) => (
+                    <input
+                      key={item.deviceTypeId}
+                      type="hidden"
+                      name={`article_qty_${item.deviceTypeId}`}
+                      value={String(item.quantity)}
+                    />
+                  ))}
+
+                  <div className="wizard-step-strip" style={{ gridColumn: "1 / -1" }}>
+                    {wizardSteps.map((step, index) => (
+                      <button
+                        key={step.key}
+                        type="button"
+                        className={`wizard-step-chip${index === wizardStepIndex ? " active" : ""}`}
+                        onClick={() => setWizardStepIndex(index)}
+                      >
+                        {index + 1}. {step.label}
+                      </button>
+                    ))}
+                  </div>
+
+                  {currentWizardStep === "visitas" ? (
+                    <>
+                      <div className="field">
+                        <label htmlFor="fecha_visita_modal">Fecha del pase</label>
+                        <select
+                          id="fecha_visita_modal"
+                          value={selectedDateValue}
+                          onChange={(event) => setSelectedDateValue(event.target.value)}
+                        >
+                          {availableDates.map((date) => (
+                            <option key={date.id} value={date.fechaCompleta}>
+                              {formatLongDateWithWeekday(date.fechaCompleta)}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+
+                      {roleKey === "super-admin" && selectedPass ? (
+                        <label className="duplicate-pass-approval">
+                          <input
+                            type="checkbox"
+                            className="duplicate-pass-approval-input"
+                            checked={allowDuplicatePass}
+                            onChange={(event) => setAllowDuplicatePass(event.target.checked)}
+                          />
+                          <span className="duplicate-pass-approval-box" aria-hidden="true" />
+                          <span className="duplicate-pass-approval-copy">
+                            <strong>Autorizar pase duplicado</strong>
+                            <small>Generar otro pase para este interno en la misma fecha.</small>
+                          </span>
+                        </label>
+                      ) : null}
+
+                      <div className="field visitor-search-field" style={{ gridColumn: "1 / -1" }}>
+                        <input
+                          value={visitorQuery}
+                          onChange={(event) => setVisitorQuery(event.target.value)}
+                          onKeyDown={(event) => {
+                            if (event.key === "Escape") {
+                              event.preventDefault();
+                              setVisitorQuery("");
+                            }
+                          }}
+                          placeholder="Buscar visita del interno"
+                          autoComplete="off"
+                        />
+                      </div>
+
+                      <section className="two-column-section visitor-columns-section" style={{ gridColumn: "1 / -1" }}>
+                        <article className="data-card visitor-column-card">
+                          <strong style={{ display: "block", marginBottom: "0.7rem" }}>No vendrán</strong>
+                          <div className="visitor-choice-grid visitor-column-list">
+                            {filteredAvailableVisitors.length === 0 ? (
+                              <span className="muted visitor-column-empty">Sin registros.</span>
+                            ) : (
+                              filteredAvailableVisitors.map((item) => (
+                                <button
+                                  key={item.id}
+                                  type="button"
+                                  className="visitor-choice-item available"
+                                  onClick={() => toggleVisitor(item.visitaId)}
+                                >
+                                  <strong>{maskPrivateText(item.visitor.fullName, selectedIsSensitive)}</strong>
+                                  <span className="muted">
+                                    {maskValue(item.visitor.edad, canViewSensitiveData && !selectedIsSensitive)} años
+                                  </span>
+                                </button>
+                              ))
+                            )}
+                          </div>
+                        </article>
+
+                        <article className="data-card visitor-column-card">
+                          <strong style={{ display: "block", marginBottom: "0.7rem" }}>Vendrán</strong>
+                          <div className="visitor-choice-grid visitor-column-list">
+                            {filteredSelectedVisitors.length === 0 ? (
+                              <span className="muted visitor-column-empty">Sin registros.</span>
+                            ) : (
+                              filteredSelectedVisitors.map((item) => (
+                                <button
+                                  key={item.id}
+                                  type="button"
+                                  className="visitor-choice-item selected"
+                                  onClick={() => toggleVisitor(item.visitaId)}
+                                >
+                                  <strong>{maskPrivateText(item.visitor.fullName, selectedIsSensitive)}</strong>
+                                  <span className="muted">
+                                    {maskValue(item.visitor.edad, canViewSensitiveData && !selectedIsSensitive)} años
+                                  </span>
+                                </button>
+                              ))
+                            )}
+                          </div>
+                        </article>
+                      </section>
+
+                      <div className="record-pill" style={{ gridColumn: "1 / -1" }}>
+                        <strong>{selectedVisitors.length} visitas seleccionadas</strong>
+                        <span>{selectedAdults.length} adultos · {Math.max(0, selectedVisitors.length - selectedAdults.length)} menores</span>
+                      </div>
+
+                      {!canCaptureWizardMentions ? (
+                        <div className="record-pill" style={{ gridColumn: "1 / -1" }}>
+                          <strong>Tu rol puede guardar el pase</strong>
+                          <span>Las menciones automáticas quedan reservadas para control y super-admin.</span>
+                        </div>
+                      ) : null}
+                    </>
+                  ) : null}
+
+                  {currentWizardStep === "documentacion" && canCaptureWizardMentions ? (
+                    <>
+                      <div className="field">
+                        <label>Visita</label>
+                        <select value={docVisitorId} onChange={(event) => setDocVisitorId(event.target.value)}>
+                          <option value="">Selecciona visita</option>
+                          {selectedWizardVisitOptions.map((visit) => (
+                            <option key={visit.visitante_id} value={visit.visitante_id}>
+                              {maskWizardVisitorName(visit.visitante_nombre, selectedIsSensitive)}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="field">
+                        <label>Documento</label>
+                        <select value={docValue} onChange={(event) => setDocValue(event.target.value)}>
+                          <option value="">Selecciona documento</option>
+                          {DOCUMENT_OPTIONS.map((item) => (
+                            <option key={item} value={item}>{item}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="actions-row" style={{ gridColumn: "1 / -1" }}>
+                        <button type="button" className="button-soft" onClick={handleAddDocumentCard} disabled={!docVisitorId || !docValue}>
+                          Agregar tarjeta
+                        </button>
+                      </div>
+                      <div style={{ gridColumn: "1 / -1" }}>
+                        {renderWizardCards(filteredDocumentCards, "Sin tarjetas de documentación.")}
+                      </div>
+                    </>
+                  ) : null}
+
+                  {currentWizardStep === "condiciones" && canCaptureWizardMentions ? (
+                    <>
+                      <div className="field">
+                        <label>Aplica a</label>
+                        <select value={conditionVisitorId} onChange={(event) => setConditionVisitorId(event.target.value)}>
+                          <option value={WIZARD_GENERAL_TARGET}>General</option>
+                          {selectedWizardVisitOptions.map((visit) => (
+                            <option key={visit.visitante_id} value={visit.visitante_id}>
+                              {maskWizardVisitorName(visit.visitante_nombre, selectedIsSensitive)}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="field">
+                        <label>Condición</label>
+                        <select value={conditionValue} onChange={(event) => setConditionValue(event.target.value)}>
+                          <option value="">Selecciona condición</option>
+                          {CONDITION_OPTIONS.map((item) => (
+                            <option key={item} value={item}>{item}</option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="field" style={{ gridColumn: "1 / -1" }}>
+                        <input
+                          value={conditionDetail}
+                          onChange={(event) => setConditionDetail(event.target.value)}
+                          placeholder="Detalle opcional"
+                          autoComplete="off"
+                        />
+                      </div>
+                      <div className="actions-row" style={{ gridColumn: "1 / -1" }}>
+                        <button type="button" className="button-soft" onClick={handleAddConditionCard} disabled={!conditionValue}>
+                          Agregar tarjeta
+                        </button>
+                      </div>
+                      <div style={{ gridColumn: "1 / -1" }}>
+                        {renderWizardCards(filteredConditionCards, "Sin tarjetas de condiciones.")}
+                      </div>
+                    </>
+                  ) : null}
+
+                  {currentWizardStep === "articulos" && canCaptureWizardMentions ? (
+                    <>
+                      <div className="field">
+                        <label>Aplica a</label>
+                        <select value={basicArticleVisitorId} onChange={(event) => setBasicArticleVisitorId(event.target.value)}>
+                          <option value={WIZARD_GENERAL_TARGET}>General</option>
+                          {selectedWizardVisitOptions.map((visit) => (
+                            <option key={visit.visitante_id} value={visit.visitante_id}>
+                              {maskWizardVisitorName(visit.visitante_nombre, selectedIsSensitive)}
+                            </option>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="field">
+                        <label>Artículo básico</label>
+                        <select value={basicArticleValue} onChange={(event) => setBasicArticleValue(event.target.value)}>
+                          <option value="">Selecciona artículo</option>
+                          {BASIC_ARTICLE_CATALOG.map((group) => (
+                            <optgroup key={group.group} label={group.group}>
+                              {group.items.map((item) => (
+                                <option key={item} value={item}>{item}</option>
+                              ))}
+                            </optgroup>
+                          ))}
+                        </select>
+                      </div>
+                      <div className="actions-row" style={{ gridColumn: "1 / -1" }}>
+                        <button type="button" className="button-soft" onClick={handleAddBasicArticleCard} disabled={!basicArticleValue}>
+                          Agregar tarjeta
+                        </button>
+                      </div>
+                      <div style={{ gridColumn: "1 / -1" }}>
+                        {renderWizardCards(filteredBasicArticleCards, "Sin artículos básicos.")}
+                      </div>
+                    </>
+                  ) : null}
+
+                  {currentWizardStep === "especiales" ? (
+                    <>
+                      {canCaptureWizardMentions ? (
+                        <>
+                          <div className="field">
+                            <label>Aplica a</label>
+                            <select value={specialArticleVisitorId} onChange={(event) => setSpecialArticleVisitorId(event.target.value)}>
+                              <option value={WIZARD_GENERAL_TARGET}>General</option>
+                              {selectedWizardVisitOptions.map((visit) => (
+                                <option key={visit.visitante_id} value={visit.visitante_id}>
+                                  {maskWizardVisitorName(visit.visitante_nombre, selectedIsSensitive)}
+                                </option>
+                              ))}
+                            </select>
+                          </div>
+                          <div className="field">
+                            <label>Artículo especial</label>
+                            <select
+                              value={specialArticleValue}
+                              onChange={(event) => setSpecialArticleValue(event.target.value)}
+                            >
+                              <option value="">Selecciona artículo</option>
+                              {SPECIAL_ARTICLE_CATALOG.map((group) => (
+                                <optgroup key={group.group} label={group.group}>
+                                  {group.items.map((item) => (
+                                    <option key={item} value={item}>{item}</option>
+                                  ))}
+                                </optgroup>
+                              ))}
+                            </select>
+                          </div>
+                          <div className="field">
+                            <label>Cantidad</label>
+                            <input
+                              type="number"
+                              min="1"
+                              value={specialArticleQuantity}
+                              onChange={(event) => setSpecialArticleQuantity(event.target.value)}
+                              autoComplete="off"
+                            />
+                          </div>
+                          <label className="duplicate-pass-approval">
+                            <input
+                              type="checkbox"
+                              className="duplicate-pass-approval-input"
+                              checked={specialArticleReview}
+                              onChange={(event) => setSpecialArticleReview(event.target.checked)}
+                            />
+                            <span className="duplicate-pass-approval-box" aria-hidden="true" />
+                            <span className="duplicate-pass-approval-copy">
+                              <strong>Requiere revisión</strong>
+                              <small>Úsalo para marcar aparatos u objetos especiales.</small>
+                            </span>
+                          </label>
+                          <div className="field" style={{ gridColumn: "1 / -1" }}>
+                            <input
+                              value={specialArticleDetail}
+                              onChange={(event) => setSpecialArticleDetail(event.target.value)}
+                              placeholder="Detalle opcional"
+                              autoComplete="off"
+                            />
+                          </div>
+                          <div className="actions-row" style={{ gridColumn: "1 / -1" }}>
+                            <button
+                              type="button"
+                              className="button-soft"
+                              onClick={handleAddSpecialCard}
+                              disabled={!specialArticleValue}
+                            >
+                              Agregar tarjeta
+                            </button>
+                          </div>
+                          <div style={{ gridColumn: "1 / -1" }}>
+                            {renderWizardCards(filteredSpecialCards, "Sin artículos especiales.")}
+                          </div>
+
+                          <div className="field" style={{ gridColumn: "1 / -1" }}>
+                            <label>Peticiones básicas manuales</label>
+                            <textarea
+                              value={wizardState.menciones_basicas_manual}
+                              onChange={(event) =>
+                                updateWizardState((current) => ({
+                                  ...current,
+                                  menciones_basicas_manual: event.target.value
+                                }))
+                              }
+                              placeholder="Texto adicional para básicas"
+                              autoComplete="off"
+                              style={{ borderColor: "#d97706", boxShadow: "0 0 0 3px rgba(217,119,6,0.10)" }}
+                            />
+                          </div>
+                          <div className="field" style={{ gridColumn: "1 / -1" }}>
+                            <label>Peticiones especiales manuales</label>
+                            <textarea
+                              value={wizardState.menciones_especiales_manual}
+                              onChange={(event) =>
+                                updateWizardState((current) => ({
+                                  ...current,
+                                  menciones_especiales_manual: event.target.value
+                                }))
+                              }
+                              placeholder="Texto adicional para especiales"
+                              autoComplete="off"
+                              style={{ borderColor: "#c23030", boxShadow: "0 0 0 3px rgba(194,48,48,0.10)" }}
+                            />
+                          </div>
+
+                          <div className="field" style={{ gridColumn: "1 / -1" }}>
+                            <label>Generado básicas</label>
+                            <textarea value={wizardState.menciones_basicas_generadas} readOnly />
+                          </div>
+                          <div className="field" style={{ gridColumn: "1 / -1" }}>
+                            <label>Generado especiales</label>
+                            <textarea value={wizardState.menciones_especiales_generadas} readOnly />
+                          </div>
+
+                          <div className="field" style={{ gridColumn: "1 / -1" }}>
+                            <div className="actions-row" style={{ justifyContent: "space-between", marginBottom: "0.4rem" }}>
+                              <label style={{ marginBottom: 0 }}>Menciones básicas finales</label>
+                              <button type="button" className="button-soft" onClick={() => restoreWizardPreview("basicas")}>
+                                Restaurar vista previa
+                              </button>
+                            </div>
+                            <textarea
+                              value={wizardState.menciones_basicas_final}
+                              onChange={(event) => {
+                                setWizardAutoSync((current) => ({ ...current, basicas: false }));
+                                setWizardState((current) => ({
+                                  ...current,
+                                  menciones_basicas_final: event.target.value
+                                }));
+                              }}
+                              placeholder="Vista final de menciones básicas"
+                              autoComplete="off"
+                              style={{ borderColor: "#d97706", boxShadow: "0 0 0 3px rgba(217,119,6,0.10)" }}
+                            />
+                          </div>
+                          <div className="field" style={{ gridColumn: "1 / -1" }}>
+                            <div className="actions-row" style={{ justifyContent: "space-between", marginBottom: "0.4rem" }}>
+                              <label style={{ marginBottom: 0 }}>Menciones especiales finales</label>
+                              <button type="button" className="button-soft" onClick={() => restoreWizardPreview("especiales")}>
+                                Restaurar vista previa
+                              </button>
+                            </div>
+                            <textarea
+                              value={wizardState.menciones_especiales_final}
+                              onChange={(event) => {
+                                setWizardAutoSync((current) => ({ ...current, especiales: false }));
+                                setWizardState((current) => ({
+                                  ...current,
+                                  menciones_especiales_final: event.target.value
+                                }));
+                              }}
+                              placeholder="Vista final de menciones especiales"
+                              autoComplete="off"
+                              style={{ borderColor: "#c23030", boxShadow: "0 0 0 3px rgba(194,48,48,0.10)" }}
+                            />
+                          </div>
+                        </>
+                      ) : (
+                        <div className="record-pill" style={{ gridColumn: "1 / -1" }}>
+                          <strong>Vista previa restringida</strong>
+                          <span>Tu rol puede seleccionar visitas y guardar el pase, pero no generar menciones automáticas.</span>
+                        </div>
+                      )}
+                    </>
+                  ) : null}
+
+                  <div className="actions-row" style={{ gridColumn: "1 / -1", justifyContent: "space-between", marginTop: "0.4rem" }}>
+                    <div className="actions-row">
+                      <button
+                        type="button"
+                        className="button-soft"
+                        onClick={() => setWizardStepIndex((current) => Math.max(0, current - 1))}
+                        disabled={wizardStepIndex === 0}
+                      >
+                        Anterior
+                      </button>
+                      <button
+                        type="button"
+                        className="button-soft"
+                        onClick={() => setWizardStepIndex((current) => Math.min(wizardSteps.length - 1, current + 1))}
+                        disabled={wizardStepIndex >= wizardSteps.length - 1}
+                      >
+                        Siguiente
+                      </button>
+                    </div>
+
+                    {canRenderPassButton && currentWizardStep === wizardSteps[wizardSteps.length - 1]?.key ? (
+                      <LoadingButton pending={passPending} label="CREAR PASE" loadingLabel="Loading..." className="button" />
+                    ) : null}
+                  </div>
+                </form>
+              </article>
+
+              {false ? <article className="data-card">
+                <strong style={{ display: "block", marginBottom: "0.7rem" }}>Crear pase</strong>
+                {passLocalError ? <MutationBanner state={{ success: null, error: passLocalError }} stateKey={`local-pass-${passLocalError}`} /> : null}
+                <MutationBanner
+                  state={passState}
+                  resetKey={modalBannerResetKey}
+                  stateKey={passBannerStateKey}
+                />
+                <form
+                  key={`pass-form-${selected!.id}-${formSeed}`}
+                  action={passAction}
+                  className="field-grid"
+                  autoComplete="off"
+                  onSubmitCapture={(event) => {
+                    if (!canSubmitPass) {
+                      event.preventDefault();
+                      setPassLocalError(passSubmitIssue ?? "No se puede crear el pase todavia.");
+                      setScreenLoading(false);
+                      return;
+                    }
+
+                    setPassLocalError(null);
+                    setPassBannerStateKey((current) => current + 1);
+                    pendingPassContextRef.current = selected
+                      ? {
+                          internoId: selected!.id,
+                          fechaVisita: selectedDateValue
+                        }
+                      : null;
+                    setScreenLoading(true);
+                  }}
+                >
+                      <input type="hidden" name="interno_id" value={selected!.id} />
                       <input type="hidden" name="fecha_visita" value={selectedDateValue} />
                       <input type="hidden" name="allow_duplicate_pass" value={allowDuplicatePass ? "true" : "false"} />
                       {selectedVisitorIds.map((visitorId) => (
@@ -918,7 +1751,7 @@ export function InternalBrowser({
                         </div>
                       ) : null}
                   </form>
-              </article>
+              </article> : null}
 
               {roleKey === "super-admin" && historyOpen ? (
                 <section className="profile-history-stack">

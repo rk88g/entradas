@@ -2081,6 +2081,7 @@ export async function createPassAction(
     const visitorIds = [...new Set(formData.getAll("visitor_ids").map((item) => String(item).trim()).filter(Boolean))];
     const targetDateValue = String(formData.get("fecha_visita") ?? "").trim();
     const allowDuplicatePass = String(formData.get("allow_duplicate_pass") ?? "").trim() === "true";
+    const wizardMode = String(formData.get("wizard_mode") ?? "").trim() === "true";
     const mentions = capitalizeFirstLetterPerLine(String(formData.get("menciones") ?? ""));
     const specials = capitalizeFirstLetterPerLine(String(formData.get("especiales") ?? ""));
     const typedArticlePayload = await getPassArticlePayload(formData);
@@ -2219,7 +2220,9 @@ export async function createPassAction(
     const orderedVisitors = [...selectedVisitors].sort((a, b) => (b.edad ?? 0) - (a.edad ?? 0));
     const specialText =
       canManageMentions(profile.roleKey)
-        ? appendDeviceSummaryToSpecials(specials, articleSummary)
+        ? wizardMode
+          ? specials || null
+          : appendDeviceSummaryToSpecials(specials, articleSummary)
         : null;
 
       const { data: insertedPass, error: insertError } = await supabase.rpc("create_support_pass", {
@@ -2263,6 +2266,7 @@ export async function createPassAction(
         afterData: {
           internoId: internoId,
           fechaVisita: targetDate.fechaCompleta,
+          wizardMode,
           duplicateAuthorized: Boolean(existingPass && allowDuplicatePass && profile.roleKey === "super-admin"),
           visitorIds,
           mentions,
