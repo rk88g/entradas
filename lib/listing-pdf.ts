@@ -738,18 +738,48 @@ function drawMainListingCard(options: {
 
 function getSexSections(pass: ListingRecord) {
   const { visibleVisitors, underTwelveCount } = getVisibleVisitors(pass);
-  const hasMen = visibleVisitors.some((visitor) => visitor.sexo === "hombre");
-  const hasWomen = visibleVisitors.some((visitor) => visitor.sexo !== "hombre");
-  const men = visibleVisitors.filter(
-    (visitor) => visitor.sexo === "hombre" || (hasMen && visitor.edad >= 16 && visitor.edad < 18)
+  const adultMen = visibleVisitors.filter((visitor) => visitor.sexo === "hombre" && visitor.edad >= 18);
+  const adultWomen = visibleVisitors.filter((visitor) => visitor.sexo !== "hombre" && visitor.edad >= 18);
+  const olderMinorBoys = visibleVisitors.filter(
+    (visitor) => visitor.sexo === "hombre" && visitor.edad > 12 && visitor.edad < 18
   );
-  const womenAndTeens = visibleVisitors.filter((visitor) => !men.some((item) => item.visitorId === visitor.visitorId));
-  const menChildrenCount = underTwelveCount > 0 && men.length > 0 && !hasWomen ? underTwelveCount : 0;
-  const womenChildrenCount = underTwelveCount > 0 ? (menChildrenCount > 0 ? 0 : underTwelveCount) : 0;
+  const otherVisibleMinors = visibleVisitors.filter(
+    (visitor) => visitor.edad < 18 && !olderMinorBoys.some((item) => item.visitorId === visitor.visitorId)
+  );
+
+  let men = [...adultMen];
+  let women = [...adultWomen];
+  let menChildrenCount = 0;
+  let womenChildrenCount = 0;
+
+  if (adultMen.length > 0 && adultWomen.length > 0) {
+    men = [...adultMen, ...olderMinorBoys];
+    women = [...adultWomen, ...otherVisibleMinors];
+    womenChildrenCount = underTwelveCount;
+  } else if (adultMen.length > 0) {
+    men = [...adultMen, ...visibleVisitors.filter((visitor) => visitor.edad < 18)];
+    women = [];
+    menChildrenCount = underTwelveCount;
+  } else if (adultWomen.length > 0) {
+    men = [];
+    women = [...adultWomen, ...visibleVisitors.filter((visitor) => visitor.edad < 18)];
+    womenChildrenCount = underTwelveCount;
+  } else {
+    const hasVisibleWomen = visibleVisitors.some((visitor) => visitor.sexo !== "hombre");
+    if (hasVisibleWomen) {
+      men = [...olderMinorBoys];
+      women = visibleVisitors.filter((visitor) => !men.some((item) => item.visitorId === visitor.visitorId));
+      womenChildrenCount = underTwelveCount;
+    } else {
+      men = [...visibleVisitors];
+      women = [];
+      menChildrenCount = underTwelveCount;
+    }
+  }
 
   return [
     { key: "men", label: "HOMBRES", visitors: men, childrenCount: menChildrenCount },
-    { key: "women", label: "MUJERES Y MENORES", visitors: womenAndTeens, childrenCount: womenChildrenCount }
+    { key: "women", label: "MUJERES", visitors: women, childrenCount: womenChildrenCount }
   ].filter((section) => section.visitors.length > 0 || section.childrenCount > 0);
 }
 
