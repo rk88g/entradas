@@ -71,13 +71,34 @@ export const BASIC_ARTICLE_CATALOG = [
     ]
   },
   {
-    group: "Ropa",
+    group: "Ropa interno",
     items: [
-      "Ropa permitida",
-      "Cambio ropa",
-      "Calzado",
-      "Gorras",
-      "Textiles"
+      "Camisa",
+      "Pantalon",
+      "Gorra",
+      "Sudadera con gorro",
+      "Sudadera sin gorro",
+      "Ropa interior",
+      "Chamarra con gorro",
+      "Chamarra sin gorro",
+      "Tenis",
+      "Zapatos",
+      "Conjunto"
+    ]
+  },
+  {
+    group: "Ropa visita",
+    items: [
+      "Cambio extra",
+      "Maleta",
+      "Ropa de color",
+      "Mezclilla",
+      "Diseno roto",
+      "Tacones",
+      "Zapatos con plataforma",
+      "Gorra",
+      "Lentes",
+      "Pupilentes"
     ]
   },
   {
@@ -95,10 +116,9 @@ export const BASIC_ARTICLE_CATALOG = [
     group: "Personales",
     items: [
       "Bolsa/mochila",
-      "Cosméticos",
+      "Cosmeticos",
       "Accesorios",
-      "Recipientes",
-      "Carrito"
+      "Extensiones de cabello"
     ]
   }
 ] as const;
@@ -497,6 +517,61 @@ function groupCardsByNormalizedValue(cards: WizardCard[]) {
   }, new Map());
 }
 
+function buildBasicArticlePhrases(cards: WizardCard[]) {
+  const itemIndexes = new Map<string, number>();
+  const itemTexts = new Map<string, string>();
+  const categoryIndexes = new Map<string, number>();
+  const categoryValues = new Map<string, string[]>();
+
+  cards.forEach((card, index) => {
+    const category = sanitizeText(card.categoria).trim();
+    const value = lowerFirst(card.valor);
+
+    if (category === "Ropa interno" || category === "Ropa visita") {
+      if (!categoryIndexes.has(category)) {
+        categoryIndexes.set(category, index);
+      }
+
+      const currentValues = categoryValues.get(category) ?? [];
+      if (!currentValues.includes(value)) {
+        currentValues.push(value);
+      }
+      categoryValues.set(category, currentValues);
+      return;
+    }
+
+    const normalizedValue = normalizeKey(value);
+    if (!itemIndexes.has(normalizedValue)) {
+      itemIndexes.set(normalizedValue, index);
+      itemTexts.set(normalizedValue, value);
+    }
+  });
+
+  const phrases: { index: number; text: string }[] = [];
+
+  itemIndexes.forEach((index, normalizedValue) => {
+    const text = itemTexts.get(normalizedValue);
+    if (text) {
+      phrases.push({ index, text });
+    }
+  });
+
+  categoryValues.forEach((values, category) => {
+    const index = categoryIndexes.get(category);
+    if (index === undefined || values.length === 0) {
+      return;
+    }
+
+    const suffix = category === "Ropa interno" ? "prendas de color permitido" : "ropa de visita";
+    phrases.push({
+      index,
+      text: `(${joinSpanishList(values)}) ${suffix}`
+    });
+  });
+
+  return phrases.sort((left, right) => left.index - right.index).map((phrase) => phrase.text);
+}
+
 function pushWholeCohortSentences(options: {
   visits: PassWizardVisit[];
   visitMap: Map<string, PassWizardVisit>;
@@ -646,12 +721,12 @@ export function generateMenciones(wizardState: PassWizardState) {
   if (generalBasicCards.length > 0) {
     basicSentences.push(
       withPeriod(
-        `Ingresan con ${joinSpanishList(uniquePreserveOrder(generalBasicCards.map((item) => lowerFirst(item.valor))))}`
+        `Ingresan con ${joinSpanishList(buildBasicArticlePhrases(generalBasicCards))}`
       )
     );
   }
 
-  const basicByVisit = new Map<string, string[]>();
+  const basicByVisit = new Map<string, WizardCard[]>();
   sortedCards
     .filter((item) => item.type === "articulo_basico" && item.visitante_id)
     .forEach((card) => {
@@ -661,7 +736,7 @@ export function generateMenciones(wizardState: PassWizardState) {
       }
 
       const current = basicByVisit.get(visit.visitante_id) ?? [];
-      current.push(lowerFirst(card.valor));
+      current.push(card);
       basicByVisit.set(visit.visitante_id, current);
     });
 
@@ -672,7 +747,9 @@ export function generateMenciones(wizardState: PassWizardState) {
       continue;
     }
 
-    const serializedSets = cohortVisits.map((visit) => serializeStringList(basicByVisit.get(visit.visitante_id) ?? []));
+    const serializedSets = cohortVisits.map((visit) =>
+      serializeStringList(buildBasicArticlePhrases(basicByVisit.get(visit.visitante_id) ?? []))
+    );
     const firstSet = serializedSets[0];
     if (!firstSet || firstSet === "[]") {
       continue;
@@ -682,7 +759,7 @@ export function generateMenciones(wizardState: PassWizardState) {
       basicSentences.push(
         withPeriod(
           `${getCohortLabel(cohort)} ingresan con ${joinSpanishList(
-            uniquePreserveOrder(basicByVisit.get(cohortVisits[0].visitante_id) ?? [])
+            buildBasicArticlePhrases(basicByVisit.get(cohortVisits[0].visitante_id) ?? [])
           )}`
         )
       );
@@ -701,7 +778,9 @@ export function generateMenciones(wizardState: PassWizardState) {
     }
 
     basicSentences.push(
-      withPeriod(`${sanitizeText(visit.visitante_nombre)} ingresa con ${joinSpanishList(uniquePreserveOrder(values))}`)
+      withPeriod(
+        `${sanitizeText(visit.visitante_nombre)} ingresa con ${joinSpanishList(buildBasicArticlePhrases(values))}`
+      )
     );
   }
 

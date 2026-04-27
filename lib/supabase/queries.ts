@@ -1389,6 +1389,44 @@ export async function searchInternals(
     .slice(0, limit);
 }
 
+export async function getInternalSearchOptionById(
+  internalId: string,
+  options?: {
+    includeInactive?: boolean;
+  }
+): Promise<InternalSearchOption | null> {
+  const normalized = internalId.trim();
+  if (!normalized) {
+    return null;
+  }
+
+  const supabase = await createServerSupabaseClient();
+  let request = supabase
+    .from("internos")
+    .select("id, nombres, apellido_pat, apellido_mat, ubicacion, estatus")
+    .eq("id", normalized)
+    .limit(1);
+
+  if (!options?.includeInactive) {
+    request = request.eq("estatus", "activo");
+  }
+
+  const { data, error } = await request.maybeSingle();
+  if (error || !data) {
+    return null;
+  }
+
+  const item = mapInternalSearchOption(data);
+  const auditMap = await getLatestInternalAuditMap([item.id]);
+  const audit = auditMap.get(item.id);
+
+  return {
+    ...item,
+    latestChangeAt: audit?.changedAt ?? null,
+    latestChangeDetails: audit?.details ?? []
+  };
+}
+
 export async function searchVisitors(
   query: string,
   options?: {
@@ -1452,6 +1490,50 @@ export async function searchVisitors(
         latestChangeDetails: audit?.details ?? []
       };
   });
+}
+
+export async function getVisitorSearchOptionById(visitorId: string): Promise<VisitorSearchOption | null> {
+  const normalized = visitorId.trim();
+  if (!normalized) {
+    return null;
+  }
+
+  const supabase = await createServerSupabaseClient();
+  const { data, error } = await supabase
+    .from("visitas")
+    .select("id, nombreCompleto, parentesco, edad, betada, fecha_betada, notas")
+    .eq("id", normalized)
+    .limit(1)
+    .maybeSingle();
+
+  if (error || !data) {
+    return null;
+  }
+
+  const { data: relations } = await supabase
+    .from("interno_visitas")
+    .select("visita_id, interno_id")
+    .eq("visita_id", normalized);
+
+  const currentInternalId = relations?.[0]?.interno_id ?? null;
+  const internalsMap = currentInternalId ? await getInternosMap(supabase, [currentInternalId]) : new Map();
+  const currentInternal = currentInternalId ? internalsMap.get(currentInternalId) ?? null : null;
+  const auditMap = await getLatestVisitorAuditMap([normalized]);
+  const audit = auditMap.get(normalized);
+
+  return {
+    id: data.id,
+    fullName: data.nombreCompleto,
+    parentesco: data.parentesco,
+    edad: Number(data.edad ?? 0),
+    currentInternalName: currentInternal?.fullName,
+    currentInternalLocation: currentInternal?.ubicacion,
+    betada: Boolean(data.betada),
+    fechaBetada: data.fecha_betada ?? null,
+    notas: data.notas ?? null,
+    latestChangeAt: audit?.changedAt ?? null,
+    latestChangeDetails: audit?.details ?? []
+  };
 }
 
 export async function getVisitas(): Promise<VisitorRecord[]> {

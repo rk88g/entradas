@@ -362,6 +362,7 @@ export function InternalBrowser({
   const [statusState, statusAction, statusPending] = useActionState(updateInternalStatusAction, mutationInitialState);
   const visitorFormRef = useRef<HTMLFormElement>(null);
   const internalFormRef = useRef<HTMLFormElement>(null);
+  const passPreviewSectionRef = useRef<HTMLElement | null>(null);
   const passPreviewApprovalRef = useRef<HTMLInputElement | null>(null);
   const handledPassSuccessKeyRef = useRef<number | null>(null);
   const pendingPassContextRef = useRef<{ internoId: string; fechaVisita: string } | null>(null);
@@ -1019,8 +1020,9 @@ export function InternalBrowser({
     goToWizardStep(currentWizardStepIndex + 1);
   }
 
-  function focusPassPreviewApproval() {
-    passPreviewApprovalRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+  function focusPassPreviewArea() {
+    passPreviewSectionRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+    passPreviewSectionRef.current?.focus();
     passPreviewApprovalRef.current?.focus();
   }
 
@@ -1488,7 +1490,7 @@ export function InternalBrowser({
                     if (!canSubmitPass) {
                       event.preventDefault();
                       if (requiresPassPreviewAcceptance && !passPreviewAccepted) {
-                        focusPassPreviewApproval();
+                        focusPassPreviewArea();
                       }
                       setPassLocalError(
                         passSubmitIssue ?? (requiresPassPreviewAcceptance && !passPreviewAccepted
@@ -1680,7 +1682,7 @@ export function InternalBrowser({
                       ) : null}
 
                       {currentWizardStep === "documentacion" ? (
-                      <section className="wizard-chip-section">
+                      <section className="wizard-chip-section" ref={passPreviewSectionRef} tabIndex={-1}>
                         <div className="wizard-chip-header">
                           <strong>Documentación</strong>
                         </div>
@@ -1960,11 +1962,6 @@ export function InternalBrowser({
                               state={{ success: null, error: "Falta validar que el pase esté correcto antes de generarlo." }}
                               stateKey="wizard-preview-approval-required"
                             />
-                            <div className="actions-row" style={{ marginTop: "0.6rem" }}>
-                              <button type="button" className="button-soft" onClick={focusPassPreviewApproval}>
-                                Ir al switch de validación
-                              </button>
-                            </div>
                           </div>
                         ) : null}
 
@@ -1983,52 +1980,6 @@ export function InternalBrowser({
 
                       {currentWizardStep === "verificar" ? (
                       <section className="wizard-preview-grid">
-                        {canManageBasicMentions ? (
-                        <div className="field" style={{ gridColumn: "1 / -1" }}>
-                          <label>Menciones basicas generadas</label>
-                          <textarea value={wizardState.menciones_basicas_generadas} readOnly />
-                        </div>
-                        ) : null}
-                        {canManageSpecialMentions ? (
-                        <div className="field" style={{ gridColumn: "1 / -1" }}>
-                          <label>Menciones especiales generadas</label>
-                          <textarea value={wizardState.menciones_especiales_generadas} readOnly />
-                        </div>
-                        ) : null}
-                        {canManageBasicMentions ? (
-                        <div className="field">
-                          <label>Basicas manuales</label>
-                          <textarea
-                            value={wizardState.menciones_basicas_manual}
-                            onChange={(event) =>
-                              updateWizardState((current) => ({
-                                ...current,
-                                menciones_basicas_manual: event.target.value
-                              }))
-                            }
-                            placeholder="Texto adicional para basicas"
-                            autoComplete="off"
-                            style={{ borderColor: "#d97706", boxShadow: "0 0 0 3px rgba(217,119,6,0.10)" }}
-                          />
-                        </div>
-                        ) : null}
-                        {canManageSpecialMentions ? (
-                        <div className="field">
-                          <label>Especiales manuales</label>
-                          <textarea
-                            value={wizardState.menciones_especiales_manual}
-                            onChange={(event) =>
-                              updateWizardState((current) => ({
-                                ...current,
-                                menciones_especiales_manual: event.target.value
-                              }))
-                            }
-                            placeholder="Texto adicional para especiales"
-                            autoComplete="off"
-                            style={{ borderColor: "#c23030", boxShadow: "0 0 0 3px rgba(194,48,48,0.10)" }}
-                          />
-                        </div>
-                        ) : null}
                         {canManageBasicMentions ? (
                         <div className="field" style={{ gridColumn: "1 / -1" }}>
                           <div className="actions-row" style={{ justifyContent: "space-between", marginBottom: "0.4rem" }}>
@@ -2088,7 +2039,7 @@ export function InternalBrowser({
                   <div className="wizard-step-actions" style={{ gridColumn: "1 / -1" }}>
                     <div className="actions-row">
                       {currentWizardStepIndex > 0 ? (
-                        <button type="button" className="button-soft" onClick={goToPreviousWizardStep}>
+                        <button type="button" className="button-soft wizard-back-button" onClick={goToPreviousWizardStep}>
                           Anterior
                         </button>
                       ) : null}
@@ -2098,11 +2049,6 @@ export function InternalBrowser({
                       {canCaptureWizardMentions && currentWizardStep !== "verificar" ? (
                         <button type="button" className="button" onClick={goToNextWizardStep}>
                           {currentWizardStep === "especiales" ? "Verificar pase" : "Siguiente"}
-                        </button>
-                      ) : null}
-                      {canRenderPassButton && currentWizardStep === "verificar" && requiresPassPreviewAcceptance && !passPreviewAccepted ? (
-                        <button type="button" className="button-soft" onClick={focusPassPreviewApproval}>
-                          Validar pase
                         </button>
                       ) : null}
                       {canRenderPassButton && (!canCaptureWizardMentions || currentWizardStep === "verificar") ? (
