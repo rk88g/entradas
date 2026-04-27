@@ -1784,17 +1784,22 @@ html[data-theme="dark"] .admin-tab.active {
 
 .tickets-list {
   display: grid;
-  gap: 0.45rem;
+  gap: 0.35rem;
 }
 
 .ticket-list-item {
   width: 100%;
   border: 1px solid var(--line);
-  border-radius: 16px;
+  border-radius: 14px;
   background: var(--surface-strong);
-  padding: 0.72rem 0.82rem;
+  padding: 0.56rem 0.72rem;
   text-align: left;
   color: var(--text);
+}
+
+.ticket-list-item strong {
+  font-size: 0.98rem;
+  line-height: 1.16;
 }
 
 .ticket-list-item.active {
@@ -1814,14 +1819,14 @@ html[data-theme="dark"] .admin-tab.active {
 }
 
 .ticket-list-meta {
-  margin-top: 0.28rem;
+  margin-top: 0.22rem;
   color: var(--muted);
-  font-size: 0.82rem;
+  font-size: 0.78rem;
 }
 
 .ticket-list-context {
-  margin-top: 0.28rem;
-  font-size: 0.8rem;
+  margin-top: 0.18rem;
+  font-size: 0.76rem;
   line-height: 1.25;
 }
 
@@ -3116,6 +3121,80 @@ html[data-theme="dark"] .admin-tab.active {
   max-height: 22rem;
 }
 
+.ticket-correction-shell {
+  width: min(1120px, calc(100vw - 1.6rem));
+}
+
+.ticket-correction-grid {
+  display: grid;
+  gap: 1rem;
+}
+
+.ticket-correction-columns {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 1rem;
+}
+
+.ticket-correction-visit-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+}
+
+.ticket-correction-visit-chip {
+  min-width: min(100%, 240px);
+  padding: 0.75rem 0.9rem;
+  border: 1px solid rgba(148, 163, 184, 0.26);
+  border-radius: 18px;
+  background: var(--surface-strong);
+  text-align: left;
+  transition: border-color 0.18s ease, box-shadow 0.18s ease, transform 0.18s ease;
+}
+
+.ticket-correction-visit-chip:hover {
+  border-color: rgba(190, 24, 93, 0.34);
+  box-shadow: 0 10px 24px rgba(15, 23, 42, 0.08);
+  transform: translateY(-1px);
+}
+
+.ticket-correction-visit-chip.active {
+  border-color: rgba(190, 24, 93, 0.38);
+  background: linear-gradient(180deg, rgba(255, 241, 242, 0.96), rgba(255, 247, 247, 0.98));
+  box-shadow: 0 12px 24px rgba(190, 24, 93, 0.12);
+}
+
+.ticket-correction-visit-chip strong,
+.ticket-correction-visit-chip span {
+  display: block;
+}
+
+.ticket-correction-visit-chip span {
+  margin-top: 0.18rem;
+  color: var(--muted);
+  font-size: 0.82rem;
+}
+
+.ticket-correction-shell .audit-last-change-card {
+  display: grid;
+  gap: 0.35rem;
+  width: 100%;
+  padding: 0.85rem 1rem;
+  border: 1px solid rgba(127, 29, 29, 0.18);
+  border-radius: 18px;
+  background: linear-gradient(180deg, rgba(255, 245, 245, 0.96), rgba(255, 252, 252, 0.98));
+}
+
+.ticket-correction-shell .audit-last-change-card strong {
+  font-size: 0.9rem;
+}
+
+.ticket-correction-shell .audit-last-change-card > span {
+  color: #9f1239;
+  font-size: 0.92rem;
+  font-weight: 700;
+}
+
 @media (max-width: 640px) {
   .scroll-top-fab {
     right: 0.85rem;
@@ -3140,6 +3219,14 @@ html[data-theme="dark"] .admin-tab.active {
     top: -0.9rem;
     flex-direction: column;
     align-items: stretch;
+  }
+
+  .ticket-correction-columns {
+    grid-template-columns: 1fr;
+  }
+
+  .ticket-correction-visit-chip {
+    min-width: 100%;
   }
 }
 

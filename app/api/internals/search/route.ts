@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getCurrentUserProfile, searchInternals } from "@/lib/supabase/queries";
+import { getCurrentUserProfile, getInternalSearchOptionById, searchInternals } from "@/lib/supabase/queries";
 
 export async function GET(request: NextRequest) {
   const profile = await getCurrentUserProfile();
@@ -8,7 +8,16 @@ export async function GET(request: NextRequest) {
   }
 
   const query = request.nextUrl.searchParams.get("q")?.trim() ?? "";
+  const internalId = request.nextUrl.searchParams.get("id")?.trim() ?? "";
   const limit = Math.max(1, Math.min(Number(request.nextUrl.searchParams.get("limit") ?? "8") || 8, 20));
+
+  if (internalId) {
+    const item = await getInternalSearchOptionById(internalId, {
+      includeInactive: profile.roleKey === "super-admin"
+    });
+
+    return NextResponse.json({ items: item ? [item] : [] }, { status: 200 });
+  }
 
   if (!query) {
     return NextResponse.json({ items: [] }, { status: 200 });

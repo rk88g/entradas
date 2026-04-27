@@ -7,6 +7,7 @@ import { MutationBanner } from "@/components/mutation-banner";
 import { FullscreenLoading } from "@/components/fullscreen-loading";
 import { LoadingButton } from "@/components/loading-button";
 import { StatusBadge } from "@/components/status-badge";
+import { TicketCorrectionModal } from "@/components/ticket-correction-modal";
 import {
   MutationState,
   RoleKey,
@@ -135,10 +136,18 @@ export function SupportTicketsPanel({
   const [statusDraft, setStatusDraft] = useState<SupportTicketStatus>(
     tickets.find((item) => item.id === initialSelectedTicketId)?.status ?? "abierto"
   );
+  const [correctionOpen, setCorrectionOpen] = useState(false);
 
   const selectedTicket = useMemo(
     () => tickets.find((item) => item.id === selectedTicketId) ?? null,
     [selectedTicketId, tickets]
+  );
+  const canOpenCorrection = useMemo(
+    () =>
+      roleKey === "super-admin" &&
+      selectedTicket?.type === "correccion" &&
+      ["interno", "visita"].includes(selectedTicket.context?.entityType ?? ""),
+    [roleKey, selectedTicket]
   );
 
   useEffect(() => {
@@ -210,7 +219,7 @@ export function SupportTicketsPanel({
     }
   }
 
-  function updateRouteParams(next: { q?: string; page?: number; ticket?: string; resetNew?: boolean }) {
+  function buildRouteParams(next: { q?: string; page?: number; ticket?: string; resetNew?: boolean }) {
     const params = new URLSearchParams(searchParams.toString());
     if (typeof next.q !== "undefined") {
       const normalized = next.q.trim();
@@ -241,7 +250,21 @@ export function SupportTicketsPanel({
       ["new", "type", "module", "entityType", "entityId", "label", "subtitle"].forEach((key) => params.delete(key));
     }
 
-    router.replace(params.size ? `${pathname}?${params.toString()}` : pathname, { scroll: false });
+    return params.size ? `${pathname}?${params.toString()}` : pathname;
+  }
+
+  function updateRouteParams(
+    next: { q?: string; page?: number; ticket?: string; resetNew?: boolean },
+    options?: { historyOnly?: boolean }
+  ) {
+    const href = buildRouteParams(next);
+
+    if (options?.historyOnly && typeof window !== "undefined") {
+      window.history.replaceState(null, "", href);
+      return;
+    }
+
+    router.replace(href, { scroll: false });
   }
 
   async function handleCreateTicket(event: React.FormEvent<HTMLFormElement>) {
@@ -279,8 +302,11 @@ export function SupportTicketsPanel({
       setNewSubject("");
       setNewBody("");
       setMessageDraft("");
-      updateRouteParams({ ticket: payload.ticketId, page: 1, resetNew: true });
-      router.refresh();
+      setSelectedTicketId(payload.ticketId);
+      setMessages([]);
+      if (typeof window !== "undefined") {
+        window.location.assign(buildRouteParams({ ticket: payload.ticketId, page: 1, resetNew: true }));
+      }
     } catch (error) {
       setCreateState({
         success: null,
@@ -438,13 +464,19 @@ export function SupportTicketsPanel({
 
   return (
     <>
-      <FullscreenLoading active={screenLoading || messagesLoading} />
+      <FullscreenLoading active={screenLoading} />
       {(toastState.success || toastState.error) ? (
         <div className={`floating-alert ${toastState.error ? "error" : "success"}`}>
           <strong>{toastState.error ? "Aviso" : "Nuevo mensaje"}</strong>
           <span>{toastState.error ?? toastState.success}</span>
         </div>
       ) : null}
+      <TicketCorrectionModal
+        ticket={selectedTicket}
+        roleKey={roleKey}
+        open={correctionOpen}
+        onClose={() => setCorrectionOpen(false)}
+      />
 
       <section className="module-panel">
         <div className="tickets-header">
@@ -538,7 +570,9 @@ export function SupportTicketsPanel({
                     className={`ticket-list-item ${selectedTicketId === ticket.id ? "active" : ""}`}
                     onClick={() => {
                       setSelectedTicketId(ticket.id);
-                      updateRouteParams({ ticket: ticket.id });
+                      setMessages([]);
+                      setCorrectionOpen(false);
+                      updateRouteParams({ ticket: ticket.id }, { historyOnly: true });
                       void fetchMessages(ticket.id);
                     }}
                   >
@@ -607,9 +641,18 @@ export function SupportTicketsPanel({
 
                 <MutationBanner state={messageState} />
                 <MutationBanner state={statusState} />
+                {canOpenCorrection ? (
+                  <div className="actions-row" style={{ justifyContent: "flex-end" }}>
+                    <button type="button" className="button-soft" onClick={() => setCorrectionOpen(true)}>
+                      Corregir desde chat
+                    </button>
+                  </div>
+                ) : null}
 
                 <div className="tickets-message-list">
-                  {messages.length === 0 ? (
+                  {messagesLoading && messages.length === 0 ? (
+                    <div className="ticket-empty">Cargando conversacion...</div>
+                  ) : messages.length === 0 ? (
                     <div className="ticket-empty">Sin mensajes.</div>
                   ) : (
                     messages.map((message) => (
