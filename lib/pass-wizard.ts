@@ -71,13 +71,34 @@ export const BASIC_ARTICLE_CATALOG = [
     ]
   },
   {
-    group: "Ropa",
+    group: "Ropa interno",
     items: [
-      "Ropa permitida",
-      "Cambio ropa",
-      "Calzado",
-      "Gorras",
-      "Textiles"
+      "Camisa",
+      "Pantalon",
+      "Gorra",
+      "Sudadera con gorro",
+      "Sudadera sin gorro",
+      "Ropa interior",
+      "Chamarra con gorro",
+      "Chamarra sin gorro",
+      "Tenis",
+      "Zapatos",
+      "Conjunto"
+    ]
+  },
+  {
+    group: "Ropa visita",
+    items: [
+      "Cambio extra",
+      "Maleta",
+      "Ropa de color",
+      "Mezclilla",
+      "Diseno roto",
+      "Tacones",
+      "Zapatos con plataforma",
+      "Gorra",
+      "Lentes",
+      "Pupilentes"
     ]
   },
   {
@@ -95,10 +116,9 @@ export const BASIC_ARTICLE_CATALOG = [
     group: "Personales",
     items: [
       "Bolsa/mochila",
-      "Cosméticos",
+      "Cosmeticos",
       "Accesorios",
-      "Recipientes",
-      "Carrito"
+      "Extensiones de cabello"
     ]
   }
 ] as const;
