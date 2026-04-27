@@ -2168,6 +2168,17 @@ html[data-theme="dark"] .admin-tab.active {
   gap: 0.9rem;
 }
 
+.ticket-send-actions {
+  align-self: start;
+  justify-content: flex-start;
+}
+
+.ticket-send-actions .button {
+  padding: 0.78rem 1.05rem;
+  border-radius: 14px;
+  box-shadow: 0 10px 20px rgba(15, 118, 110, 0.16);
+}
+
 .tickets-chat-status {
   display: flex;
   align-items: center;

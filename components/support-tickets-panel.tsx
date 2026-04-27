@@ -679,7 +679,7 @@ export function SupportTicketsPanel({
                       autoComplete="off"
                     />
                   </div>
-                  <div className="actions-row">
+                  <div className="actions-row ticket-send-actions">
                     <LoadingButton pending={screenLoading} label="Enviar mensaje" loadingLabel="Loading..." className="button" disabled={!selectedTicketId || !messageDraft.trim()} />
                   </div>
                 </form>
